@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import terminalImage from 'terminal-image';
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { collection, getDocs } from "firebase/firestore";
+import {initializeApp} from "firebase/app";
+import {collection, getDocs, getFirestore} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDaaJXLcG-RaIJmi9mLXjwqcptcB3_IJRE",
@@ -29,11 +28,13 @@ querySnapshot.forEach((doc) => {
     searchLocation: doc.data().location?.toLowerCase()
   });
 });
-teams.forEach(t => {console.log(t)});
+teams.forEach(t => {
+  console.log(t)
+});
 const findTeam = (team) => {
   const searchKey = team.toLowerCase();
-  const foundTeam= teams.find(t => searchKey === t.searchTeam || searchKey === t.searchLocation  );
-  if ( foundTeam ) {
+  const foundTeam = teams.find(t => searchKey === t.searchTeam || searchKey === t.searchLocation);
+  if (foundTeam) {
     return `${foundTeam.team} ${foundTeam.location}`;
   } else {
     return team;
@@ -55,7 +56,7 @@ const isNo = str => ['no', 'NO', 'n', 'N', 'No'].includes(str);
 let questionIndex = 0;
 const ask = async questionText => {
   let answer;
-  if ( questionIndex < answers.length ) {
+  if (questionIndex < answers.length) {
     console.log(`${questionText} => ${answers[questionIndex]}`)
     answer = answers[questionIndex];
   } else {
@@ -70,7 +71,7 @@ const ask = async questionText => {
 
 // Set up full run information
 let input_directory = await ask('Input Directory: ');
-if ( input_directory.indexOf('/') !== input_directory.length-1 ) {
+if (input_directory.indexOf('/') !== input_directory.length - 1) {
   input_directory = `${input_directory}/`;
 }
 console.log(input_directory)
@@ -78,51 +79,58 @@ console.log(input_directory)
 const isSet = isYes(await ask('Is this a complete set? '));
 
 //Set up an prefixes to the card title
-let useNumberInput = false;
 let card_number_prefix = '';
 let year, setName, sport;
-if ( isSet ) {
+if (isSet) {
   year = await ask('Year: ');
   setName = await ask('Set Name: ');
   sport = await ask('Sport: ');
 
-  useNumberInput = isYes(await ask('Should cards be prefixed with a Card Number? '));
-  card_number_prefix = useNumberInput ? await ask('Enter Card Number Prefix: ') : '';
+  card_number_prefix = await ask('Enter Card Number Prefix: ');
 }
 
 //Set up the card name and track with previous for front/back situations
 let player;
 let img_number = 1;
-let card_number = 0;
+let lastCardNumber = 0;
 
-const getName = async ()=> {
-    const name= await ask(`Player/Card Name: `);
-    if ( name ) {
-      card_number++;
-      img_number = 1;
-      player = name;
-    } else if (player) {
-      img_number++;
-    } else {
-      console.log('No Player Name Entered');
-      await $`exit 1`;
-    }
+const getName = async () => {
+  let cardNumber = await ask(`Card Number [${lastCardNumber}]: `);
+  if (!cardNumber) {
+    cardNumber = lastCardNumber;
+  } else {
 
-    //if useNumberInput is false then ask for card number
-    if ( !useNumberInput ) {
-      card_number = await ask('Card Number: ');
-    }
+  }
 
-    //gather information if it is not set yet for year, set name, and sport
-    if ( !year ) {  year = await ask('Year: '); }
-    if ( !setName ) { setName = await ask('Set Name: '); }
-    if ( !sport ) { sport = await ask('Sport: '); }
+  const name = await ask(`Player/Card Name [${player}]: `);
+  if (name) {
+    lastCardNumber++;
+    img_number = 1;
+    player = name;
+  } else if (player) {
+    img_number++;
+  } else {
+    console.log('No Player Name Entered');
+    await $`exit 1`;
+  }
 
-    //gather team name
-    const team = findTeam(await ask('Team: '));
 
-    titleOutputs.push(`${year} ${setName} ${card_number_prefix}${card_number} ${player} ${team}`);
-    return `${year}_${setName}_${card_number_prefix}${card_number}_${player}_${img_number}.jpg`;
+  //gather information if it is not set yet for year, set name, and sport
+  if (!year) {
+    year = await ask('Year: ');
+  }
+  if (!setName) {
+    setName = await ask('Set Name: ');
+  }
+  if (!sport) {
+    sport = await ask('Sport: ');
+  }
+
+  //gather team name
+  const team = findTeam(await ask('Team: '));
+  titleOutputs.push(`${year} ${setName} ${card_number_prefix}${cardNumber} ${player} ${team}`);
+
+  return `${year}_${setName}_${card_number_prefix}${cardNumber}_${player.replace(/\s/g, '_')}_${img_number}.jpg`;
 }
 
 const processImage = async (image) => {
@@ -130,9 +138,9 @@ const processImage = async (image) => {
   const new_file_name = await getName();
   let rotation = await ask('Rotate? ');
   let rotate;
-  if ( isYes(rotation) ) {
+  if (isYes(rotation)) {
     rotate = -90
-  } else if ( isNaN(rotation) ) {
+  } else if (isNaN(rotation)) {
     rotate = 0;
   } else {
     rotate = rotation || 0;
@@ -149,15 +157,15 @@ try {
   while (i < files.length - 1) {
     const front = files[i++];
     let back;
-    if ( i < files.length -1 ) {
+    if (i < files.length - 1) {
       back = files [i++];
     }
     console.log(await terminalImage.file(front, {height: 30}));
-    if ( back ) {
+    if (back) {
       console.log(await terminalImage.file(back, {height: 30}));
     }
     await processImage(front);
-    if ( back ) {
+    if (back) {
       await processImage(back);
     }
   }
