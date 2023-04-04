@@ -25,28 +25,52 @@ querySnapshot.forEach((doc) => {
     team: doc.data().team,
     searchTeam: doc.data().team?.toLowerCase(),
     location: doc.data().location,
-    searchLocation: doc.data().location?.toLowerCase()
+    searchLocation: doc.data().location?.toLowerCase(),
+    sport: {'nfl': 'football', 'nba': 'basketball', 'mlb': 'baseball', 'nhl': 'hockey'}[doc.data().league]
   });
 });
 teams.forEach(t => {
   console.log(t)
 });
-const findTeam = (team) => {
+const findTeam = (team, sport) => {
   const searchKey = team.toLowerCase();
-  const foundTeam = teams.find(t => searchKey === t.searchTeam || searchKey === t.searchLocation);
+  const foundTeam = teams.find(t => t.sport === sport.toLowerCase() && (searchKey === t.searchTeam || searchKey === t.searchLocation));
   if (foundTeam) {
-    return `${foundTeam.team} ${foundTeam.location}`;
+    return `${foundTeam.location} ${foundTeam.team}`;
   } else {
     return team;
   }
 }
 
 const output_directory = 'output/';
-const titleOutputs = [];
+const titleOutputs = {};
 
 //comment out the body of this to be prompted
 const answers = [
-  'gameface', 'y', '2021', 'Sore Gameface', 'Football', 'y', 'GF'
+  'gameface', 'y', '2021', 'Sore Gameface',
+  'Football', 'GF', '15', 'Charles Woodson',
+  'packers', 'n', '14', 'Deion Sanders',
+  'falcons', 'n', '14', 'n',
+  '15', 'n', '13', 'Troy Polamalu',
+  'steelers', '', '', '',
+  '12', 'Lawrence Taylor', 'giants', '',
+  '', '', '11', 'Howie Long',
+  'raiders', '', '', '',
+  '10', 'John Randle', 'vikings', '',
+  '', '', '9', 'Von Miller',
+  'broncos', '', '', '',
+  '8', 'Myles Garrett', 'browns', '',
+  '', '', '7', 'Luke Kuechly',
+  'panthers', '90', '', '90',
+  '6', 'Ray Lewis', 'ravens', 'y',
+  '', 'y', '5', 'TJ Watt',
+  'steelers', '90', '', '',
+  '4', 'JJ Watt', 'texans', '',
+  '', '', '3', 'Nick Bosa',
+  '49ers', '', '', '',
+  '2', 'Aaron Donald', 'rams', '180',
+  '', '180', '1', 'Khalil Mack',
+  'bears', '', '', ''
 ]
 
 //Helper Functions
@@ -90,50 +114,36 @@ if (isSet) {
 }
 
 //Set up the card name and track with previous for front/back situations
-let player;
-let img_number = 1;
 let lastCardNumber = 0;
 
 const getName = async () => {
-  let cardNumber = await ask(`Card Number [${lastCardNumber}]: `);
+  let cardNumber = await ask(`Card Number${lastCardNumber ? ` [${lastCardNumber}]` : ''}: `) || lastCardNumber;
   if (!cardNumber) {
     cardNumber = lastCardNumber;
   } else {
-
+    lastCardNumber = cardNumber;
   }
 
-  const name = await ask(`Player/Card Name [${player}]: `);
-  if (name) {
-    lastCardNumber++;
-    img_number = 1;
-    player = name;
-  } else if (player) {
-    img_number++;
+  let output = titleOutputs[cardNumber];
+  if (output) {
+    output.count = output.count + 1;
   } else {
-    console.log('No Player Name Entered');
-    await $`exit 1`;
+    output = {
+      count: 1,
+      player: await ask(`Player/Card Name: `),
+      year: year || await ask('Year: '),
+      setName: setName || await ask('Set Name: '),
+      sport: sport || await ask('Sport: '),
+      team: findTeam(await ask('Team: '), sport),
+    };
+    output.title = `${output.year} ${output.setName} ${card_number_prefix}${cardNumber} ${output.player} ${output.team}`;
   }
+  titleOutputs[cardNumber] = output;
 
-
-  //gather information if it is not set yet for year, set name, and sport
-  if (!year) {
-    year = await ask('Year: ');
-  }
-  if (!setName) {
-    setName = await ask('Set Name: ');
-  }
-  if (!sport) {
-    sport = await ask('Sport: ');
-  }
-
-  //gather team name
-  const team = findTeam(await ask('Team: '));
-  titleOutputs.push(`${year} ${setName} ${card_number_prefix}${cardNumber} ${player} ${team}`);
-
-  return `${year}_${setName}_${card_number_prefix}${cardNumber}_${player.replace(/\s/g, '_')}_${img_number}.jpg`;
+  return `${output.year}_${output.setName}_${card_number_prefix}${cardNumber}_${output.player}_${output.count}.jpg`.replace(/\s/g, '_');
 }
 
-const processImage = async (image) => {
+const processImage = async (image, img_number) => {
   console.log(`Entering information for Image ${img_number}`);
   const new_file_name = await getName();
   let rotation = await ask('Rotate? ');
@@ -146,7 +156,8 @@ const processImage = async (image) => {
     rotate = rotation || 0;
   }
 
-  await $`magick ${image} -rotate ${rotate}  -crop \`magick ${image} -virtual-pixel edge -blur 0x40 -fuzz 25% -trim -format '%wx%h%O' info: \` +repage ${output_directory}${new_file_name}`;
+  // await $`magick ${image} -rotate ${rotate}  -crop \`magick ${image} -virtual-pixel edge -blur 0x40 -fuzz 25% -trim -format '%wx%h%O' info: \` +repage ${output_directory}${new_file_name}`;
+  await $`magick ${image} -rotate ${rotate} -fuzz 25% -trim ${output_directory}${new_file_name}`;
   console.log(`${image} -> ${new_file_name} Complete`)
 }
 
@@ -164,13 +175,13 @@ try {
     if (back) {
       console.log(await terminalImage.file(back, {height: 30}));
     }
-    await processImage(front);
+    await processImage(front, 1);
     if (back) {
-      await processImage(back);
+      await processImage(back, 2);
     }
   }
-  titleOutputs.forEach(t => console.log(t));
+  //print all the title values in titleOutputs
+  Object.values(titleOutputs).forEach(t => console.log(t.title));
 } finally {
   console.log(answers);
 }
-
