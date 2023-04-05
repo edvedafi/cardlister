@@ -21,16 +21,16 @@ const db = getFirestore(app);
 const teams = [];
 const querySnapshot = await getDocs(collection(db, "team"));
 querySnapshot.forEach((doc) => {
-  teams.push({
-    team: doc.data().team,
-    searchTeam: doc.data().team?.toLowerCase(),
-    location: doc.data().location,
-    searchLocation: doc.data().location?.toLowerCase(),
-    sport: {'nfl': 'football', 'nba': 'basketball', 'mlb': 'baseball', 'nhl': 'hockey'}[doc.data().league]
-  });
-});
-teams.forEach(t => {
-  console.log(t)
+  if (!doc.data().endYear) {
+    teams.push({
+      team: doc.data().team,
+      searchTeam: doc.data().team?.toLowerCase(),
+      location: doc.data().location,
+      searchLocation: doc.data().location?.toLowerCase(),
+      sport: {'nfl': 'football', 'nba': 'basketball', 'mlb': 'baseball', 'nhl': 'hockey'}[doc.data().league],
+      league: doc.data().league
+    });
+  }
 });
 const findTeam = (team, sport) => {
   const searchKey = team.toLowerCase();
@@ -47,30 +47,29 @@ const titleOutputs = {};
 
 //comment out the body of this to be prompted
 const answers = [
-  'gameface', 'y', '2021', 'Sore Gameface',
-  'Football', 'GF', '15', 'Charles Woodson',
-  'packers', 'n', '14', 'Deion Sanders',
-  'falcons', 'n', '14', 'n',
-  '15', 'n', '13', 'Troy Polamalu',
-  'steelers', '', '', '',
-  '12', 'Lawrence Taylor', 'giants', '',
-  '', '', '11', 'Howie Long',
-  'raiders', '', '', '',
-  '10', 'John Randle', 'vikings', '',
-  '', '', '9', 'Von Miller',
-  'broncos', '', '', '',
-  '8', 'Myles Garrett', 'browns', '',
-  '', '', '7', 'Luke Kuechly',
-  'panthers', '90', '', '90',
-  '6', 'Ray Lewis', 'ravens', 'y',
-  '', 'y', '5', 'TJ Watt',
-  'steelers', '90', '', '',
-  '4', 'JJ Watt', 'texans', '',
-  '', '', '3', 'Nick Bosa',
-  '49ers', '', '', '',
-  '2', 'Aaron Donald', 'rams', '180',
-  '', '180', '1', 'Khalil Mack',
-  'bears', '', '', ''
+  'throwback', 'y', '2021',
+  'Score', 'football', '1991 Rookie Throwbacks',
+  'n', 'TB', '1',
+  'Trevor Lawrence', 'Jaguars RC', '',
+  '', 'y', '2',
+  'Justin Fields', 'Bears RC', '',
+  '', 'y', '3',
+  'Trey Lance', '49ers RC', '',
+  '', 'y', '4',
+  'DeVonta Smith', 'Eagles RC', '',
+  '', 'y', '5',
+  "Ja'Marr Chase", 'Bengals RC', '',
+  '', 'y', '6',
+  'Kyle Pitts', 'Falcons RC', '',
+  '', 'y', '7',
+  'Jalen Waddle', 'Eagles RC', '',
+  '', 'y', '8',
+  'Zach Wilson', 'Jets RC', '',
+  '', 'y', '9',
+  'Mac Jones', 'Patriots RC', '',
+  '', 'y', '10',
+  'Kyle Trask', 'Buccaneers RC', '',
+  '', 'y'
 ]
 
 //Helper Functions
@@ -104,11 +103,14 @@ const isSet = isYes(await ask('Is this a complete set? '));
 
 //Set up an prefixes to the card title
 let card_number_prefix = '';
-let year, setName, sport;
+let year, setName, sport, insert, parallel, features;
 if (isSet) {
   year = await ask('Year: ');
   setName = await ask('Set Name: ');
   sport = await ask('Sport: ');
+  insert = await ask('Insert: ');
+  parallel = await ask('Parallel: ');
+  features = await ask('Features: ');
 
   card_number_prefix = await ask('Enter Card Number Prefix: ');
 }
@@ -134,13 +136,34 @@ const getName = async () => {
       year: year || await ask('Year: '),
       setName: setName || await ask('Set Name: '),
       sport: sport || await ask('Sport: '),
-      team: findTeam(await ask('Team: '), sport),
+      features: features || await ask('Features (RC, #/, etc): '),
     };
-    output.title = `${output.year} ${output.setName} ${card_number_prefix}${cardNumber} ${output.player} ${output.team}`;
+    if (!isNo(parallel)) {
+      output.parallel = parallel || await ask('Parallel: ');
+    }
+    if (!isNo(insert)) {
+      output.insert = insert || await ask('Insert: ');
+    }
+    output.team = findTeam(await ask('Team: '), output.sport);
+    //try to get to the best 80 character title that we can
+    output.title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert} insert` : ' '}${output.parallel ? `${output.parallel} parallel` : ''} #${card_number_prefix}${cardNumber} ${output.player} ${output.team} ${output.features}`;
+    if (output.title.length > 80) {
+      output.title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert} insert` : ' '}${output.parallel ? `${output.parallel} parallel` : ''} #${card_number_prefix}${cardNumber} ${output.player} ${output.team.slice(output.team.indexOf(' '))} ${output.features}`;
+    }
+    if (output.title.length > 80) {
+      output.title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''} #${card_number_prefix}${cardNumber} ${output.player} ${output.team.slice(output.team.indexOf(' '))} ${output.features}`;
+    }
+    if (output.title.length > 80) {
+      output.title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''} #${card_number_prefix}${cardNumber} ${output.player} ${output.team.slice(output.team.indexOf(' '))}`;
+    }
   }
+
+  output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ''}${output.parallel ? `/${output.parallel}` : ''}/`;
+  output.filename = `${card_number_prefix}${cardNumber}_${output.player}_${output.count}.jpg`.replace(/\s/g, '_');
+
   titleOutputs[cardNumber] = output;
 
-  return `${output.year}_${output.setName}_${card_number_prefix}${cardNumber}_${output.player}_${output.count}.jpg`.replace(/\s/g, '_');
+  return output
 }
 
 const processImage = async (image, img_number) => {
@@ -156,8 +179,10 @@ const processImage = async (image, img_number) => {
     rotate = rotation || 0;
   }
 
+  await $`mkdir -p ${output_directory}${new_file_name.directory}`;
+
   // await $`magick ${image} -rotate ${rotate}  -crop \`magick ${image} -virtual-pixel edge -blur 0x40 -fuzz 25% -trim -format '%wx%h%O' info: \` +repage ${output_directory}${new_file_name}`;
-  await $`magick ${image} -rotate ${rotate} -fuzz 25% -trim ${output_directory}${new_file_name}`;
+  await $`magick ${image} -rotate ${rotate} -fuzz 45% -trim ${output_directory}${new_file_name.directory}/${new_file_name.filename}`;
   console.log(`${image} -> ${new_file_name} Complete`)
 }
 
@@ -166,6 +191,8 @@ const files = lsOutput.toString().split('\n')
 let i = 0;
 try {
   while (i < files.length - 1) {
+    //print answers for debugging
+    console.log(answers);
     const front = files[i++];
     let back;
     if (i < files.length - 1) {
@@ -180,8 +207,8 @@ try {
       await processImage(back, 2);
     }
   }
+} finally {
   //print all the title values in titleOutputs
   Object.values(titleOutputs).forEach(t => console.log(t.title));
-} finally {
-  console.log(answers);
+  await $`exit`;
 }

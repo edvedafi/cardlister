@@ -1,0 +1,12 @@
+#Mac
+.DS_Store
+
+#IDE
+.idea
+
+#Javascript
+node_modules
+
+#code
+input
+output
