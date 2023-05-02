@@ -2,8 +2,7 @@ import {ask} from "./ask.mjs";
 import {isYes} from "./utils/data.mjs";
 import {getStorage} from "firebase-admin/storage";
 
-const cv = require('@u4/opencv4nodejs');
-const fs = require('fs');
+import cv from '@u4/opencv4nodejs';
 
 const output_directory = 'output/';
 
@@ -13,54 +12,8 @@ export const initializeStorage = (app) => {
   storage = getStorage(app);
 }
 
-async function detectRectangleAndCrop(inputFile, outputFile) {
-  try {
-    const src = await cv.imreadAsync(inputFile);
-    const gray = src.cvtColor(cv.COLOR_BGR2GRAY);
-    const blurred = gray.gaussianBlur(new cv.Size(5, 5), 0);
-    const edged = blurred.canny(50, 200);
-
-    const contours = edged.findContours(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-    let maxArea = 0;
-    let bestContour = null;
-
-    for (let i = 0; i < contours.length; i++) {
-      const contour = contours[i];
-      const area = contour.area;
-
-      if (area > maxArea) {
-        const arcLength = contour.arcLength(true);
-        const approx = contour.approxPolyDP(0.02 * arcLength, true);
-
-        if (approx.length === 4) {
-          maxArea = area;
-          bestContour = approx;
-        }
-      }
-    }
-
-    if (bestContour) {
-      const points = bestContour
-        .map(pt => [pt.x, pt.y])
-        .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-
-      const topLeft = points[0];
-      const bottomRight = points[2];
-      const rect = new cv.Rect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
-      const cropped = src.getRegion(rect);
-
-      await cv.imwriteAsync(outputFile, cropped);
-      console.log('Rectangle detection and cropping successful');
-    } else {
-      console.log('No rectangle found');
-    }
-  } catch (err) {
-    console.error('Error processing the image:', err);
-  }
-}
-
-async function cropLargestObject(input, output) {
+// an OpenCV Option to crop the largest object, however it does not work at the time of writing
+async function cropLargestObject(input, output, debugname) {
   const img = cv.imread(input);
   const grayImg = img.bgrToGray();
   const classifier = new cv.CascadeClassifier(cv.HAAR_FRONTALFACE_ALT2);
@@ -73,15 +26,135 @@ async function cropLargestObject(input, output) {
     if (obj.width * obj.height > largestObject.width * largestObject.height) {
       largestObject = obj;
     }
+
+    const croppedImg = img.getRegion(new cv.Rect(
+      obj.x,
+      obj.y,
+      obj.width,
+      obj.height
+    ));
+
+    // Save the cropped image
+    cv.imwrite(`${output_directory}debug_${debugname}_${obj.x}_${obj.y}_${obj.height}_${obj.width}`, croppedImg);
   });
 
   // Crop the image based on the detected object
-  const croppedImg = img.getRegion(new cv.Rect(largestObject.x, largestObject.y, largestObject.width, largestObject.height));
+  const padding = 0;
+  const croppedImg = img.getRegion(new cv.Rect(
+    largestObject.x - padding,
+    largestObject.y - padding,
+    largestObject.width + padding,
+    largestObject.height + padding
+  ));
 
   // Save the cropped image
   cv.imwrite(output, croppedImg);
 }
 
+const padding = 30;
+const getMin = (coordinates, dimension) => {
+  let min = Math.min(...coordinates.map(dimension));
+  console.log(`min: ${min}, points:`, coordinates.map(dimension).join(', '));
+  if (min - padding > 0) {
+    min -= padding;
+  } else {
+    min = 0;
+  }
+  return min;
+}
+
+const getMax = (coordinates, dimension, maxDimension) => {
+  let max = Math.max(...coordinates.map(dimension));
+  // if (max + padding < maxDimension) {
+  //   max += padding;
+  // } else {
+  //   max = maxDimension;
+  // }
+  return max + padding
+}
+
+function saveRectangleImage(image, rectangle, output) {
+  try {
+    if (rectangle) {
+      const coordinates = rectangle.getPoints();
+      // console.log('Rectangle coordinates', coordinates);
+      // Get the minimum and maximum X and Y coordinates
+      const minX = getMin(coordinates, point => point.x);
+      const minY = getMin(coordinates, point => point.y);
+      const maxX = getMax(coordinates, point => point.x, image.cols);
+      const maxY = getMax(coordinates, point => point.y, image.rows);
+
+      console.log(`printing ${minX}, ${minY}, ${maxX}, ${maxY}`);
+
+      // Crop the image
+      // const cropped = image.getRegion(new cv.Rect(minX, minY, maxX - minX, maxY - minY));
+      const cropped = image.getRegion(rectangle.boundingRect());
+      // Save the cropped image
+      cv.imwrite(output, cropped);
+      // console.log(`Cropped image saved as ${output}`);
+    } else {
+      console.log('No rectangle found.');
+    }
+  } catch (e) {
+    console.error('Error saving rectangle image', e);
+    throw e;
+  }
+}
+
+// an OpenCV Option to crop the largest rectangle, however it does not work at the time of writing
+async function detectLargestRectangleAndCrop(imagePath, output, debugname) {
+  // Read the image
+  const src = cv.imread(imagePath);
+
+  // Convert the image to grayscale
+  const gray = src.cvtColor(cv.COLOR_BGR2GRAY);
+  // Apply Gaussian blur
+  const blurred = gray.gaussianBlur(new cv.Size(5, 5), 0);
+  // Apply Canny edge detection
+  const edges = blurred.canny(25, 200);
+  // console.log('Canny edge detection applied', edges);
+  // Find contours
+  // const contours = edges.findContours(cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+  const contours = edges.findContours(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE);
+  // console.log('Contours found', contours);
+  // Filter contours that form a rectangle
+  const rectContours = contours.filter((contour) => {
+    const approx = contour.approxPolyDP(0.02 * contour.arcLength(true), true);
+    return approx.length === 4;
+  });
+  // console.log('Rectangles found', rectContours);
+  // Find the largest rectangle
+
+  let maxArea = 0;
+  let largestRect = null;
+  let largestRectIndex = null;
+  rectContours.forEach((rect, index) => {
+    const area = rect.area;
+    console.log(`Rectangle ${index} has area ${area} compared to max area ${maxArea}`);
+    if (area > maxArea) {
+      maxArea = area;
+      largestRect = rect;
+      largestRectIndex = index;
+    }
+
+    // saveRectangleImage(src, largestRect, `output/debug/${debugname}_${ index }.jpg`);
+  });
+
+
+  if (largestRect) {
+
+    console.log(`Largest rectangle found ${largestRectIndex} has size ${maxArea}`);
+
+    // if ( largestRectIndex === 798 ) {
+    //   console.log(`points:`, largestRect.getPoints());
+    // }
+    // Get the coordinates of the rectangle
+    saveRectangleImage(src, largestRect, output);
+    console.log(`Cropped image saved as ${output}`);
+  } else {
+    console.log('No rectangle found.');
+  }
+}
 
 export const processImageFile = async (image, cardData) => {
   let rotation = await ask('Rotate? ');
@@ -94,13 +167,17 @@ export const processImageFile = async (image, cardData) => {
     rotate = rotation || 0;
   }
 
-  await $`mkdir -p ${output_directory}${cardData.directory}`;
+  const outputLocation = `${output_directory}${cardData.directory}`;
+
+  await $`mkdir -p ${outputLocation}`;
 
   if (rotate) {
     await $`magick ${image} -rotate ${rotate} ${output_directory}temp.jpg`;
-    await cropLargestObject(`${output_directory}temp.jpg`, `${output_directory}${cardData.filename}`);
+    // await detectLargestRectangleAndCrop(`${output_directory}temp.jpg`, `${outputLocation}${cardData.filename}`);
+    await $`swift src/CardCropper.swift ${output_directory}temp.jpg ${outputLocation}${cardData.filename}`
   } else {
-    await cropLargestObject(image, `${output_directory}${cardData.filename}`);
+    // await detectLargestRectangleAndCrop(image, `${outputLocation}${cardData.filename}`, cardData.filename);
+    await $`swift src/CardCropper.swift ${image} ${outputLocation}${cardData.filename}`
   }
 
   // upload file to firebase storage

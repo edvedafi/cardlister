@@ -26,11 +26,15 @@ await loadTeams(app);
 const allCards = {};
 
 // Set up full run information
-let input_directory = await ask('Input Directory: ');
-if (input_directory.indexOf('/') !== input_directory.length - 1) {
+let input_directory = await ask('Input Directory', 'input');
+if (input_directory === 'input') {
+  input_directory = 'input/'
+} else if (input_directory.indexOf('/') !== input_directory.length - 1) {
   input_directory = `input/${input_directory}/`;
+} else {
+  input_directory = `input/${input_directory}`;
 }
-console.log(input_directory)
+console.log(`Input Directory: ${input_directory}`);
 await initializeAnswers(input_directory);
 await getSetData()
 
@@ -56,10 +60,10 @@ try {
     if (i < files.length - 1) {
       back = files [i++];
     }
-    console.log(await terminalImage.file(front, {height: 30}));
-    if (back) {
-      console.log(await terminalImage.file(back, {height: 30}));
-    }
+    // console.log(await terminalImage.file(front, {height: 30}), front);
+    // if (back) {
+    //   console.log(await terminalImage.file(back, {height: 30}), back);
+    // }
     await processImage(front, 1);
     if (back) {
       await processImage(back, 2);
