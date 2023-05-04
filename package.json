@@ -8,7 +8,7 @@
     "zx": "^7.2.1"
   },
   "scripts": {
-    "process": "node trim.mjs",
+    "process": "node trim.mjs | tee run.log",
     "install_arm64": "CXXFLAGS=\"-std=c++17 -Wno-c++11-narrowing\" && build-opencv --version 4.7.0_4 --flag=\"-DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_ARCHITECTURES=arm64\" build",
     "install_4.5.5_cuda": "build-opencv --version 4.5.5 --flags=\"-DWITH_CUDA=ON -DWITH_CUDNN=ON -DOPENCV_DNN_CUDA=ON -DCUDA_FAST_MATH=ON\" build",
     "do-install": "build-opencv build"
