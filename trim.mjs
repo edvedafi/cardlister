@@ -60,10 +60,10 @@ try {
     if (i < files.length - 1) {
       back = files [i++];
     }
-    // console.log(await terminalImage.file(front, {height: 30}), front);
-    // if (back) {
-    //   console.log(await terminalImage.file(back, {height: 30}), back);
-    // }
+    console.log(await terminalImage.file(front, {height: 25}), front);
+    if (back) {
+      console.log(await terminalImage.file(back, {height: 25}), back);
+    }
     await processImage(front, 1);
     if (back) {
       await processImage(back, 2);
