@@ -2,29 +2,47 @@
 import {getFirestore} from "firebase-admin/firestore";
 
 const teams = [];
+const allTeams = {
+  'football': [],
+  'basketball': [],
+  'baseball': [],
+  'hockey': []
+};
 
-const leagues = {'nfl': 'football', 'nba': 'basketball', 'mlb': 'baseball', 'nhl': 'hockey'};
+const leagues = {
+  'nfl': 'football',
+  'nba': 'basketball',
+  'mlb': 'baseball',
+  'nhl': 'hockey',
+  'nlf': 'football',
+  'baseball': 'baseball',
+  'mnl': 'baseball',
+};
 
 export const loadTeams = async (app) => {
   const db = getFirestore(app);
   const querySnapshot = await db.collection('team').get();
   querySnapshot.forEach((doc) => {
     if (!doc.data().endYear) {
-      teams.push({
+      const sport = findSport(doc.data().league)
+      const team = {
         team: doc.data().team,
         searchTeam: doc.data().team?.toLowerCase(),
         location: doc.data().location,
         searchLocation: doc.data().location?.toLowerCase(),
-        sport: findSport(doc.data().league),
+        sport: sport,
         league: doc.data().league
-      });
+      }
+      teams.push(team);
+      allTeams[sport]?.push(team);
     }
   });
 }
 
 export const findTeam = (team, sport) => {
   const searchKey = team.toLowerCase();
-  const foundTeam = teams.find(t => t.sport === sport.toLowerCase() && (searchKey === t.searchTeam || searchKey === t.searchLocation));
+  console.log('searching for team', searchKey, sport, teams);
+  const foundTeam = allTeams[sport.toLowerCase()].find(t => searchKey === t.searchTeam || searchKey === t.searchLocation);
   if (foundTeam) {
     return `${foundTeam.location} ${foundTeam.team}`;
   } else {
