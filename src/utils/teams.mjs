@@ -6,7 +6,8 @@ const allTeams = {
   'football': [],
   'basketball': [],
   'baseball': [],
-  'hockey': []
+  'hockey': [],
+  'other': [],
 };
 
 const leagues = {
@@ -34,19 +35,23 @@ export const loadTeams = async (app) => {
         league: doc.data().league
       }
       teams.push(team);
-      allTeams[sport]?.push(team);
+      if (allTeams[sport]) {
+        allTeams[sport].push(team);
+      } else {
+        allTeams['other'].push(team);
+      }
     }
   });
 }
 
 export const findTeam = (team, sport) => {
   const searchKey = team.toLowerCase();
-  console.log('searching for team', searchKey, sport, teams);
+  // console.log('searching for team', searchKey, sport, teams);
   const foundTeam = allTeams[sport.toLowerCase()].find(t => searchKey === t.searchTeam || searchKey === t.searchLocation);
   if (foundTeam) {
-    return `${foundTeam.location} ${foundTeam.team}`;
+    return [`${foundTeam.location} ${foundTeam.team}`, foundTeam.team];
   } else {
-    return team;
+    return [team, team];
   }
 }
 
@@ -57,3 +62,5 @@ export const findSport = (league) => {
 export const findLeague = (sport) => {
   return Object.keys(leagues).find(key => leagues[key] === sport.toLowerCase());
 }
+
+export const sports = Object.keys(allTeams);

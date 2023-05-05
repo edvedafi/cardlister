@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@inquirer/prompts": "^1.0.0",
     "@u4/opencv4nodejs": "^6.5.1",
     "csv-writer": "^1.6.0",
     "firebase": "^9.19.1",

@@ -1,5 +1,5 @@
 import {ask} from "./ask.mjs";
-import {findLeague, findTeam} from "./utils/teams.mjs";
+import {findLeague, findTeam, sports} from "./utils/teams.mjs";
 import {isNo, isYes} from "./utils/data.mjs";
 
 //Set up the card name and track with previous for front/back situations
@@ -11,7 +11,7 @@ export const getSetData = async () => {
 
   //Set up an prefixes to the card title
   if (isSet) {
-    sport = await ask('Sport');
+    sport = await ask('Sport', 'Football', {selectOptions: sports});
     year = await ask('Year');
     manufacture = await ask('Manufacturer');
     setName = await ask('Set Name');
@@ -26,19 +26,18 @@ export const getSetData = async () => {
 async function getCardTitle(output) {
   //try to get to the best 80 character title that we can
   const maxTitleLength = 80;
-  const addProp = (prop) => prop ? ` ${prop}` : '';
-  let title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert} Insert` : ' '}${output.parallel ? `${output.parallel} parallel` : ''} #${output.cardNumber} ${output.player} ${output.team} ${output.features}${output.printRun ? ` /${output.printRun}` : ''}`;
+  let title = `${output.year} ${output.setName} ${output.insert ? ` ${output.insert} Insert` : ''} ${output.parallel ? `${output.parallel} parallel ` : ''} #${output.cardNumber} ${output.player} ${output.team} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ''}${output.parallel ? `${output.parallel} ` : ' '}#${output.cardNumber} ${output.player} ${output.team} ${output.features}${output.printRun ? ` /${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.team} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ''}${output.parallel ? ` ${output.parallel} ` : ' '}#${output.cardNumber} ${output.player} ${output.team.slice(output.team.lastIndexOf(' '))} ${output.features}${output.printRun ? ` /${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.teamName} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ''}${output.parallel ? ` ${output.parallel} ` : ' '}#${output.cardNumber} ${output.player} ${output.team.slice(output.team.indexOf(' '))} ${output.features}${output.printRun ? ` /${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${output.insert ? ` ${output.insert}` : ''}${output.parallel ? ` ${output.parallel} ` : ' '}#${output.cardNumber} ${output.player} ${output.team.slice(output.team.indexOf(' '))}${output.printRun ? ` /${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} ${output.player} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
   }
 
   title = title.replace(/  /g, ' ');
@@ -81,11 +80,10 @@ export const getCardData = async (allCards) => {
       pics: []
     };
 
-    output.sport = sport || await ask('Sport');
+    output.sport = sport || await ask('Sport', 'football', {selectOptions: sports});
     output.league = findLeague(output.sport);
     output.player = await ask('Player/Card Name');
-    output.team = findTeam(await ask('Team'), output.sport);
-    output.league = findLeague(output.sport);
+    [output.team, output.teamName] = findTeam(await ask('Team'), output.sport);
     output.year = year || await ask('Year');
     output.manufacture = manufacture || await ask('Manufacturer');
     output.setName = setName || await ask('Set Name');
