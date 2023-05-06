@@ -35,7 +35,7 @@ if (input_directory === 'input') {
   input_directory = `input/${input_directory}`;
 }
 console.log(`Input Directory: ${input_directory}`);
-await initializeAnswers(input_directory);
+const overrideImages = await initializeAnswers(input_directory);
 await getSetData()
 
 //gather the list of files that we will process
@@ -46,7 +46,7 @@ const files = lsOutput.toString().split('\n')
 const processImage = async (image, img_number) => {
   console.log(`Entering information for Image ${img_number}`);
   const cardData = await getCardData(allCards);
-  await processImageFile(image, cardData);
+  await processImageFile(image, cardData, overrideImages);
   console.log(`${image} -> ${cardData.filename} Complete`)
 }
 

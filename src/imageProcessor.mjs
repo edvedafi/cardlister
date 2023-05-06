@@ -156,7 +156,8 @@ async function detectLargestRectangleAndCrop(imagePath, output, debugname) {
   }
 }
 
-export const processImageFile = async (image, cardData) => {
+export const processImageFile = async (image, cardData, overrideImages) => {
+  const outputLocation = `${output_directory}${cardData.directory}`;
   let rotation = await ask('Rotate? ');
   let rotate;
   if (isYes(rotation)) {
@@ -166,20 +167,24 @@ export const processImageFile = async (image, cardData) => {
   } else {
     rotate = rotation || 0;
   }
-
-  const outputLocation = `${output_directory}${cardData.directory}`;
-
-  await $`mkdir -p ${outputLocation}`;
-
-  if (rotate) {
-    await $`magick ${image} -rotate ${rotate} ${output_directory}temp.jpg`;
-    // await detectLargestRectangleAndCrop(`${output_directory}temp.jpg`, `${outputLocation}${cardData.filename}`);
-    await $`swift src/CardCropper.swift ${output_directory}temp.jpg ${outputLocation}${cardData.filename}`
+  //if the output file already exists, skip it
+  if (!overrideImages && fs.existsSync(`${outputLocation}${cardData.filename}`)) {
+    console.log('Image already exists, skipping');
   } else {
-    // await detectLargestRectangleAndCrop(image, `${outputLocation}${cardData.filename}`, cardData.filename);
-    await $`swift src/CardCropper.swift ${image} ${outputLocation}${cardData.filename}`
-  }
 
-  // upload file to firebase storage
-  await storage.bucket().upload(image, {destination: cardData.filename});
+
+    await $`mkdir -p ${outputLocation}`;
+
+    if (rotate) {
+      await $`magick ${image} -rotate ${rotate} ${output_directory}temp.jpg`;
+      // await detectLargestRectangleAndCrop(`${output_directory}temp.jpg`, `${outputLocation}${cardData.filename}`);
+      await $`swift src/CardCropper.swift ${output_directory}temp.jpg ${outputLocation}${cardData.filename}`
+    } else {
+      // await detectLargestRectangleAndCrop(image, `${outputLocation}${cardData.filename}`, cardData.filename);
+      await $`swift src/CardCropper.swift ${image} ${outputLocation}${cardData.filename}`
+    }
+
+    // upload file to firebase storage
+    await storage.bucket().upload(image, {destination: cardData.filename});
+  }
 }

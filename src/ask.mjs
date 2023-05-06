@@ -11,6 +11,8 @@ export const initializeAnswers = async (inputDirectory) => {
   try {
     const answerInput = await fs.readJSON(answerFile);
     answers = answerInput.answers;
+
+    return confirm({message: 'Reprocess existing images'});
   } catch (e) {
     console.log('No prefilled answers file found');
   }
