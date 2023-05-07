@@ -1,5 +1,5 @@
 //comment out the body of this to be prompted
-import {select, confirm} from '@inquirer/prompts';
+import {select, confirm as confirmPrompt} from '@inquirer/prompts';
 
 let answers = []
 
@@ -12,13 +12,13 @@ export const initializeAnswers = async (inputDirectory) => {
     const answerInput = await fs.readJSON(answerFile);
     answers = answerInput.answers;
 
-    return confirm({message: 'Reprocess existing images'});
+    return confirmPrompt({message: 'Reprocess existing images'});
   } catch (e) {
     console.log('No prefilled answers file found');
   }
 }
 
-export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions} = {}) => {
+export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions, isYN} = {}) => {
   let answer;
   if (questionIndex < answers.length) {
     console.log(`${questionText} => ${answers[questionIndex]}`)
@@ -41,25 +41,31 @@ export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions
         message: questionText,
         choices: choices,
       });
-    } else if (defaultAnswer) {
+    } else {
       let displayText = questionText;
       if (maxLength) {
-        if (defaultAnswer.length > maxLength) {
+        if (defaultAnswer && defaultAnswer.length > maxLength) {
           displayText = `${questionText} (Max Length ${maxLength} Characters. Current: ${defaultAnswer.length})`;
         } else {
           displayText = `${questionText} (Max Length ${maxLength} Characters)`;
         }
       }
-      answer = await question(`${displayText} [${defaultAnswer}]: `);
-      if (!answer) {
-        answer = defaultAnswer;
+      if (defaultAnswer) {
+        displayText = `${displayText} [${defaultAnswer}]`
       }
-    } else {
-      answer = await question(`${questionText}: `);
+      if (isYN) {
+        answer = await confirmPrompt({message: displayText, 'default': defaultAnswer});
+      } else {
+        answer = await question(`${displayText}: `);
+      }
+    }
+
+    if (!answer) {
+      answer = defaultAnswer;
     }
 
     if (maxLength && answer.length > maxLength) {
-      answer = await ask(questionText, answer, maxLength);
+      answer = await ask(questionText, answer, {maxLength});
     }
     answers.push(answer);
     await fs.writeJSON(answerFile, {answers});
@@ -70,4 +76,7 @@ export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions
   return answer;
 }
 
+export const confirm = async (questionText, defaultAnswer) => {
+  return await ask(questionText, defaultAnswer, {isYN: true});
+}
 

@@ -3,7 +3,7 @@ import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
 import writeEbayFile from "./src/ebay.mjs";
 import {loadTeams} from "./src/utils/teams.mjs";
-import {ask, initializeAnswers} from "./src/ask.mjs";
+import {ask, initializeAnswers, confirm} from "./src/ask.mjs";
 import {initializeStorage, processImageFile} from "./src/imageProcessor.mjs";
 import {getCardData, getSetData} from "./src/cardData.mjs";
 
@@ -36,6 +36,7 @@ if (input_directory === 'input') {
 }
 console.log(`Input Directory: ${input_directory}`);
 const overrideImages = await initializeAnswers(input_directory);
+
 await getSetData()
 
 //gather the list of files that we will process
@@ -45,7 +46,7 @@ const files = lsOutput.toString().split('\n')
 //Here we run the actual process
 const processImage = async (image, img_number) => {
   console.log(`Entering information for Image ${img_number}`);
-  const cardData = await getCardData(allCards);
+  let cardData = await getCardData(allCards);
   await processImageFile(image, cardData, overrideImages);
   console.log(`${image} -> ${cardData.filename} Complete`)
 }

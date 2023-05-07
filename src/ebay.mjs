@@ -103,6 +103,14 @@ async function writeEbayFile(data) {
 
   //ebay mapping logic
   let csvData = Object.values(data).map((card) => {
+    const addFeature = (feature) => {
+      if (card.features && card.features.length > 0) {
+        card.features = `${card.features}|${feature}`;
+      } else {
+        card.features = feature;
+      }
+    }
+
     if (isYes(card.autographed)) {
       card.signedBy = card.player;
       card.autoAuth = card.manufacture;
@@ -126,15 +134,28 @@ async function writeEbayFile(data) {
 
     if (!card.parallel || isNo(card.parallel)) {
       card.parallel = 'Base Set';
+    } else {
+      addFeature('Parallel/Variety');
+      if (card.parallel.toLowerCase().indexOf('refractor') > -1) {
+        addFeature('Refractor');
+      }
     }
 
     if (!card.insert || isNo(card.insert)) {
       card.insert = 'Base Set';
+    } else {
+      addFeature('Insert');
+    }
+
+    if (card.printRun && card.printRun > 0) {
+      addFeature('Serial Numbered');
     }
 
     if (!card.features || isNo(card.features)) {
       card.features = 'Base';
     }
+
+    card.features = card.features.replace('RC', 'Rookie');
 
     card.league = card.league ? {
       'mlb': 'Major League (MLB)',
@@ -143,7 +164,9 @@ async function writeEbayFile(data) {
       'nhl': 'National Hockey League (NHL)'
     }[card.league?.toLowerCase()] || card.league : 'N/A';
 
-    card.description = `${card.title}<br><br>${defaultValues.shippingInfo}`
+    card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`
+
+    card.setName = `${card.year} ${card.setName}`;
 
     return card;
   });
