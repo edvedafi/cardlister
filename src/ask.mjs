@@ -1,5 +1,6 @@
 //comment out the body of this to be prompted
 import {select, confirm as confirmPrompt} from '@inquirer/prompts';
+import {isNo, isYes} from "./utils/data.mjs";
 
 let answers = []
 
@@ -12,13 +13,16 @@ export const initializeAnswers = async (inputDirectory) => {
     const answerInput = await fs.readJSON(answerFile);
     answers = answerInput.answers;
 
-    return confirmPrompt({message: 'Reprocess existing images'});
+    return confirmPrompt({message: 'Reprocess existing images', "default": false});
   } catch (e) {
     console.log('No prefilled answers file found');
   }
 }
 
 export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions, isYN} = {}) => {
+  if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
+    isYN = true;
+  }
   let answer;
   if (questionIndex < answers.length) {
     console.log(`${questionText} => ${answers[questionIndex]}`)

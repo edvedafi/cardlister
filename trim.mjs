@@ -1,11 +1,13 @@
 #!/usr/bin/env zx
 import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
-import writeEbayFile from "./src/ebay.mjs";
+import writeEbayFile from "./src/listing-sites/ebay.mjs";
 import {loadTeams} from "./src/utils/teams.mjs";
 import {ask, initializeAnswers, confirm} from "./src/ask.mjs";
 import {initializeStorage, processImageFile} from "./src/imageProcessor.mjs";
 import {getCardData, getSetData} from "./src/cardData.mjs";
+import writeSportLotsOutput from "./src/listing-sites/sportlots.js";
+import writeBuySportsCardsOutput from "./src/listing-sites/bsc.js";
 
 const firebaseConfig = {
   credential: cert(require('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json')),
@@ -71,6 +73,8 @@ try {
     }
   }
   //write the output
+  await writeSportLotsOutput(allCards);
+  await writeBuySportsCardsOutput(allCards);
   await writeEbayFile(allCards);
 } finally {
   //print all the title values in allCards

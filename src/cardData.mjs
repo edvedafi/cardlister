@@ -25,22 +25,36 @@ export const getSetData = async () => {
   }
 }
 
+const add = (info, modifier) => info ? modifier ? ` ${info} ${modifier}` : ` ${info}` : '';
+
 //try to get to the best 80 character title that we can
 async function getCardTitle(output) {
+
   const maxTitleLength = 80;
-  let longTitle = `${output.year} ${output.setName} ${output.insert ? ` ${output.insert} Insert` : ''} ${output.parallel ? `${output.parallel} parallel ` : ''} #${output.cardNumber} ${output.player} ${output.team} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
-  let title = longTitle;
+
+  let insert = add(output.insert, 'Insert');
+  let parallel = add(output.parallel, 'Parallel');
+  let features = add(output.features).replace('|', '');
+  let printRun = output.printRun ? ` /${output.printRun}` : '';
+
+  output.longTitle = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
+  let title = output.longTitle;
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.team} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
+    insert = add(output.insert);
+    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.teamName} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
+    parallel = add(output.parallel);
+    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} #${output.cardNumber} ${output.player} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.teamName}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName} ${output.insert} ${output.parallel} ${output.player} ${output.features} ${output.printRun ? `/${output.printRun}` : ''}`;
+    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`
+  }
+  if (title.length > maxTitleLength) {
+    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}`
   }
 
   title = title.replace(/  /g, ' ');
@@ -52,22 +66,22 @@ async function getCardName(output) {
   //generate a 60 character card name
   const maxCardNameLength = 60;
   let cardName = output.title;
-  if (cardName > maxCardNameLength) {
-    output.cardName = `${output.year} ${output.manufacture} ${output.setName}${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''} ${output.player}`;
+  let insert = add(output.insert);
+  let parallel = add(output.parallel);
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${output.year} ${output.manufacture} ${output.setName}${insert}${parallel} ${output.player}`;
   }
-  if (cardName > maxCardNameLength) {
-    output.cardName = `${output.setName}${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''} ${output.player}`;
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${output.year} ${output.setName}${insert}${parallel} ${output.player}`;
   }
-  if (cardName > maxCardNameLength) {
-    output.cardName = `${output.setName}${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''}`;
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${output.year} ${output.setName}${insert}${parallel}`;
   }
-  if (cardName > maxCardNameLength && output.insert) {
-    output.cardName = `${output.insert ? ` ${output.insert}` : ' '}${output.parallel ? `${output.parallel} ` : ''}`;
-  } else {
-    output.cardName = `${output.setName} ${output.parallel ? `${output.parallel} ` : ''}`;
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${output.setName}${insert}${parallel}`;
   }
-  output.cardName = output.cardName.replace(/  /g, ' ');
-  return await ask('Card Name', output.cardName, {maxLength: maxCardNameLength});
+  cardName = cardName.replace(/  /g, ' ');
+  return await ask('Card Name', cardName, {maxLength: maxCardNameLength});
 }
 
 async function getNewCardData(cardNumber, defaults = {}) {

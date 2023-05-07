@@ -2,7 +2,7 @@ import {ask} from "./ask.mjs";
 import {isYes} from "./utils/data.mjs";
 import {getStorage} from "firebase-admin/storage";
 
-import cv from '@u4/opencv4nodejs';
+// import cv from '@u4/opencv4nodejs';
 
 const output_directory = 'output/';
 
@@ -159,7 +159,7 @@ async function detectLargestRectangleAndCrop(imagePath, output, debugname) {
 export const processImageFile = async (image, cardData, overrideImages) => {
   const outputLocation = `${output_directory}${cardData.directory}`;
   const outputFile = `${outputLocation}${cardData.filename}`;
-  let rotation = await ask('Rotate? ');
+  let rotation = await ask('Rotate', false);
   let rotate;
   if (isYes(rotation)) {
     rotate = -90

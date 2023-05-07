@@ -1,6 +1,6 @@
 //write a function that takes in a file path and an array of objects that will be written as a csv to the file
 import {createObjectCsvWriter} from 'csv-writer';
-import {isNo, isYes} from "./utils/data.mjs";
+import {isNo, isYes} from "../utils/data.mjs";
 
 const defaultValues = {
   action: 'Add',
