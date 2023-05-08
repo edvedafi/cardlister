@@ -1,5 +1,5 @@
 //comment out the body of this to be prompted
-import {select, confirm as confirmPrompt} from '@inquirer/prompts';
+import {select, confirm as confirmPrompt, input} from '@inquirer/prompts';
 import {isNo, isYes} from "./utils/data.mjs";
 
 let answers = []
@@ -49,18 +49,17 @@ export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions
       let displayText = questionText;
       if (maxLength) {
         if (defaultAnswer && defaultAnswer.length > maxLength) {
-          displayText = `${questionText} (Max Length ${maxLength} Characters. Current: ${defaultAnswer.length})`;
+          displayText = `${questionText} [Max Length ${maxLength} Characters. Current: ${defaultAnswer.length}]`;
         } else {
-          displayText = `${questionText} (Max Length ${maxLength} Characters)`;
+          displayText = `${questionText} [Max Length ${maxLength} Characters]`;
         }
       }
-      if (defaultAnswer) {
-        displayText = `${displayText} [${defaultAnswer}]`
-      }
+
       if (isYN) {
         answer = await confirmPrompt({message: displayText, 'default': defaultAnswer});
       } else {
-        answer = await question(`${displayText}: `);
+        // answer = await question(`${displayText}: `);
+        answer = await input({message: displayText, 'default': defaultAnswer});
       }
     }
 
