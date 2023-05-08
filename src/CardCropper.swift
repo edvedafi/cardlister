@@ -20,10 +20,7 @@ let currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirect
 
 // Create the image file URL
 let imageURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[1])
-print(imageURL)
 let outputURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[2])
-print(outputURL)
-
 
 // Load the image from the file URL
 let inputImage = NSImage(contentsOf: imageURL)!
@@ -37,24 +34,25 @@ let ciImage = CIImage(cgImage: image!.cgImage(forProposedRect: nil, context: nil
 // Step 3: Find the rectangular area
 let detector = CIDetector(ofType: CIDetectorTypeRectangle, context: nil, options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
 let features = detector?.features(in: ciImage)
+let feature = features?.first as! CIRectangleFeature
 
 // Step 4: Crop the image or just move it if we cannot crop it
 if ( features?.count == 0 ) {
     try! FileManager.default.copyItem(at: imageURL, to: outputURL)
 } else {
-    let feature = features?.first as! CIRectangleFeature
-    let bounds = feature.bounds
-    let rectWithPadding = CGRect(x: bounds.origin.x - padding,
-                                 y: bounds.origin.y - padding,
-                                 width: bounds.width + padding * 2,
-                                 height: bounds.height + padding * 2)
-    let croppedImage = ciImage.cropped(to: rectWithPadding) // cropping(to: feature.bounds)
-    
+     let perspectiveCorrection = CIFilter(name: "CIPerspectiveCorrection")!
+     perspectiveCorrection.setValue(ciImage, forKey: kCIInputImageKey)
+     perspectiveCorrection.setValue(CIVector(cgPoint: feature.topLeft), forKey: "inputTopLeft")
+     perspectiveCorrection.setValue(CIVector(cgPoint: feature.topRight), forKey: "inputTopRight")
+     perspectiveCorrection.setValue(CIVector(cgPoint: feature.bottomRight), forKey: "inputBottomRight")
+     perspectiveCorrection.setValue(CIVector(cgPoint: feature.bottomLeft), forKey: "inputBottomLeft")
+     let croppedImage = perspectiveCorrection.outputImage!
+
     // Step 5: Create a new NSImage from the cropped CIImage
-    let newImage = NSImage(size: NSSize(width: rectWithPadding.size.width, height: rectWithPadding.size.height))
+    let newImage = NSImage(size: NSSize(width: croppedImage.extent.width, height: croppedImage.extent.height))
     let rep = NSCIImageRep(ciImage: croppedImage)
     newImage.addRepresentation(rep)
-    
+
     // Step 6: Save the new image
     let imageData = newImage.tiffRepresentation!
     let bitmap = NSBitmapImageRep(data: imageData)!

@@ -1,6 +1,7 @@
 import {ask} from "./ask.mjs";
 import {isYes} from "./utils/data.mjs";
 import {getStorage} from "firebase-admin/storage";
+import terminalImage from "terminal-image";
 
 // import cv from '@u4/opencv4nodejs';
 
@@ -174,13 +175,33 @@ export const processImageFile = async (image, cardData, overrideImages) => {
   } else {
     await $`mkdir -p ${outputLocation}`;
 
-    if (rotate) {
-      await $`magick ${image} -rotate ${rotate} ${output_directory}temp.jpg`;
-      // await detectLargestRectangleAndCrop(`${output_directory}temp.jpg`, `${outputLocation}${cardData.filename}`);
-      await $`swift src/CardCropper.swift ${output_directory}temp.jpg ${outputFile}`
-    } else {
-      // await detectLargestRectangleAndCrop(image, `${outputLocation}${cardData.filename}`, cardData.filename);
-      await $`swift src/CardCropper.swift ${image} ${outputFile}`
+    if (fs.existsSync(outputFile)) {
+      fs.removeSync(outputFile);
+    }
+
+    let proceed;
+
+    try {
+      if (rotate) {
+        await $`magick ${image} -rotate ${rotate} ${output_directory}temp.jpg`;
+        // await detectLargestRectangleAndCrop(`${output_directory}temp.jpg`, `${outputLocation}${cardData.filename}`);
+        await $`swift src/CardCropper.swift ${output_directory}temp.jpg ${outputFile}`
+      } else {
+        // await detectLargestRectangleAndCrop(image, `${outputLocation}${cardData.filename}`, cardData.filename);
+        await $`swift src/CardCropper.swift ${image} ${outputFile}`
+      }
+
+      console.log(await terminalImage.file(outputFile, {height: 25}), outputFile);
+      proceed = await ask('Did Image render correct?', true);
+    } catch (e) {
+      console.error('Error cropping image', e);
+      proceed = false;
+    }
+
+    if (!proceed) {
+      await $`open -W ${image}`;
+      await ask('Press enter to continue');
+      await fs.copyFile(image, outputFile);
     }
 
     // upload file to firebase storage

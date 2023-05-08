@@ -64,10 +64,6 @@ export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions
       }
     }
 
-    if (!answer) {
-      answer = defaultAnswer;
-    }
-
     if (maxLength && answer.length > maxLength) {
       answer = await ask(questionText, answer, {maxLength});
     }
