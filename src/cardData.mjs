@@ -4,10 +4,10 @@ import {isNo, isYes} from "./utils/data.mjs";
 
 //Set up the card name and track with previous for front/back situations
 let card_number_prefix = '';
-let cardNumber, year, setName, sport, insert, parallel, features, manufacture, printRun, autographed;
+let isSet, cardNumber, year, setName, sport, insert, parallel, features, manufacture, printRun, autographed;
 
 export const getSetData = async () => {
-  const isSet = isYes(await ask('Is this a complete set?'));
+  isSet = await ask('Is this a complete set?', false);
 
   //Set up an prefixes to the card title
   if (isSet) {
@@ -15,11 +15,11 @@ export const getSetData = async () => {
     year = await ask('Year');
     manufacture = await ask('Manufacturer');
     setName = await ask('Set Name');
-    insert = await ask('Insert');
-    parallel = await ask('Parallel');
+    insert = await ask('Insert (enter No to skip)');
+    parallel = await ask('Parallel (enter No to skip)');
     features = await ask('Features');
-    printRun = await ask('Print Run');
-    autographed = await ask('Autograph');
+    printRun = await ask('Print Run (enter No to skip)');
+    autographed = await ask('Autograph (enter No to skip)');
 
     card_number_prefix = await ask('Enter Card Number Prefix');
   }
@@ -123,6 +123,8 @@ async function getNewCardData(cardNumber, defaults = {}) {
   output.title = await getCardTitle(output);
   output.cardName = await getCardName(output);
 
+  output.quantity = await ask('Quantity', defaults.quantity || 1);
+
   const skipShipping = await ask('Use Standard Card Size/Shipping?', 'Y');
 
   if (isYes(skipShipping)) {
@@ -161,9 +163,11 @@ async function getNewCardData(cardNumber, defaults = {}) {
 export const getCardData = async (allCards) => {
   cardNumber = await ask('Card Number', cardNumber);
   let output = allCards[cardNumber];
+  let bumpCardNumber = false;
 
   if (output) {
     output.count = output.count + 1;
+    bumpCardNumber = true;
   } else {
     output = await getNewCardData(cardNumber);
 
@@ -180,6 +184,10 @@ export const getCardData = async (allCards) => {
   output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
   allCards[cardNumber] = output;
+
+  if (bumpCardNumber) {
+    cardNumber++;
+  }
 
   return output
 }

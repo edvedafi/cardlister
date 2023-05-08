@@ -35,7 +35,7 @@ async function writeSportLotsOutput(allCards) {
     Object.keys(years[year]).sort().forEach(setName => {
       output.push(`  ${setName}`);
       years[year][setName].forEach(card => {
-        output.push(`    ${card.cardNumber} ${card.player} ${card.price}`);
+        output.push(`    ${card.cardNumber} ${card.player} ${card.price} (${card.qauntity})`);
       });
     });
   });

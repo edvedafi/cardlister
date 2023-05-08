@@ -55,6 +55,7 @@ export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions
         }
       }
 
+      displayText = `${displayText}:`;
       if (isYN) {
         answer = await confirmPrompt({message: displayText, 'default': defaultAnswer});
       } else {

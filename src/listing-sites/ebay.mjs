@@ -98,6 +98,7 @@ async function writeEbayFile(data) {
       {id: 'width', title: 'PackageWidth'},
       {id: 'depth', title: 'PackageDepth'},
       {id: 'packageType', title: 'PackageType'},
+      {id: 'quantity', title: '*Quantity'},
     ],
   });
 

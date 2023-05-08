@@ -34,7 +34,7 @@ async function writeBuySportsCardsOutput(allCards) {
     output.push(year);
     Object.keys(years[year]).sort().forEach(setName => {
       years[year][setName].forEach(card => {
-        output.push(`    ${card.year} ${setName} ${card.cardNumber} ${card.player} ${card.price}`);
+        output.push(`    ${card.year} ${setName} ${card.cardNumber} ${card.player} ${card.price} (${card.qauntity})`);
       });
     });
   });
