@@ -3,26 +3,67 @@ import {findLeague, findTeam, sports} from "./utils/teams.mjs";
 import {isNo, isYes} from "./utils/data.mjs";
 
 //Set up the card name and track with previous for front/back situations
-let card_number_prefix = '';
-let isSet, cardNumber, year, setName, sport, insert, parallel, features, manufacture, printRun, autographed;
+let answerFile;
+const saveData = {
+  metadata: {},
+  setData: {},
+  allCardData: []
+}
+export const initializeAnswers = async (inputDirectory) => {
+  answerFile = `${inputDirectory}input.json`;
+
+  try {
+    const answerInput = await fs.readJSON(answerFile);
+
+    saveData.metadata = answerInput.metadata;
+    saveData.metadata.reprocessImages = await ask('Reprocess existing images', false);
+
+    saveData.allCardData = answerInput.allCardData?.map(card => ({
+      ...card,
+      //clear out the pics property because it is appended to every run
+      pics: '',
+      //reset the count to 0 if we want to reuse the existing images
+      count: saveData.metadata.reprocessImages ? card.count : 0,
+    }));
+    saveData.setData = answerInput.setData;
+  } catch (e) {
+    console.log('No prefilled answers file found');
+  }
+
+  return saveData;
+}
+
+const saveAnswers = (cardData) => {
+  if (cardData) {
+    saveData.allCardData = cardData;
+  }
+  fs.writeJSON(answerFile, saveData).catch((e) => {
+    console.log('Error saving answers', e);
+  });
+}
 
 export const getSetData = async () => {
-  isSet = await ask('Is this a complete set?', false);
+  saveData.setData.isSet = await ask('Is this a complete set?', saveData.setData.isSet || false);
 
   //Set up an prefixes to the card title
-  if (isSet) {
-    sport = await ask('Sport', 'Football', {selectOptions: sports});
-    year = await ask('Year');
-    manufacture = await ask('Manufacturer');
-    setName = await ask('Set Name');
-    insert = await ask('Insert (enter No to skip)');
-    parallel = await ask('Parallel (enter No to skip)');
-    features = await ask('Features');
-    printRun = await ask('Print Run (enter No to skip)');
-    autographed = await ask('Autograph (enter No to skip)');
+  if (saveData.setData.isSet) {
+    saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
+    saveData.setData.year = await ask('Year', saveData.setData.year);
+    saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
+    saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
+    saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
+    saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
+    saveData.setData.features = await ask('Features', saveData.setData.features);
+    saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
+    saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
 
-    card_number_prefix = await ask('Enter Card Number Prefix');
+    saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
+    saveData.setData.price = await ask('Default Price', saveData.setData.price);
+    saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer);
+  } else {
+    saveData.setData = {};
   }
+  saveAnswers();
 }
 
 const add = (info, modifier) => info ? modifier ? ` ${info} ${modifier}` : ` ${info}` : '';
@@ -86,34 +127,34 @@ async function getCardName(output) {
 
 async function getNewCardData(cardNumber, defaults = {}) {
   let output = {
-    cardNumber: `${card_number_prefix}${cardNumber}`,
+    cardNumber: `${saveData.setData.card_number_prefix}${cardNumber}`,
     count: 1,
     pics: []
   };
 
-  output.sport = sport || await ask('Sport', defaults.sport || 'football', {selectOptions: sports});
+  output.sport = saveData?.setData?.sport || await ask('Sport', defaults.sport || 'football', {selectOptions: sports});
   output.league = findLeague(output.sport);
   output.player = await ask('Player/Card Name', defaults.player);
   [output.team, output.teamName] = findTeam(await ask('Team', defaults.team), output.sport);
-  output.year = year || await ask('Year', defaults.year);
-  output.manufacture = manufacture || await ask('Manufacturer', defaults.manufacture);
-  output.setName = setName || await ask('Set Name', defaults.setName);
-  if (!isNo(parallel)) {
-    output.parallel = parallel || await ask('Parallel', defaults.parallel);
+  output.year = saveData?.setData?.year || await ask('Year', defaults.year);
+  output.manufacture = saveData?.setData?.manufacture || await ask('Manufacturer', defaults.manufacture);
+  output.setName = saveData?.setData?.setName || await ask('Set Name', defaults.setName);
+  if (!isNo(saveData?.setData?.parallel)) {
+    output.parallel = saveData?.setData?.parallel || await ask('Parallel', defaults.parallel);
   }
-  if (parallel === 'base') {
+  if (saveData?.setData?.parallel === 'base') {
     output.parallel = undefined;
   }
-  if (!isNo(insert)) {
-    output.insert = insert || await ask('Insert', defaults.insert);
+  if (!isNo(saveData?.setData?.insert)) {
+    output.insert = saveData?.setData?.insert || await ask('Insert', defaults.insert);
   }
-  output.features = features || await ask('Features (RC, etc)', defaults.features);
+  output.features = saveData?.setData?.features || await ask('Features (RC, etc)', defaults.features);
 
-  if (!isNo(printRun)) {
+  if (!isNo(saveData?.setData?.printRun)) {
     output.printRun = await ask('Print Run', defaults.printRun);
   }
 
-  if (!isNo(autographed)) {
+  if (!isNo(saveData?.setData?.autographed)) {
     output.autographed = await ask('Autographed', defaults.autographed);
     if (isYes(output.autographed)) {
       output.autoFormat = await ask('Autograph Format', defaults.autoFormat || 'On Card');
@@ -148,18 +189,19 @@ async function getNewCardData(cardNumber, defaults = {}) {
   }
 
 
-  output.price = await ask('Price', defaults.price || '0.99');
+  output.price = await ask('Price', saveData?.setData?.price || defaults.price || '0.99');
   if (output.price === '0.99') {
     output.autoOffer = '0.01';
-    output.minOffer = '0.01';
+    // output.minOffer = '0.01';
   } else {
-    output.autoOffer = await ask('Auto Accept Offer', defaults.autoOffer);
-    output.minOffer = await ask('Minimum Offer', defaults.minOffer);
+    output.autoOffer = await ask('Auto Accept Offer', saveData?.setData?.price || defaults.autoOffer);
+    // output.minOffer = await ask('Minimum Offer', defaults.minOffer);
   }
   output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ''}${output.parallel ? `/${output.parallel}` : ''}/`.replace(/\s/g, '_');
   return output;
 }
 
+let cardNumber = 1;
 export const getCardData = async (allCards) => {
   cardNumber = await ask('Card Number', cardNumber);
   let output = allCards[cardNumber];
@@ -167,7 +209,9 @@ export const getCardData = async (allCards) => {
 
   if (output) {
     output.count = output.count + 1;
-    bumpCardNumber = true;
+    if (output.count > 1) {
+      bumpCardNumber = true;
+    }
   } else {
     output = await getNewCardData(cardNumber);
 
@@ -179,11 +223,12 @@ export const getCardData = async (allCards) => {
 
   }
 
-  output.filename = `${card_number_prefix}${cardNumber}_${output.player}_${output.count}.jpg`.replace(/\s/g, '_').replace(/\//g, '_').replace(/\|/g, '_');
+  output.filename = `${output.cardNumber}_${output.player}_${output.count}.jpg`.replace(/\s/g, '_').replace(/\//g, '_').replace(/\|/g, '_');
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`
   output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
   allCards[cardNumber] = output;
+  saveAnswers(allCards);
 
   if (bumpCardNumber) {
     cardNumber++;

@@ -103,7 +103,7 @@ async function writeEbayFile(data) {
   });
 
   //ebay mapping logic
-  let csvData = Object.values(data).map((card) => {
+  let csvData = Object.values(data).filter(card => card.cardNumber).map((card) => {
     const addFeature = (feature) => {
       if (card.features && card.features.length > 0) {
         card.features = `${card.features}|${feature}`;

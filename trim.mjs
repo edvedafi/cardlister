@@ -3,9 +3,9 @@ import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
 import writeEbayFile from "./src/listing-sites/ebay.mjs";
 import {loadTeams} from "./src/utils/teams.mjs";
-import {ask, initializeAnswers, confirm} from "./src/ask.mjs";
+import {ask} from "./src/ask.mjs";
 import {initializeStorage, processImageFile} from "./src/imageProcessor.mjs";
-import {getCardData, getSetData} from "./src/cardData.mjs";
+import {getCardData, getSetData, initializeAnswers} from "./src/cardData.mjs";
 import writeSportLotsOutput from "./src/listing-sites/sportlots.js";
 import writeBuySportsCardsOutput from "./src/listing-sites/bsc.js";
 
@@ -25,7 +25,6 @@ const app = initializeApp(firebaseConfig);
 initializeStorage(app);
 await loadTeams(app);
 
-const allCards = {};
 
 // Set up full run information
 let input_directory = await ask('Input Directory', 'input');
@@ -37,9 +36,11 @@ if (input_directory === 'input') {
   input_directory = `input/${input_directory}`;
 }
 console.log(`Input Directory: ${input_directory}`);
-const overrideImages = await initializeAnswers(input_directory);
+const savedAnswers = await initializeAnswers(input_directory);
+const overrideImages = savedAnswers.metadata.reprocessImages;
+const allCards = savedAnswers.allCardData || {};
 
-await getSetData()
+await getSetData();
 
 //gather the list of files that we will process
 const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
@@ -54,7 +55,7 @@ const processImage = async (image, img_number) => {
 }
 
 try {
-  let i = 0;
+  let i = 9999;
   while (i < files.length - 1) {
 
     //move on to the next files

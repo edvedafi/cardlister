@@ -199,12 +199,14 @@ export const processImageFile = async (image, cardData, overrideImages) => {
     }
 
     if (!proceed) {
-      await $`open -W ${image}`;
-      await ask('Press enter to continue');
+      await $`open -Wn ${image}`;
       await fs.copyFile(image, outputFile);
     }
 
     // upload file to firebase storage
-    await storage.bucket().upload(outputFile, {destination: cardData.filename});
+    storage.bucket().upload(outputFile, {destination: cardData.filename}).catch(e => {
+      console.error(`Error uploading ${outputFile}`, e);
+      process.exit(1);
+    });
   }
 }
