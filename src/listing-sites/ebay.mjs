@@ -134,7 +134,11 @@ async function writeEbayFile(data) {
     }
 
     if (!card.parallel || isNo(card.parallel)) {
-      card.parallel = 'Base Set';
+      if (card.insert && !isNo(card.insert)) {
+        card.parallel = 'Base Insert';
+      } else {
+        card.parallel = 'Base Set';
+      }
     } else {
       addFeature('Parallel/Variety');
       if (card.parallel.toLowerCase().indexOf('refractor') > -1) {
@@ -164,6 +168,8 @@ async function writeEbayFile(data) {
       'nba': 'National Basketball Association (NBA)',
       'nhl': 'National Hockey League (NHL)'
     }[card.league?.toLowerCase()] || card.league : 'N/A';
+
+    card.sport = card.sport ? card.sport.slice(0, 1).toUpperCase() + card.sport.slice(1).toLowerCase() : 'N/A';
 
     card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`
 

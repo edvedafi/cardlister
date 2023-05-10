@@ -3,11 +3,12 @@ import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
 import writeEbayFile from "./src/listing-sites/ebay.mjs";
 import {loadTeams} from "./src/utils/teams.mjs";
-import {ask} from "./src/ask.mjs";
-import {initializeStorage, processImageFile} from "./src/imageProcessor.mjs";
-import {getCardData, getSetData, initializeAnswers} from "./src/cardData.mjs";
+import {ask} from "./src/utils/ask.mjs";
+import {initializeStorage, processImageFile} from "./src/image-processing/imageProcessor.mjs";
+import {getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.mjs";
 import writeSportLotsOutput from "./src/listing-sites/sportlots.js";
 import writeBuySportsCardsOutput from "./src/listing-sites/bsc.js";
+import imageRecognition from "./src/card-data/imageRecognition.js";
 
 const firebaseConfig = {
   credential: cert(require('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json')),
@@ -40,22 +41,22 @@ const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
 
-await getSetData();
+const setData = await getSetData();
 
 //gather the list of files that we will process
 const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
 const files = lsOutput.toString().split('\n')
 
 //Here we run the actual process
-const processImage = async (image, img_number) => {
+const processImage = async (image, imageDefaults, img_number) => {
   console.log(`Entering information for Image ${img_number}`);
-  let cardData = await getCardData(allCards);
+  let cardData = await getCardData(allCards, imageDefaults);
   await processImageFile(image, cardData, overrideImages);
   console.log(`${image} -> ${cardData.filename} Complete`)
 }
 
 try {
-  let i = 9999;
+  let i = 0;
   while (i < files.length - 1) {
 
     //move on to the next files
@@ -68,9 +69,12 @@ try {
     if (back) {
       console.log(await terminalImage.file(back, {height: 25}), back);
     }
-    await processImage(front, 1);
+    const imageDefaults = await imageRecognition(front, back, setData);
+    // console.log(imageDefaults);
+    // await ask('Press Enter to Continue');
+    await processImage(front, imageDefaults, 1);
     if (back) {
-      await processImage(back, 2);
+      await processImage(back, imageDefaults, 2);
     }
   }
   //write the output

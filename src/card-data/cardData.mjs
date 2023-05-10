@@ -1,6 +1,7 @@
-import {ask, confirm} from "./ask.mjs";
-import {findLeague, findTeam, sports} from "./utils/teams.mjs";
-import {isNo, isYes} from "./utils/data.mjs";
+import {ask, confirm} from "../utils/ask.mjs";
+import {findLeague, findTeam, sports} from "../utils/teams.mjs";
+import {isNo, isYes} from "../utils/data.mjs";
+import getTextFromImage from "./imageRecognition.js";
 
 //Set up the card name and track with previous for front/back situations
 let answerFile;
@@ -43,27 +44,30 @@ const saveAnswers = (cardData) => {
 }
 
 export const getSetData = async () => {
-  saveData.setData.isSet = await ask('Is this a complete set?', saveData.setData.isSet || false);
+  const isSet = await ask('Is this a complete set?', saveData.setData.isSet || false);
 
   //Set up an prefixes to the card title
-  if (saveData.setData.isSet) {
-    saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
-    saveData.setData.year = await ask('Year', saveData.setData.year);
-    saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
-    saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
-    saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
-    saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
-    saveData.setData.features = await ask('Features', saveData.setData.features);
-    saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
-    saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
+  if (isSet) {
+    if (!saveData.setData.isSet) {
+      saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
+      saveData.setData.year = await ask('Year', saveData.setData.year);
+      saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
+      saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
+      saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
+      saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
+      saveData.setData.features = await ask('Features', saveData.setData.features);
+      saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
+      saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
 
-    saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
-    saveData.setData.price = await ask('Default Price', saveData.setData.price);
-    saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer);
+      saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
+      saveData.setData.price = await ask('Default Price', saveData.setData.price);
+      saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer);
+    }
   } else {
     saveData.setData = {};
   }
   saveAnswers();
+  return saveData.setData;
 }
 
 const add = (info, modifier) => info ? modifier ? ` ${info} ${modifier}` : ` ${info}` : '';
@@ -202,7 +206,10 @@ async function getNewCardData(cardNumber, defaults = {}) {
 }
 
 let cardNumber = 1;
-export const getCardData = async (allCards) => {
+export const getCardData = async (allCards, imageDefaults) => {
+  if (imageDefaults.cardNumber) {
+    cardNumber = imageDefaults.cardNumber;
+  }
   cardNumber = await ask('Card Number', cardNumber);
   let output = allCards[cardNumber];
   let bumpCardNumber = false;
@@ -213,7 +220,7 @@ export const getCardData = async (allCards) => {
       bumpCardNumber = true;
     }
   } else {
-    output = await getNewCardData(cardNumber);
+    output = await getNewCardData(cardNumber, imageDefaults);
 
     console.log('Card Info: ', output);
     while (!await confirm('Proceed with card?')) {
