@@ -1,14 +1,14 @@
 import {ask, confirm} from "../utils/ask.mjs";
 import {findLeague, findTeam, sports} from "../utils/teams.mjs";
 import {isNo, isYes} from "../utils/data.mjs";
-import getTextFromImage from "./imageRecognition.js";
+import fs from 'fs-extra';
 
 //Set up the card name and track with previous for front/back situations
 let answerFile;
 const saveData = {
   metadata: {},
   setData: {},
-  allCardData: []
+  allCardData: {}
 }
 export const initializeAnswers = async (inputDirectory) => {
   answerFile = `${inputDirectory}input.json`;
@@ -131,9 +131,10 @@ async function getCardName(output) {
 
 async function getNewCardData(cardNumber, defaults = {}) {
   let output = {
-    cardNumber: `${saveData.setData.card_number_prefix}${cardNumber}`,
+    cardNumber: `${saveData.setData.card_number_prefix || ''}${cardNumber}`,
     count: 1,
-    pics: []
+    pics: [],
+    crop: defaults.crop
   };
 
   output.sport = saveData?.setData?.sport || await ask('Sport', defaults.sport || 'football', {selectOptions: sports});

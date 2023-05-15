@@ -9,9 +9,12 @@ import {getCardData, getSetData, initializeAnswers} from "./src/card-data/cardDa
 import writeSportLotsOutput from "./src/listing-sites/sportlots.js";
 import writeBuySportsCardsOutput from "./src/listing-sites/bsc.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
+import 'zx/globals';
+import {readFileSync} from 'fs';
 
+const hofDBJSON = JSON.parse(readFileSync('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json'));
 const firebaseConfig = {
-  credential: cert(require('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json')),
+  credential: cert(hofDBJSON),
   apiKey: "AIzaSyDaaJXLcG-RaIJmi9mLXjwqcptcB3_IJRE",
   authDomain: "hofdb-2038e.firebaseapp.com",
   projectId: "hofdb-2038e",
@@ -70,8 +73,6 @@ try {
       console.log(await terminalImage.file(back, {height: 25}), back);
     }
     const imageDefaults = await imageRecognition(front, back, setData);
-    // console.log(imageDefaults);
-    // await ask('Press Enter to Continue');
     await processImage(front, imageDefaults, 1);
     if (back) {
       await processImage(back, imageDefaults, 2);

@@ -10,7 +10,7 @@ const allTeams = {
   'other': [],
 };
 
-const leagues = {
+export const leagues = {
   'nfl': 'football',
   'nba': 'basketball',
   'mlb': 'baseball',
@@ -50,9 +50,18 @@ export const isTeam = (team, sport) => {
   const searchKey = team.toLowerCase();
   // console.log('searching for team', searchKey, sport,);
   // console.log('searching for team', searchKey, sport, teams);
-  const foundTeam = allTeams[sport.toLowerCase()].find(t => searchKey === t.searchTeam || searchKey === t.searchLocation || searchKey === t.searchExact);
+  let foundTeam;
+  if (sport) {
+    foundTeam = allTeams[sport.toLowerCase()].find(t => searchKey === t.searchTeam || searchKey === t.searchLocation || searchKey === t.searchExact);
+  } else {
+    sports.find(s => {
+      // console.log('searching for team', searchKey, s)
+      foundTeam = isTeam(team, s);
+      return foundTeam;
+    });
+  }
   // console.log('found team', foundTeam);
-  return foundTeam ? [`${foundTeam.location} ${foundTeam.team}`, foundTeam.team] : false;
+  return foundTeam ? foundTeam.team ? [`${foundTeam.location} ${foundTeam.team}`, foundTeam.team, foundTeam.sport] : foundTeam : false;
 }
 
 export const findTeam = (team, sport) => {
