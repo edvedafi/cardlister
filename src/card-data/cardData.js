@@ -1,6 +1,6 @@
-import {ask, confirm} from "../utils/ask.mjs";
-import {findLeague, findTeam, sports} from "../utils/teams.mjs";
-import {isNo, isYes} from "../utils/data.mjs";
+import {ask, confirm} from "../utils/ask.js";
+import {findLeague, findTeam, sports} from "../utils/teams.js";
+import {isNo, isYes} from "../utils/data.js";
 import fs from 'fs-extra';
 
 //Set up the card name and track with previous for front/back situations
@@ -221,7 +221,10 @@ export const getCardData = async (allCards, imageDefaults) => {
       bumpCardNumber = true;
     }
   } else {
-    output = await getNewCardData(cardNumber, imageDefaults);
+    output = await getNewCardData(cardNumber, {
+      ...output,
+      ...imageDefaults
+    });
 
     console.log('Card Info: ', output);
     while (!await confirm('Proceed with card?')) {

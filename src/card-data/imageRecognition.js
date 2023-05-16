@@ -1,8 +1,12 @@
 import vision from '@google-cloud/vision'
-import {sports, isTeam, leagues} from "../utils/teams.mjs";
-import {titleCase} from "../utils/data.mjs";
-import {ask} from "../utils/ask.mjs";
-import {nlp} from 'spacy-nlp';
+import {sports, isTeam, leagues} from "../utils/teams.js";
+import {titleCase} from "../utils/data.js";
+import {ask} from "../utils/ask.js";
+// import {nlp} from 'spacy-nlp';
+import {HfInference} from '@huggingface/inference'
+// import { readFileSync } from 'fs'
+
+const hf = new HfInference(process.env.HF_TOKEN)
 // import spacyImport from 'spacy';
 // const spacy = spacyImport.default;
 // console.log(spacy)
@@ -27,10 +31,29 @@ const detectionFeatures = [
   {type: 'DOCUMENT_TEXT_DETECTION'}
 ];
 
+// export const runHG = async (front, back, setData) => {
+//   // const textfromImage = await hf.imageToText({
+//   //   data: readFileSync(front),
+//   //   model: 'nlpconnect/vit-gpt2-image-captioning'
+//   // });
+//   // console.log(textfromImage);
+//   // const objectDetectionOutputValues = await hf.objectDetection({
+//   //   data: readFileSync(front),
+//   //   model: 'facebook/detr-resnet-50'
+//   // })
+//   // console.log(objectDetectionOutputValues);
+//
+//   const segemnts = await hf.tokenClassification({
+//     model: 'dbmdz/bert-large-cased-finetuned-conll03-english',
+//     inputs: 'My name is Sarah Jessica Parker but you can call me Jessica'
+//   })
+//   console.log(segemnts);
+//
+//   await ask('Continue?');
+// }
+
 async function getTextFromImage(front, back, setData) {
-  const defaults = {
-    sport: setData.sport
-  };
+  let defaults = {...setData};
 
   // Creates a client
   const client = new vision.ImageAnnotatorClient();
@@ -52,13 +75,11 @@ async function getTextFromImage(front, back, setData) {
     features: detectionFeatures,
   });
 
-  const [cropHintResults] = await client.cropHints(front);
-  const hint = cropHintResults.cropHintsAnnotation.cropHints[0].boundingPoly.vertices;
-  const left = hint.map(h => h.x).sort((a, b) => a - b)[0];
-  const top = hint.map(h => h.y).sort((a, b) => a - b)[0];
-  const right = hint.map(h => h.x).sort((a, b) => b - a)[0];
-  const bottom = hint.map(h => h.y).sort((a, b) => b - a)[0];
-  defaults.crop = {left, top, width: right - left, height: bottom - top};
+  defaults = {
+    ...defaults,
+    crop: await getCropHints(client, front),
+    cropBack: await getCropHints(client, back)
+  }
 
   /**
    * Array of searchable data
@@ -120,7 +141,7 @@ async function getTextFromImage(front, back, setData) {
   addLogosToSearch(backResult.logoAnnotations, false);
 
   const addSearch = async (textResult, isFront) => {
-    const textBlocks = textResult.fullTextAnnotation.pages[0].blocks.filter(block => block.blockType === 'TEXT');
+    const textBlocks = textResult.fullTextAnnotation?.pages[0]?.blocks?.filter(block => block.blockType === 'TEXT') || [];
 
     const blocks = await Promise.all(textBlocks.map(
       async (block) => {
@@ -134,36 +155,6 @@ async function getTextFromImage(front, back, setData) {
           }
           searchValue.isNumber = !isNaN(searchValue.word);
           searchValue.lowerCase = searchValue.word.toLowerCase();
-
-          if (!searchValue.isNumber) {
-            // const result = await nlp.parse(searchValue.word);
-            // console.log('Looking for names in buffer: ', searchValue.word);
-            // console.log('Result: ', result);
-            // if (result) {
-            //   console.log('Result[0]: ', result[0]);
-            //   console.log('Result[0][\'parse_list\']: ', result[0]['parse_list']);
-            //   result[0]['parse_list'].forEach((element) => {
-            //     if (element.NE === 'PERSON') {
-            //       searchValue.isPerson = true;
-            //     } else if (element.POS_coarse === 'PROPN') {
-            //       searchValue.isProperName = true;
-            //     }
-            //   });
-            //   if (result.len === 3 &&
-            //     result[0]['parse_list'][0].POS_coarse !== 'num' &&
-            //     result[0]['parse_list'][1].POS_fine !== 'HYPH' &&
-            //     result[0]['parse_list'][2].POS_coarse === 'num') {
-            //     searchValue.potentialCardNumber = true;
-            //   }
-            //   if (result.len === 2 &&
-            //     result[0]['parse_list'][0].POS_coarse !== 'num' &&
-            //     result[0]['parse_list'][1].POS_fine !== 'HYPH' &&
-            //     result[0]['parse_list'][2].POS_coarse === 'num') {
-            //     searchValue.potentialCardNumber = true;
-            //   }
-            // }
-
-          }
           return searchValue;
         }))
       }));
@@ -176,173 +167,31 @@ async function getTextFromImage(front, back, setData) {
     addSearch(backResult, false)
   ]);
 
-  // console.log('searchParagraphs:', searchParagraphs);
-
   // Sort the search paragraphs by confidence
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
 
-
-  // const doc = await nlp(searchParagraphs.join('\n'));
-  // for (let ent of doc.ents) {
-  //   console.log(ent.text, ent.label);
-  // }
-  // for (let token of doc) {
-  //   console.log(token.text, token.pos, token.head.text);
-  // }
-  const searchAll = searchParagraphs.map(block=>block.word).join('\n');
-  const result = await nlp.parse(searchAll);
-  console.log('Looking for names in buffer: ', searchAll);
-  console.log('Result: ', result);
-  if (result) {
-    console.log('Result[0]: ', result[0]);
-    // console.log('Result[0][\'parse_list\']: ', result[0]['parse_list']);
-    result[0]['parse_list'].forEach((element) => {
-      if (element.NE === 'PERSON') {
-        // searchValue.isPerson = true;
-        console.log('Found a person!', element.word);
-      } else if (element.POS_coarse === 'PROPN') {
-        // searchValue.isProperName = true;
-        console.log('Found a proper name!', element.word);
-      }
-    });
-    if (result.len === 3 &&
-      result[0]['parse_list'][0].POS_coarse !== 'num' &&
-      result[0]['parse_list'][1].POS_fine !== 'HYPH' &&
-      result[0]['parse_list'][2].POS_coarse === 'num') {
-      // searchValue.potentialCardNumber = true;
-      console.log('found potential card number 3', result)
-    }
-    if (result.len === 2 &&
-      result[0]['parse_list'][0].POS_coarse !== 'num' &&
-      result[0]['parse_list'][1].POS_fine !== 'HYPH' &&
-      result[0]['parse_list'][2].POS_coarse === 'num') {
-      console.log('found potential card number 2', result)
-    }
-  }
+  //Run NLP on the entire document first
+  defaults = {
+    defaults,
+    ...await runNLP(searchParagraphs.map(block => block.word).join('. '), defaults)
+  };
 
   //first pass only check for near exact matches
-  searchParagraphs.forEach(block => {
-    const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
-
-    // console.log('checking: ', block)
-
-    if (block.isNumber) {
-      if (!defaults.year && block.word > 1900 && block.word < 2100) {
-        defaults.year = block.word;
-      } else if (!defaults.cardNumber && !setData.card_number_prefix && !block.isFront) {
-        defaults.cardNumber = block.word;
-      }
-    } else {
-
-      if (setData.card_number_prefix && !defaults.cardNumber) {
-        // concat all but the last value in the block.words array together
-        const prefix = block.words.slice(0, -1).map(word => word.toLowerCase()).join('');
-        if (prefix === setData.card_number_prefix.toLowerCase()) {
-          defaults.cardNumber = block.words[block.words.length - 1];
-          block.set = true;
-        }
-      }
-
-      if (!defaults.player && block.isPerson) {
-        defaults.player = block.word;
-        block.set = true;
-      }
-
-      //block.set default.printRun if block.word matches a regex that is number then / then number
-      if (!defaults.printRun && block.word.match(/^\d+\/\d+$/)) {
-        defaults.printRun = block.word.slice(block.word.indexOf('/') + 1);
-        block.set = true;
-      }
-      //block.set default.printRun if block.word matches a regex that is number then of then number
-      if (!defaults.printRun && block.word.match(/^\d+ of \d+$/)) {
-        defaults.printRun = block.word.slice(block.word.indexOf('of') + 3);
-        block.set = true;
-      }
-
-      if (!defaults.cardNumber) {
-        const firstWord = block.words[0].toLowerCase();
-        if (wordCountBetween(2, 4) && ['no', 'no.'].includes(firstWord)) {
-          defaults.cardNumber = block.words.slice(1).join('');
-          block.set = true;
-        }
-      }
-
-      if (!defaults.manufacture && wordCountBetween(1, 2) && manufactures.includes(block.lowerCase)) {
-        defaults.manufacture = titleCase(block.word);
-        block.set = true;
-      }
-
-      if (!defaults.setName && wordCountBetween(1, 2) && sets.includes(block.lowerCase)) {
-        defaults.setName = titleCase(block.word);
-        block.set = true;
-      }
-
-      if (!defaults.insert && wordCountBetween(1, 2) && inserts.includes(block.lowerCase)) {
-        defaults.insert = titleCase(block.word);
-        block.set = true;
-      }
-
-      let teamTest;
-      if (!defaults.team) {
-        block.words.find(word => {
-          teamTest = isTeam(word, setData.sport);
-          return teamTest;
-        });
-
-        if (teamTest) {
-          // console.log(teamTest)
-          defaults.team = teamTest[0];
-          block.set = true;
-          if (!defaults.sport) {
-            defaults.sport = teamTest[2];
-          }
-        }
-      }
-    }
-  });
-
+  defaults = {
+    defaults,
+    ...await runFirstPass(searchParagraphs, defaults, setData)
+  };
   //second pass, lets check things that are a little less exact
-  const yearRegex = /©\s?\d{4}/;
-  searchParagraphs.filter(block => !block.set).forEach(block => {
-    const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
-
-    // console.log('second pass: ', block)
-
-    if (!defaults.year) {
-      const yearMatch = block.word.match(yearRegex);
-      if (yearMatch) {
-        console.log(yearMatch)
-        defaults.year = yearMatch[0].slice(-4);
-        block.set = true;
-      }
-    }
-
-    if (!defaults.cardNumber) {
-      //set cardNumber if the block.word matches a regex that is letters followed by numbers with an optional space between
-      if (block.word.match(/^[a-zA-Z]{1,3}\s?-?\s?\d{1,3}/)) {
-        defaults.cardNumber = block.word;
-        block.set = true;
-      }
-    }
-
-    if (!defaults.player && !block.set && block.isProperName && wordCountBetween(2, 3)) {
-      defaults.player = titleCase(block.word);
-    }
-  });
+  defaults = {
+    defaults,
+    ...await runSecondPass(searchParagraphs, defaults)
+  };
 
   //third pass, lets get really fuzzy
-  searchParagraphs.filter(block => !block.set).forEach(block => {
-    // console.log('third pass: ', block)
-
-    if (!defaults.cardNumber && block.isNumber) {
-      defaults.cardNumber = block.word;
-      block.set = true;
-    }
-
-    if (!defaults.player && block.isProperName) {
-      defaults.player = titleCase(block.word);
-    }
-  });
+  defaults = {
+    defaults,
+    ...await fuzzyMatch(searchParagraphs, defaults)
+  };
 
   console.log(defaults);
   await ask('Continue?');
@@ -350,5 +199,168 @@ async function getTextFromImage(front, back, setData) {
   return defaults;
 }
 
+const getCropHints = async (client, image) => {
+  const [cropHintResults] = await client.cropHints(image);
+  const hint = cropHintResults.cropHintsAnnotation.cropHints[0].boundingPoly.vertices;
+  const left = hint.map(h => h.x).sort((a, b) => a - b)[0];
+  const top = hint.map(h => h.y).sort((a, b) => a - b)[0];
+  const right = hint.map(h => h.x).sort((a, b) => b - a)[0];
+  const bottom = hint.map(h => h.y).sort((a, b) => b - a)[0];
+  return {left, top, width: right - left, height: bottom - top};
+}
+
+const runNLP = async (text) => {
+  const results = {};
+  const segemnts = await hf.tokenClassification({
+    model: 'dbmdz/bert-large-cased-finetuned-conll03-english',
+    // model: 'microsoft/SportsBERT',
+    // parameters: {
+    //   aggregation_strategy: 'max'
+    // },
+    inputs: text
+  })
+  // console.log(segemnts);
+  const persons = segemnts.filter(segment => segment.entity_group === 'PER');
+  console.log(persons)
+
+  if (persons.length === 1) {
+    results.player = persons[0].word;
+  } else if (persons.length > 1) {
+    if (persons[0].word.startsWith('. ')) {
+      results.player = `${persons[1].word} ${persons[0].word.slice(2)}`;
+    } else {
+      results.player = `${persons[0].word} ${persons[1].word}`;
+    }
+  }
+
+  return results;
+}
+
+const runFirstPass = async (searchParagraphs, defaults, setData) => {
+  const results = {...defaults};
+  searchParagraphs.forEach(block => {
+    const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
+
+    // console.log('First Pass: ', block)
+
+    if (block.isNumber) {
+      if (!results.year && block.word > 1900 && block.word < 2100) {
+        results.year = block.word;
+      } else if (!results.cardNumber && !setData.card_number_prefix && !block.isFront) {
+        results.cardNumber = block.word;
+      }
+    } else {
+
+      if (setData.card_number_prefix && !results.cardNumber) {
+        // concat all but the last value in the block.words array together
+        const prefix = block.words.slice(0, -1).map(word => word.toLowerCase()).join('');
+        if (prefix === setData.card_number_prefix.toLowerCase()) {
+          results.cardNumber = block.words[block.words.length - 1];
+          block.set = true;
+        }
+      }
+
+      //block.set default.printRun if block.word matches a regex that is number then / then number
+      if (!results.printRun && block.word.match(/^\d+\/\d+$/)) {
+        results.printRun = block.word.slice(block.word.indexOf('/') + 1);
+        block.set = true;
+      }
+      //block.set default.printRun if block.word matches a regex that is number then of then number
+      if (!results.printRun && block.word.match(/^\d+ of \d+$/)) {
+        results.printRun = block.word.slice(block.word.indexOf('of') + 3);
+        block.set = true;
+      }
+
+      if (!results.cardNumber) {
+        const firstWord = block.words[0].toLowerCase();
+        if (wordCountBetween(2, 4) && ['no', 'no.'].includes(firstWord)) {
+          results.cardNumber = block.words.slice(1).join('');
+          block.set = true;
+        }
+      }
+
+      if (!results.setName && wordCountBetween(1, 2) && sets.includes(block.lowerCase)) {
+        results.setName = titleCase(block.word);
+        block.set = true;
+      } else if (!results.manufacture && wordCountBetween(1, 2) && manufactures.includes(block.lowerCase)) {
+        results.manufacture = titleCase(block.word);
+        block.set = true;
+      }
+
+      if (!results.insert && wordCountBetween(1, 2) && inserts.includes(block.lowerCase)) {
+        results.insert = titleCase(block.word);
+        block.set = true;
+      }
+
+      let teamTest;
+      if (!results.team) {
+        block.words.find(word => {
+          teamTest = isTeam(word, setData.sport);
+          return teamTest;
+        });
+
+        if (teamTest) {
+          // console.log(teamTest)
+          results.team = teamTest[0];
+          block.set = true;
+          if (!results.sport) {
+            results.sport = teamTest[2];
+          }
+        }
+      }
+    }
+  });
+  return results;
+}
+
+const runSecondPass = async (searchParagraphs, defaults) => {
+  const results = {...defaults};
+  searchParagraphs.filter(block => !block.set).forEach(block => {
+    const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
+
+    // console.log('second pass: ', block)
+
+    if (!results.year) {
+      results.year = copyRightYearRegexMatch(block.word);
+    }
+
+    if (!results.cardNumber) {
+      //set cardNumber if the block.word matches a regex that is letters followed by numbers with an optional space between
+      if (block.word.match(/^[a-zA-Z]{1,3}\s?-?\s?\d{1,3}/)) {
+        results.cardNumber = block.word;
+      }
+    }
+
+    if (!results.player && !block.set && block.isProperName && wordCountBetween(2, 3)) {
+      results.player = titleCase(block.word);
+    }
+  });
+  return results;
+}
+
+const yearRegex = /©\s?\d{4}/;
+export const copyRightYearRegexMatch = (text) => {
+  const yearMatch = text.match(yearRegex);
+  if (yearMatch) {
+    return yearMatch[0].slice(-4);
+  }
+}
+
+const fuzzyMatch = async (searchParagraphs, defaults) => {
+  const results = {...defaults};
+  searchParagraphs.filter(block => !block.set).forEach(block => {
+    // console.log('third pass: ', block)
+
+    if (!results.cardNumber && block.isNumber) {
+      results.cardNumber = block.word;
+      block.set = true;
+    }
+
+    if (!results.player && block.isProperName) {
+      results.player = titleCase(block.word);
+    }
+  });
+  return results;
+}
 
 export default getTextFromImage

@@ -1,5 +1,5 @@
-import {ask} from "../utils/ask.mjs";
-import {isYes} from "../utils/data.mjs";
+import {ask} from "../utils/ask.js";
+import {isYes} from "../utils/data.js";
 import {getStorage} from "firebase-admin/storage";
 import terminalImage from "terminal-image";
 import sharp from 'sharp';

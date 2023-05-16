@@ -1,8 +1,8 @@
 //comment out the body of this to be prompted
 import {select, confirm as confirmPrompt, input} from '@inquirer/prompts';
-import {isNo, isYes} from "./data.mjs";
+import {isNo, isYes} from "./data.js";
 
-export const ask = async (questionText, defaultAnswer, {maxLength, selectOptions, isYN} = {}) => {
+export const ask = async (questionText, defaultAnswer = undefined, {maxLength, selectOptions, isYN} = {}) => {
   if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
     isYN = true;
   }
