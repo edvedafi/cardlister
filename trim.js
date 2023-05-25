@@ -48,7 +48,7 @@ const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
 
-// const setData = await getSetData();
+const setData = await getSetData();
 
 //gather the list of files that we will process
 const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
@@ -65,9 +65,9 @@ const processImage = async (image, imageDefaults) => {
 const preProcessQueue = [];
 const processQueue = [];
 const preProcessPair = async (front, back) => {
-  // const imageDefaults = await imageRecognition(front, back, setData);
+  const imageDefaults = await imageRecognition(front, back, setData);
   // processQueue.push(() => processPair(front, back, imageDefaults));
-  return processPair(front, back, {});
+  return processPair(front, back, imageDefaults);
 }
 
 const processPair = async (front, back, imageDefaults) => {
@@ -78,24 +78,24 @@ const processPair = async (front, back, imageDefaults) => {
 }
 
 try {
-  // let i = 0;
-  // while (i < files.length - 1) {
-  //
-  //   //move on to the next files
-  //   const front = files[i++];
-  //   let back;
-  //   if (i < files.length - 1) {
-  //     back = files [i++];
-  //   }
-  //   preProcessQueue.push(await preProcessPair(front, back));
-  // }
-  //
-  // await Promise.all(preProcessQueue);
+  let i = 0;
+  while (i < files.length - 1) {
+
+    //move on to the next files
+    const front = files[i++];
+    let back;
+    if (i < files.length - 1) {
+      back = files [i++];
+    }
+    preProcessQueue.push(await preProcessPair(front, back));
+  }
+
+  await Promise.all(preProcessQueue);
 
   //write the output
-  // await writeSportLotsOutput(allCards);
-  // await writeBuySportsCardsOutput(allCards);
-  // await writeEbayFile(allCards);
+  await writeSportLotsOutput(allCards);
+  await writeBuySportsCardsOutput(allCards);
+  await writeEbayFile(allCards);
   await writeShopifyFile(allCards);
 } finally {
   //print all the title values in allCards

@@ -23,7 +23,7 @@ export const initializeAnswers = async (inputDirectory) => {
     saveData.allCardData = Object.values(answerInput.allCardData).map(card => ({
       ...card,
       //clear out the pics property because it is appended to every run
-      // pics: '',
+      pics: '',
       //reset the count to 0 if we want to reuse the existing images
       count: saveData.metadata.reprocessImages ? card.count : 0,
     })).reduce((acc, card) => {
