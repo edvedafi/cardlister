@@ -15,19 +15,25 @@ export const initializeAnswers = async (inputDirectory) => {
 
   try {
     const answerInput = await fs.readJSON(answerFile);
+    console.log('answerInput', answerInput);
 
     saveData.metadata = answerInput.metadata;
     saveData.metadata.reprocessImages = await ask('Reprocess existing images', false);
 
-    saveData.allCardData = answerInput.allCardData?.map(card => ({
+    saveData.allCardData = Object.values(answerInput.allCardData).map(card => ({
       ...card,
       //clear out the pics property because it is appended to every run
-      pics: '',
+      // pics: '',
       //reset the count to 0 if we want to reuse the existing images
       count: saveData.metadata.reprocessImages ? card.count : 0,
-    }));
+    })).reduce((acc, card) => {
+      acc[card.cardNumber] = card;
+      return acc;
+    }, {});
     saveData.setData = answerInput.setData;
+    console.log('saveData', saveData);
   } catch (e) {
+    console.log(e)
     console.log('No prefilled answers file found');
   }
 
@@ -48,21 +54,19 @@ export const getSetData = async () => {
 
   //Set up an prefixes to the card title
   if (isSet) {
-    if (!saveData.setData.isSet) {
-      saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
-      saveData.setData.year = await ask('Year', saveData.setData.year);
-      saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
-      saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
-      saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
-      saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
-      saveData.setData.features = await ask('Features', saveData.setData.features);
-      saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
-      saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
+    saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
+    saveData.setData.year = await ask('Year', saveData.setData.year);
+    saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
+    saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
+    saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
+    saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
+    saveData.setData.features = await ask('Features', saveData.setData.features);
+    saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
+    saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
 
-      saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
-      saveData.setData.price = await ask('Default Price', saveData.setData.price);
-      saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer);
-    }
+    saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
+    saveData.setData.price = await ask('Default Price', saveData.setData.price);
+    saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer);
   } else {
     saveData.setData = {};
   }
@@ -140,8 +144,8 @@ async function getNewCardData(cardNumber, defaults = {}) {
   output.sport = saveData?.setData?.sport || await ask('Sport', defaults.sport || 'football', {selectOptions: sports});
   output.league = findLeague(output.sport);
   output.player = await ask('Player/Card Name', defaults.player);
-  [output.team, output.teamName] = findTeam(await ask('Team', defaults.team), output.sport);
   output.year = saveData?.setData?.year || await ask('Year', defaults.year);
+  [output.team, output.teamName] = findTeam(await ask('Team', defaults.team), output.sport, output.year);
   output.manufacture = saveData?.setData?.manufacture || await ask('Manufacturer', defaults.manufacture);
   output.setName = saveData?.setData?.setName || await ask('Set Name', defaults.setName);
   if (!isNo(saveData?.setData?.parallel)) {

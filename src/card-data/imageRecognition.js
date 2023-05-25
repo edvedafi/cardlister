@@ -1,7 +1,7 @@
 import vision from '@google-cloud/vision'
 import {sports, isTeam, leagues} from "../utils/teams.js";
 import {titleCase} from "../utils/data.js";
-import {ask} from "../utils/ask.js";
+// import {ask} from "../utils/ask.js";
 // import {nlp} from 'spacy-nlp';
 import {HfInference} from '@huggingface/inference'
 // import { readFileSync } from 'fs'
@@ -31,28 +31,8 @@ const detectionFeatures = [
   {type: 'DOCUMENT_TEXT_DETECTION'}
 ];
 
-// export const runHG = async (front, back, setData) => {
-//   // const textfromImage = await hf.imageToText({
-//   //   data: readFileSync(front),
-//   //   model: 'nlpconnect/vit-gpt2-image-captioning'
-//   // });
-//   // console.log(textfromImage);
-//   // const objectDetectionOutputValues = await hf.objectDetection({
-//   //   data: readFileSync(front),
-//   //   model: 'facebook/detr-resnet-50'
-//   // })
-//   // console.log(objectDetectionOutputValues);
-//
-//   const segemnts = await hf.tokenClassification({
-//     model: 'dbmdz/bert-large-cased-finetuned-conll03-english',
-//     inputs: 'My name is Sarah Jessica Parker but you can call me Jessica'
-//   })
-//   console.log(segemnts);
-//
-//   await ask('Continue?');
-// }
-
 async function getTextFromImage(front, back, setData) {
+  console.log('getTextFromImage');
   let defaults = {...setData};
 
   // Creates a client
@@ -66,6 +46,7 @@ async function getTextFromImage(front, back, setData) {
     },
     features: detectionFeatures,
   });
+
   const [backResult] = await client.annotateImage({
     image: {
       source: {
@@ -158,7 +139,7 @@ async function getTextFromImage(front, back, setData) {
           return searchValue;
         }))
       }));
-    console.log('blocks:', blocks)
+    // console.log('blocks:', blocks)
     searchParagraphs = searchParagraphs.concat(blocks.reduce((acc, val) => acc.concat(val), []));
   }
   // console.log(frontResult.fullTextAnnotation)
@@ -172,29 +153,21 @@ async function getTextFromImage(front, back, setData) {
 
   //Run NLP on the entire document first
   defaults = {
-    defaults,
-    ...await runNLP(searchParagraphs.map(block => block.word).join('. '), defaults)
+    ...defaults,
+    ...await runNLP(searchParagraphs.map(block => block.word).join('. '))
   };
 
   //first pass only check for near exact matches
-  defaults = {
-    defaults,
-    ...await runFirstPass(searchParagraphs, defaults, setData)
-  };
+  defaults = await runFirstPass(searchParagraphs, defaults, setData);
+
   //second pass, lets check things that are a little less exact
-  defaults = {
-    defaults,
-    ...await runSecondPass(searchParagraphs, defaults)
-  };
+  defaults = await runSecondPass(searchParagraphs, defaults);
 
   //third pass, lets get really fuzzy
-  defaults = {
-    defaults,
-    ...await fuzzyMatch(searchParagraphs, defaults)
-  };
+  defaults = await fuzzyMatch(searchParagraphs, defaults);
 
-  console.log(defaults);
-  await ask('Continue?');
+  // console.log(defaults);
+  // await ask('Continue?');
 
   return defaults;
 }
@@ -209,27 +182,36 @@ const getCropHints = async (client, image) => {
   return {left, top, width: right - left, height: bottom - top};
 }
 
+const callNLP = async (text) => {
+  try {
+    console.log('calling NLP', text);
+    return await hf.tokenClassification({
+      model: 'dslim/bert-base-NER-uncased',
+      inputs: text
+    });
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
+}
 const runNLP = async (text) => {
   const results = {};
-  const segemnts = await hf.tokenClassification({
-    model: 'dbmdz/bert-large-cased-finetuned-conll03-english',
-    // model: 'microsoft/SportsBERT',
-    // parameters: {
-    //   aggregation_strategy: 'max'
-    // },
-    inputs: text
-  })
-  // console.log(segemnts);
-  const persons = segemnts.filter(segment => segment.entity_group === 'PER');
-  console.log(persons)
+  const segments = await callNLP(text);
+  // console.log('segemnts', segemnts);
+  const persons = segments.filter(segment => segment.entity_group === 'PER');
+  // console.log('persons', persons)
 
   if (persons.length === 1) {
-    results.player = persons[0].word;
+    results.player = titleCase(persons[0].word);
   } else if (persons.length > 1) {
-    if (persons[0].word.startsWith('. ')) {
-      results.player = `${persons[1].word} ${persons[0].word.slice(2)}`;
+    const names = persons.sort((a, b) => b.score - a.score).map(person => person.word);
+    // console.log('selecting persons from: ', persons)
+    if (names[0].includes(' ') || names[0] === names[1]) {
+      results.player = titleCase(names[0]);
+    } else if (names[1].includes(' ')) {
+      results.player = titleCase(names[0]);
     } else {
-      results.player = `${persons[0].word} ${persons[1].word}`;
+      results.player = titleCase(`${names[0]} ${names[1]}`);
     }
   }
 
@@ -321,7 +303,10 @@ const runSecondPass = async (searchParagraphs, defaults) => {
     // console.log('second pass: ', block)
 
     if (!results.year) {
-      results.year = copyRightYearRegexMatch(block.word);
+      const regexMatch = copyRightYearRegexMatch(block.word);
+      if (regexMatch) {
+        results.year = regexMatch;
+      }
     }
 
     if (!results.cardNumber) {

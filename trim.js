@@ -12,6 +12,7 @@ import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
 import {readFileSync} from 'fs';
 import dotenv from 'dotenv';
+import writeShopifyFile from "./src/listing-sites/shopify.js";
 
 dotenv.config();
 
@@ -47,44 +48,55 @@ const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
 
-const setData = await getSetData();
+// const setData = await getSetData();
 
 //gather the list of files that we will process
 const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
 const files = lsOutput.toString().split('\n')
 
 //Here we run the actual process
-const processImage = async (image, imageDefaults, img_number) => {
-  console.log(`Entering information for Image ${img_number}`);
+const processImage = async (image, imageDefaults) => {
+  console.log(await terminalImage.file(image, {height: 25}));
   let cardData = await getCardData(allCards, imageDefaults);
   await processImageFile(image, cardData, overrideImages);
   console.log(`${image} -> ${cardData.filename} Complete`)
 }
 
-try {
-  let i = 0;
-  while (i < files.length - 1) {
+const preProcessQueue = [];
+const processQueue = [];
+const preProcessPair = async (front, back) => {
+  // const imageDefaults = await imageRecognition(front, back, setData);
+  // processQueue.push(() => processPair(front, back, imageDefaults));
+  return processPair(front, back, {});
+}
 
-    //move on to the next files
-    const front = files[i++];
-    let back;
-    if (i < files.length - 1) {
-      back = files [i++];
-    }
-    console.log(await terminalImage.file(front, {height: 25}), front);
-    if (back) {
-      console.log(await terminalImage.file(back, {height: 25}), back);
-    }
-    const imageDefaults = await imageRecognition(front, back, setData);
-    await processImage(front, imageDefaults, 1);
-    if (back) {
-      await processImage(back, imageDefaults, 2);
-    }
+const processPair = async (front, back, imageDefaults) => {
+  await processImage(front, imageDefaults, 1);
+  if (back) {
+    await processImage(back, imageDefaults, 2);
   }
+}
+
+try {
+  // let i = 0;
+  // while (i < files.length - 1) {
+  //
+  //   //move on to the next files
+  //   const front = files[i++];
+  //   let back;
+  //   if (i < files.length - 1) {
+  //     back = files [i++];
+  //   }
+  //   preProcessQueue.push(await preProcessPair(front, back));
+  // }
+  //
+  // await Promise.all(preProcessQueue);
+
   //write the output
-  await writeSportLotsOutput(allCards);
-  await writeBuySportsCardsOutput(allCards);
-  await writeEbayFile(allCards);
+  // await writeSportLotsOutput(allCards);
+  // await writeBuySportsCardsOutput(allCards);
+  // await writeEbayFile(allCards);
+  await writeShopifyFile(allCards);
 } finally {
   //print all the title values in allCards
   Object.values(allCards).forEach(t => console.log(t.title));

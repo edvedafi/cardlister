@@ -11,3 +11,4 @@ node_modules
 input
 output
 run.log
+.env
