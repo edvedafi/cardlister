@@ -114,9 +114,17 @@ async function writeShopifyFile(data) {
       card.sport = 'N/A';
     }
 
+    addTag(card.year);
+    addTag(card.setName);
+    addTag(card.player);
+    addTag(card.team);
+    if (card.grade) {
+      addTag(card.grade);
+    }
+
     card.weight = card.lbs * 453.59237 + card.oz * 28.3495231;
 
-    card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`
+    card.description = `${card.longTitle}`
 
     card.setName = `${card.year} ${card.setName}`;
 
