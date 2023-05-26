@@ -33,7 +33,9 @@ export const loadTeams = async (app) => {
       searchLocation: doc.data().location?.toLowerCase(),
       sport: sport,
       league: doc.data().league,
-      searchExact: `${doc.data().location?.toLowerCase()} ${doc.data().team?.toLowerCase()}`
+      searchExact: `${doc.data().location?.toLowerCase()} ${doc.data().team?.toLowerCase()}`,
+      startYear: doc.data().startYear || 1800,
+      endYear: doc.data().endYear || 9999,
     }
     teams.push(team);
     if (allTeams[sport]) {
@@ -42,6 +44,8 @@ export const loadTeams = async (app) => {
       allTeams['other'].push(team);
     }
   });
+
+  console.log('loaded teams', allTeams);
 }
 
 export const isTeam = (team, sport, year) => {

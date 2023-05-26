@@ -131,13 +131,9 @@ async function writeShopifyFile(data) {
     return card;
   });
 
-  // merge defaults
-  csvData = csvData.map((card) => ({...defaultValues, ...card}));
-
   // make a second record for each image
   const secondImages = [];
   csvData = csvData.map((card) => {
-    console.log(card.pics);
     const images = card.pics.split('|');
     images.forEach((image, index) => {
       if (index === 0) {
@@ -156,8 +152,11 @@ async function writeShopifyFile(data) {
     return card;
   });
 
-  console.log(secondImages)
   csvData = csvData.concat(secondImages);
+
+  // merge defaults
+  csvData = csvData.map((card) => ({...defaultValues, ...card}));
+
   console.log(`Writing ${csvData.length} records to ${filePath}`);
 
   try {

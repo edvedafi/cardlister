@@ -1,18 +1,15 @@
 #!/usr/bin/env zx
 import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
-import writeEbayFile from "./src/listing-sites/ebay.js";
 import {loadTeams} from "./src/utils/teams.js";
-import {ask} from "./src/utils/ask.js";
+import {ask, getInputDirectory} from "./src/utils/ask.js";
 import {initializeStorage, processImageFile} from "./src/image-processing/imageProcessor.js";
 import {getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
-import writeSportLotsOutput from "./src/listing-sites/sportlots.js";
-import writeBuySportsCardsOutput from "./src/listing-sites/bsc.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
 import {readFileSync} from 'fs';
 import dotenv from 'dotenv';
-import writeShopifyFile from "./src/listing-sites/shopify.js";
+import writeOutputFiles from "./src/writeFiles.js";
 
 dotenv.config();
 
@@ -35,15 +32,7 @@ await loadTeams(app);
 
 
 // Set up full run information
-let input_directory = await ask('Input Directory', 'input');
-if (input_directory === 'input') {
-  input_directory = 'input/'
-} else if (input_directory.indexOf('/') !== input_directory.length - 1) {
-  input_directory = `input/${input_directory}/`;
-} else {
-  input_directory = `input/${input_directory}`;
-}
-console.log(`Input Directory: ${input_directory}`);
+let input_directory = await getInputDirectory()
 const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
@@ -93,10 +82,7 @@ try {
   await Promise.all(preProcessQueue);
 
   //write the output
-  await writeSportLotsOutput(allCards);
-  await writeBuySportsCardsOutput(allCards);
-  await writeEbayFile(allCards);
-  await writeShopifyFile(allCards);
+  await writeOutputFiles(allCards);
 } finally {
   //print all the title values in allCards
   Object.values(allCards).forEach(t => console.log(t.title));

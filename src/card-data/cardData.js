@@ -10,17 +10,17 @@ const saveData = {
   setData: {},
   allCardData: {}
 }
-export const initializeAnswers = async (inputDirectory) => {
+export const initializeAnswers = async (inputDirectory, readExact = false) => {
   answerFile = `${inputDirectory}input.json`;
 
   try {
     const answerInput = await fs.readJSON(answerFile);
-    console.log('answerInput', answerInput);
+    // console.log('answerInput', answerInput);
 
     saveData.metadata = answerInput.metadata;
-    saveData.metadata.reprocessImages = await ask('Reprocess existing images', false);
+    saveData.metadata.reprocessImages = readExact ? false : await ask('Reprocess existing images', false);
 
-    saveData.allCardData = Object.values(answerInput.allCardData).map(card => ({
+    saveData.allCardData = readExact ? answerInput.allCardData : Object.values(answerInput.allCardData).map(card => ({
       ...card,
       //clear out the pics property because it is appended to every run
       pics: '',

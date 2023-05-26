@@ -29,6 +29,7 @@
     "install-spacy-models": "python3 -m spacy download en_core_web_md",
     "start": "node startSpacy.js",
     "process": "ts-node trim.js",
+    "rewrite": "ts-node src/rewriteFiles.js",
     "test": "jest"
   },
   "opencv4nodejs": {
