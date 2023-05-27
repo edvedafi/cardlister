@@ -3,7 +3,6 @@ import {createObjectCsvWriter} from 'csv-writer';
 import {isNo, isYes, titleCase} from "../utils/data.js";
 
 const defaultValues = {
-  vendor: 'edvedafi',
   published: 'TRUE',
   category: '532',
   inventoryTracker: 'shopify',
@@ -16,6 +15,7 @@ const defaultValues = {
   opt1: 'Title',
   opt1Value: 'Default Title',
   location: 'Home',
+  weightUnit: 'oz',
 }
 
 const filePath = 'output/shopify.csv';
@@ -25,11 +25,14 @@ async function writeShopifyFile(data) {
     path: filePath,
     header: [
       {id: 'handle', title: 'Handle'},
-      {id: 'vendor', title: 'Vendor'},
+      {id: 'manufacture', title: 'Vendor'},
       {id: 'published', title: 'Published'},
       {id: 'title', title: 'Title'},
+      {id: 'category', title: 'Product Category'},
+      {id: 'type', title: 'Type'},
       {id: 'description', title: 'Body (HTML)'},
       {id: 'weight', title: 'Variant Grams'},
+      {id: 'weightUnit', title: 'Variant Weight Unit'},
       {id: 'inventoryTracker', title: 'Variant Inventory Tracker'},
       {id: 'quantity', title: 'Variant Inventory Qty'},
       {id: 'quantity', title: 'On Hand'},
@@ -49,7 +52,7 @@ async function writeShopifyFile(data) {
       {id: 'opt2Value', title: 'Option2 Value'},
       {id: 'opt3', title: 'Option3 Name'},
       {id: 'opt3Value', title: 'Option3 Value'},
-      {id: 'location', title: 'Location'}
+      {id: 'location', title: 'Location'},
     ],
   });
 
@@ -112,6 +115,7 @@ async function writeShopifyFile(data) {
       card.type = `${card.sport} Card`;
     } else {
       card.sport = 'N/A';
+      card.type = `Sports Card`;
     }
 
     addTag(card.year);
@@ -124,7 +128,17 @@ async function writeShopifyFile(data) {
 
     card.weight = card.lbs * 453.59237 + card.oz * 28.3495231;
 
-    card.description = `${card.longTitle}`
+    card.description = `
+<p><strong>Year:</strong> ${card.year}</p>
+<p><strong>Manufacture:</strong> ${card.manufacture}</p>
+<p><strong>Set:</strong> ${card.setName}</p>
+<p><strong>Insert:</strong> ${card.insert}</p>
+<p><strong>Parallel:</strong> ${card.parallel}</p>
+<p><strong>Card Number:</strong> #${card.cardNumber}</p>
+<p><strong>Player:</strong> ${card.player}</p>
+<p><strong>Team:</strong> ${card.team}</p>
+<p><strong>Sport:</strong> ${card.sport}</p>
+`;
 
     card.setName = `${card.year} ${card.setName}`;
 
@@ -139,23 +153,27 @@ async function writeShopifyFile(data) {
       if (index === 0) {
         card.image = image;
         card.imagePosition = 1;
-        card.imageAlt = `Front of ${card.year}  ${card.setName} #${card.cardNumber} ${card.player}`;
+        card.imageAlt = `Front of ${card.setName} #${card.cardNumber} ${card.player}`;
       } else {
         secondImages.push({
           handle: card.handle,
           image,
           imagePosition: index + 1,
-          imageAlt: `Back of ${card.year}  ${card.setName} #${card.cardNumber} ${card.player}`,
+          imageAlt: `Back of ${card.setName} #${card.cardNumber} ${card.player}`,
         });
       }
     });
     return card;
   });
 
-  csvData = csvData.concat(secondImages);
-
   // merge defaults
   csvData = csvData.map((card) => ({...defaultValues, ...card}));
+
+  // add second images after defaults so they don't get them
+  csvData = csvData.concat(secondImages);
+
+  // sort by handle to put images next to real records
+  csvData = csvData.sort((a, b) => a.handle.localeCompare(b.handle));
 
   console.log(`Writing ${csvData.length} records to ${filePath}`);
 
