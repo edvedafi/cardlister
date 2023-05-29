@@ -45,7 +45,7 @@ export const loadTeams = async (app) => {
     }
   });
 
-  console.log('loaded teams', allTeams);
+  // console.log('loaded teams', allTeams);
 }
 
 export const isTeam = (team, sport, year) => {

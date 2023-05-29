@@ -1,4 +1,8 @@
 #!/usr/bin/env zx
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
 import {loadTeams} from "./src/utils/teams.js";
@@ -8,10 +12,8 @@ import {getCardData, getSetData, initializeAnswers} from "./src/card-data/cardDa
 import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
 import {readFileSync} from 'fs';
-import dotenv from 'dotenv';
 import writeOutputFiles from "./src/writeFiles.js";
 
-dotenv.config();
 
 const hofDBJSON = JSON.parse(readFileSync('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json'));
 const firebaseConfig = {
@@ -46,13 +48,13 @@ const files = lsOutput.toString().split('\n')
 //Here we run the actual process
 const processImage = async (image, imageDefaults) => {
   console.log(await terminalImage.file(image, {height: 25}));
-  let cardData = await getCardData(allCards, imageDefaults);
+  let cardData = await getCardData(image, allCards, imageDefaults);
+  imageDefaults.cardNumber = cardData.cardNumber;
   await processImageFile(image, cardData, overrideImages);
   console.log(`${image} -> ${cardData.filename} Complete`)
 }
 
 const preProcessQueue = [];
-const processQueue = [];
 const preProcessPair = async (front, back) => {
   const imageDefaults = await imageRecognition(front, back, setData);
   // processQueue.push(() => processPair(front, back, imageDefaults));

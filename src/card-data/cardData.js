@@ -23,9 +23,9 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
     saveData.allCardData = readExact ? answerInput.allCardData : Object.values(answerInput.allCardData).map(card => ({
       ...card,
       //clear out the pics property because it is appended to every run
-      pics: '',
+      pics: saveData.metadata.reprocessImages ? '' : card.pics,
       //reset the count to 0 if we want to reuse the existing images
-      count: saveData.metadata.reprocessImages ? card.count : 0,
+      count: saveData.metadata.reprocessImages ? 0 : card.count,
     })).reduce((acc, card) => {
       acc[card.cardNumber] = card;
       return acc;
@@ -50,10 +50,10 @@ const saveAnswers = (cardData) => {
 }
 
 export const getSetData = async () => {
-  const isSet = await ask('Is this a complete set?', saveData.setData.isSet || false);
+  const isSet = await ask('Is this a complete set?', isYes(saveData.setData?.isSet));
 
-  //Set up an prefixes to the card title
   if (isSet) {
+    saveData.setData.isSet = true;
     saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
     saveData.setData.year = await ask('Year', saveData.setData.year);
     saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
@@ -135,7 +135,7 @@ async function getCardName(output) {
 
 async function getNewCardData(cardNumber, defaults = {}) {
   let output = {
-    cardNumber: `${saveData.setData.card_number_prefix || ''}${cardNumber}`,
+    cardNumber: saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix) ? `${saveData.setData.card_number_prefix}${cardNumber}` : cardNumber,
     count: 1,
     pics: [],
     crop: defaults.crop
@@ -211,7 +211,17 @@ async function getNewCardData(cardNumber, defaults = {}) {
 }
 
 let cardNumber = 1;
-export const getCardData = async (allCards, imageDefaults) => {
+export const getCardData = async (rawImage, allCards, imageDefaults) => {
+
+  //first kick out if we already have data saved for this image
+  if (rawImage) {
+    const saved = Object.values(allCards).find(card => card.raw?.includes(rawImage));
+    if (saved) {
+      return saved;
+    }
+  }
+
+  //find the card number
   if (imageDefaults.cardNumber) {
     cardNumber = imageDefaults.cardNumber;
   }
@@ -219,12 +229,14 @@ export const getCardData = async (allCards, imageDefaults) => {
   let output = allCards[cardNumber];
   let bumpCardNumber = false;
 
+  //see if we already have that card number
   if (output) {
     output.count = output.count + 1;
     if (output.count > 1) {
       bumpCardNumber = true;
     }
   } else {
+    //if we haven't found it yet, lets get the new data!
     output = await getNewCardData(cardNumber, {
       ...output,
       ...imageDefaults

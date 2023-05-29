@@ -4,6 +4,9 @@ import {titleCase} from "../utils/data.js";
 // import {ask} from "../utils/ask.js";
 // import {nlp} from 'spacy-nlp';
 import {HfInference} from '@huggingface/inference'
+import dotenv from 'dotenv';
+
+dotenv.config();
 // import { readFileSync } from 'fs'
 
 const hf = new HfInference(process.env.HF_TOKEN)
@@ -32,8 +35,10 @@ const detectionFeatures = [
 ];
 
 async function getTextFromImage(front, back, setData) {
-  console.log('getTextFromImage');
   let defaults = {...setData};
+  defaults.raw = [front, back];
+
+  console.log('Processing: ', defaults.raw);
 
   // Creates a client
   const client = new vision.ImageAnnotatorClient();
