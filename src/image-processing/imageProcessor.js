@@ -57,18 +57,6 @@ export const processImageFile = async (image, cardData, overrideImages) => {
         }
       }
 
-      // if (!goodImage) {
-      //   goodImage = await cropImage(async () => {
-      //     await sharp(input).trim({threshold: 50}).toFile(tempImage);
-      //   });
-      // }
-
-      if (!goodImage && cardData.crop) {
-        goodImage = await cropImage(async () => {
-          await sharp(input).extract(cardData.crop).toFile(tempImage);
-        });
-      }
-
       if (!goodImage) {
         goodImage = await cropImage(async () => {
           await $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`
@@ -84,6 +72,18 @@ export const processImageFile = async (image, cardData, overrideImages) => {
       if (!goodImage) {
         goodImage = await cropImage(async () => {
           await $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`
+        });
+      }
+
+      if (!goodImage) {
+        goodImage = await cropImage(async () => {
+          await sharp(input).trim({threshold: 50}).toFile(tempImage);
+        });
+      }
+
+      if (!goodImage && cardData.crop) {
+        goodImage = await cropImage(async () => {
+          await sharp(input).extract(cardData.crop).toFile(tempImage);
         });
       }
 
