@@ -38,7 +38,7 @@ async function getTextFromImage(front, back, setData) {
   let defaults = {...setData};
   defaults.raw = [front, back];
 
-  console.log('Processing: ', defaults.raw);
+  //console.log('Processing: ', defaults.raw);
 
   // Creates a client
   const client = new vision.ImageAnnotatorClient();
@@ -189,7 +189,7 @@ const getCropHints = async (client, image) => {
 
 const callNLP = async (text) => {
   try {
-    console.log('calling NLP', text);
+    // console.log('calling NLP', text);
     return await hf.tokenClassification({
       model: 'dslim/bert-base-NER-uncased',
       inputs: text

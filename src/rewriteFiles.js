@@ -1,5 +1,4 @@
-#!/usr/bin/env zx
-import {ask, getInputDirectory} from "./utils/ask.js";
+import {getInputDirectory} from "./utils/ask.js";
 import {initializeAnswers} from "./card-data/cardData.js";
 import 'zx/globals';
 import dotenv from 'dotenv'

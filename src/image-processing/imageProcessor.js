@@ -15,9 +15,14 @@ export const initializeStorage = (app) => {
   storage = getStorage(app);
 }
 
-export const processImageFile = async (image, cardData, overrideImages) => {
+function getOutputFile(cardData) {
   const outputLocation = `${output_directory}${cardData.directory}`;
   const outputFile = `${outputLocation}${cardData.filename}`;
+  return {outputLocation, outputFile};
+}
+
+export const prepareImageFile = async (image, cardData, overrideImages) => {
+  const {outputLocation, outputFile} = getOutputFile(cardData);
   let input = image;
   let rotation = await ask('Rotate', false);
   let rotate;
@@ -99,10 +104,18 @@ export const processImageFile = async (image, cardData, overrideImages) => {
       await fs.copyFile(input, outputFile);
     }
 
-    // upload file to firebase storage
-    storage.bucket().upload(outputFile, {destination: cardData.filename}).catch(e => {
-      console.error(`Error uploading ${outputFile}`, e);
-      process.exit(1);
-    });
+    return outputFile
   }
+}
+
+// upload file to firebase storage
+export const processImageFile = async (outputFile, filename) => {
+  let promise;
+  try {
+    promise = storage.bucket().upload(outputFile, {destination: filename});
+  } catch (e) {
+    console.error(`Error uploading ${outputFile}`, e);
+    process.exit(1);
+  }
+  return promise
 }
