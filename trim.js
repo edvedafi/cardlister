@@ -8,7 +8,7 @@ import {cert, initializeApp} from "firebase-admin/app";
 import {loadTeams} from "./src/utils/teams.js";
 import {ask, getInputDirectory} from "./src/utils/ask.js";
 import {initializeStorage, prepareImageFile, processImageFile} from "./src/image-processing/imageProcessor.js";
-import {getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
+import {cardDataExistsForRawImage, getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
 import {readFileSync} from 'fs';
@@ -45,38 +45,48 @@ const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
 const files = lsOutput.toString().split('\n')
 
 // set up the queues
-const queueReadImage = new Queue({results: [], concurrency: 3});
+const queueReadImage = new Queue({results: [], autostart: true, concurrency: 3});
 const queueGatherData = new Queue({results: [], autostart: true, concurrency: 1});
 const queueImageFiles = new Queue({results: [], autostart: true, concurrency: 3});
 
 //some debugging listeners
-// queueGatherData.addEventListener('start', ({job}) => {
-//   console.log('Gather Data Queue Started: ', job);
-// });
-// queueGatherData.addEventListener('success', ({result}) => {
-//   console.log('Gather Data Queue success: ', result);
-// });
-// queueGatherData.addEventListener('error', ({error, job}) => {
-//   console.log('Gather Data Queue error: ', error, job);
-// });
-// queueGatherData.addEventListener('timeout', ({next, job}) => {
-//   console.log('Gather Data Queue timeout: ', next, job);
-// });
-// queueGatherData.addEventListener('end', ({err}) => {
-//   console.log('Gather Data Queue end: ', err);
-// });
+const debugQueue = queue => {
+  queue.addEventListener('start', (job) => {
+    console.log('Gather Data Queue Started: ', job);
+  });
+  queue.addEventListener('success', (result) => {
+    console.log('Gather Data Queue success: ', result);
+  });
+  queue.addEventListener('error', (error, job) => {
+    console.log('Gather Data Queue error: ', error, job);
+  });
+  queue.addEventListener('timeout', (next, job) => {
+    console.log('Gather Data Queue timeout: ', next, job);
+  });
+  queue.addEventListener('end', (err) => {
+    console.log('Gather Data Queue end: ', err);
+  });
+}
+// debugQueue(queueReadImage);
+// debugQueue(queueGatherData);
+// debugQueue(queueImageFiles);
 
 //Here we run the actual process
-
 const preProcessPair = async (front, back) => {
-  const imageDefaults = await imageRecognition(front, back, setData);
-  queueGatherData.push(() => processPair(front, back, imageDefaults));
+  // console.log('here!', front)
+  if (!cardDataExistsForRawImage(front, allCards)) {
+    // console.log('here2')
+    const imageDefaults = await imageRecognition(front, back, setData);
+    queueGatherData.push(() => processPair(front, back, imageDefaults));
+  }
 }
 
 const processPair = async (front, back, imageDefaults) => {
-  await processImage(front, imageDefaults, 1);
-  if (back) {
-    await processImage(back, imageDefaults, 2);
+  if (!cardDataExistsForRawImage(front, allCards)) {
+    await processImage(front, imageDefaults, 1);
+    if (back) {
+      await processImage(back, imageDefaults, 2);
+    }
   }
 }
 
@@ -104,26 +114,17 @@ try {
     queueReadImage.push(() => preProcessPair(front, back));
   }
 
-  queueReadImage.start(err => {
-    if (err) throw err
-    // console.log('all done:', queueReadImage.results)
-  })
-  queueGatherData.start(err => {
-    if (err) throw err
-    // console.log('all done:', queueGatherData.results)
-  })
-  queueImageFiles.start(err => {
-    if (err) throw err
-    // console.log('all done:', queueImageFiles.results)
-  })
-
   //wait for the 3 queues to finish before writing any outupt
+  console.log('wait for the queues!')
   await new Promise(resolve => queueReadImage.addEventListener('end', resolve));
+  console.log('queueReadImage done')
   await new Promise(resolve => queueGatherData.addEventListener('end', resolve));
   await new Promise(resolve => queueImageFiles.addEventListener('end', resolve));
 
   //write the output
   await writeOutputFiles(allCards);
+} catch (e) {
+  console.log(e);
 } finally {
   //print all the title values in allCards
   Object.values(allCards).forEach(t => console.log(t.title));

@@ -52,17 +52,31 @@ const saveAnswers = (cardData) => {
 export const getSetData = async () => {
   const isSet = await ask('Is this a complete set?', isYes(saveData.setData?.isSet));
 
+  const askWithNoToSkip = async (question, defaultValue) => {
+    let dv;
+    if (typeof defaultValue === 'boolean') {
+      if (defaultValue === true) {
+        dv = true;
+      } else {
+        dv = 'n';
+      }
+    } else {
+      dv = `${defaultValue}`;
+    }
+    return await ask(`${question} (enter No to skip)`, defaultValue);
+  }
+
   if (isSet) {
     saveData.setData.isSet = true;
     saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
     saveData.setData.year = await ask('Year', saveData.setData.year);
     saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
     saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
-    saveData.setData.insert = await ask('Insert (enter No to skip)', saveData.setData.insert);
-    saveData.setData.parallel = await ask('Parallel (enter No to skip)', saveData.setData.parallel);
+    saveData.setData.insert = await askWithNoToSkip('Insert', saveData.setData.insert);
+    saveData.setData.parallel = await askWithNoToSkip('Parallel', saveData.setData.parallel);
     saveData.setData.features = await ask('Features', saveData.setData.features);
-    saveData.setData.printRun = await ask('Print Run (enter No to skip)', saveData.setData.printRun);
-    saveData.setData.autographed = await ask('Autograph (enter No to skip)', saveData.setData.autographed);
+    saveData.setData.printRun = await askWithNoToSkip('Print Run', saveData.setData.printRun);
+    saveData.setData.autographed = await askWithNoToSkip('Autograph', saveData.setData.autographed);
 
     saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
     saveData.setData.price = await ask('Default Price', saveData.setData.price);
@@ -214,12 +228,7 @@ let cardNumber = 1;
 export const getCardData = async (rawImage, allCards, imageDefaults) => {
 
   //first kick out if we already have data saved for this image
-  if (rawImage) {
-    const saved = Object.values(allCards).find(card => card.raw?.includes(rawImage));
-    if (saved) {
-      return saved;
-    }
-  }
+
 
   //find the card number
   if (imageDefaults.cardNumber) {
@@ -262,4 +271,14 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
   }
 
   return output
+}
+
+export const cardDataExistsForRawImage = (rawImage, allCards) => {
+  if (rawImage) {
+    const saved = Object.values(allCards).find(card => card.raw?.includes(rawImage));
+    if (saved) {
+      return saved;
+    }
+  }
+  return false;
 }
