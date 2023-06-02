@@ -1,3 +1,5 @@
+import {byCardNumber} from "../utils/data.js";
+
 async function writeSportLotsOutput(allCards) {
   const years = {};
 
@@ -34,12 +36,7 @@ async function writeSportLotsOutput(allCards) {
     output.push(year);
     Object.keys(years[year]).sort().forEach(setName => {
       output.push(`  ${setName}`);
-      years[year][setName].sort((a, b) => {
-        //extract card number from cardNumber string
-        const aNumber = parseInt(a.cardNumber.match(/\d+/)[0]);
-        const bNumber = parseInt(b.cardNumber.match(/\d+/)[0]);
-        return aNumber - bNumber;
-      }).forEach(card => {
+      years[year][setName].sort(byCardNumber).forEach(card => {
         output.push(`    ${card.cardNumber} ${card.player} ${card.price} (${card.quantity})`);
       });
     });

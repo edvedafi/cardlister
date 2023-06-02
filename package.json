@@ -34,7 +34,7 @@
     "start": "ts-node trim.js",
     "process": "ts-node trim.js",
     "rewrite": "ts-node src/rewriteFiles.js",
-    "test": "jest"
+    "test": "jest --watch"
   },
   "opencv4nodejs": {
     "disableAutoBuild": 1,

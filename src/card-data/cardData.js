@@ -234,7 +234,11 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
   if (imageDefaults.cardNumber) {
     cardNumber = imageDefaults.cardNumber;
   }
-  cardNumber = await ask('Card Number', cardNumber);
+
+  if (!allCards[cardNumber]) {
+    cardNumber = await ask('Card Number', cardNumber);
+  }
+
   let output = allCards[cardNumber];
   let bumpCardNumber = false;
 
@@ -263,7 +267,7 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`
   output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
-  allCards[cardNumber] = output;
+  allCards[output.cardNumber] = output;
   saveAnswers(allCards);
 
   if (bumpCardNumber) {

@@ -12,3 +12,21 @@ export const titleCase = str => {
   }
   return str.split(' ').map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 }
+
+export const byCardNumber = (a, b) => {
+  //extract card number from cardNumber string
+  if (parseInt(a.cardNumber) && parseInt(b.cardNumber)) {
+    return parseInt(a.cardNumber) - parseInt(b.cardNumber);
+  }
+  const aMatcher = a.cardNumber.match(/\d+/);
+  const bMatcher = b.cardNumber.match(/\d+/);
+  if (aMatcher && aMatcher.length > 0 && bMatcher && bMatcher.length > 0) {
+    const aNumber = parseInt(aMatcher[0]);
+    const bNumber = parseInt(bMatcher[0]);
+    return aNumber - bNumber;
+  } else {
+    if (a.cardNumber < b.cardNumber) return -1;
+    if (a.cardNumber > b.cardNumber) return 1;
+  }
+  return 0;
+};

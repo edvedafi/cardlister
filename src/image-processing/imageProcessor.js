@@ -24,15 +24,15 @@ function getOutputFile(cardData) {
 export const prepareImageFile = async (image, cardData, overrideImages) => {
   const {outputLocation, outputFile} = getOutputFile(cardData);
   let input = image;
-  let rotation = await ask('Rotate', false);
+  // let rotation = await ask('Rotate', false);
   let rotate;
-  if (isYes(rotation)) {
-    rotate = -90
-  } else if (isNaN(rotation)) {
-    rotate = 0;
-  } else {
-    rotate = rotation || 0;
-  }
+  // if (isYes(rotation)) {
+  //   rotate = -90
+  // } else if (isNaN(rotation)) {
+  //   rotate = 0;
+  // } else {
+  //   rotate = rotation || 0;
+  // }
   //if the output file already exists, skip it
   if (!overrideImages && fs.existsSync(outputFile)) {
     console.log('Image already exists, skipping');

@@ -117,7 +117,6 @@ try {
   //wait for the 3 queues to finish before writing any outupt
   console.log('wait for the queues!')
   await new Promise(resolve => queueReadImage.addEventListener('end', resolve));
-  console.log('queueReadImage done')
   await new Promise(resolve => queueGatherData.addEventListener('end', resolve));
   await new Promise(resolve => queueImageFiles.addEventListener('end', resolve));
 
