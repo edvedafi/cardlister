@@ -154,29 +154,37 @@ async function getTextFromImage(front, back, setData) {
     addSearch(backResult, false)
   ]);
 
-  // Sort the search paragraphs by confidence
-  searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
-
-  //Run NLP on the entire document first
-  // console.log('Search Paragraphs', searchParagraphs);
-  defaults = {
-    ...defaults,
-    ...await runNLP(searchParagraphs)
-  };
-
-  //first pass only check for near exact matches
-  defaults = await runFirstPass(searchParagraphs, defaults, setData);
-
-  //second pass, lets check things that are a little less exact
-  defaults = await runSecondPass(searchParagraphs, defaults);
-
-  //third pass, lets get really fuzzy
-  defaults = await fuzzyMatch(searchParagraphs, defaults);
+  defaults = await extractData(searchParagraphs, defaults, setData);
 
   // console.log(defaults);
   // await ask('Continue?');
 
   return defaults;
+}
+
+export const extractData = async (searchParagraphs, defaults, setData) => {
+  let result = {...defaults};
+  // Sort the search paragraphs by confidence
+  searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
+  // console.log('extractData', searchParagraphs);
+
+  //Run NLP on the entire document first
+  // console.log('Search Paragraphs', searchParagraphs);
+  result = {
+    ...result,
+    ...await runNLP(searchParagraphs)
+  };
+
+  //first pass only check for near exact matches
+  result = await runFirstPass(searchParagraphs, result, setData);
+
+  //second pass, lets check things that are a little less exact
+  result = await runSecondPass(searchParagraphs, result, setData);
+
+  //third pass, lets get really fuzzy
+  result = await fuzzyMatch(searchParagraphs, result, setData);
+
+  return result;
 }
 
 const getCropHints = async (client, image) => {
@@ -245,9 +253,9 @@ export const runNLP = async (text) => {
       }))
       //sort first by count and then by score
       .sort((a, b) => {
-        if (b.wordCount === 2) {
+        if (b.wordCount === 2 && a.wordCount !== 2) {
           return 1;
-        } else if (a.wordCount === 2) {
+        } else if (a.wordCount === 2 && b.wordCount !== 2) {
           return -1;
         } else {
           return b.count - a.count || b.score - a.score
@@ -303,12 +311,15 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
     // console.log('First Pass: ', block)
 
     if (block.isNumber) {
-      if (!results.year && block.word > 1900 && block.word < 2100) {
-        results.year = block.word;
-      } else if (!results.cardNumber && !setData.card_number_prefix && !block.isFront) {
-        results.cardNumber = block.word;
-      }
+      //do nothing in the first pass
     } else {
+
+      if (!results.year) {
+        const regexMatch = copyRightYearRegexMatch(block.word);
+        if (regexMatch) {
+          results.year = regexMatch;
+        }
+      }
 
       if (setData.card_number_prefix && !results.cardNumber) {
         // concat all but the last value in the block.words array together
@@ -351,6 +362,10 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
         block.set = true;
       }
 
+      if (block.word === 'RC') {
+        results.features = addFeature(results.features, 'RC');
+      }
+
       let teamTest;
       if (!results.team) {
         block.words.find(word => {
@@ -372,17 +387,18 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
   return results;
 }
 
-const runSecondPass = async (searchParagraphs, defaults) => {
+const runSecondPass = async (searchParagraphs, defaults, setData) => {
   const results = {...defaults};
   searchParagraphs.filter(block => !block.set).forEach(block => {
     const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
 
     // console.log('second pass: ', block)
 
-    if (!results.year) {
-      const regexMatch = copyRightYearRegexMatch(block.word);
-      if (regexMatch) {
-        results.year = regexMatch;
+    if (block.isNumber) {
+      if (!results.year && block.word > 1900 && block.word < 2100) {
+        results.year = block.word;
+      } else if (!results.cardNumber && !setData.card_number_prefix && !block.isFront) {
+        results.cardNumber = block.word;
       }
     }
 
@@ -423,6 +439,16 @@ const fuzzyMatch = async (searchParagraphs, defaults) => {
     }
   });
   return results;
+}
+
+const addFeature = (features, feature) => {
+  if (!features) {
+    return feature;
+  } else if (features.indexOf(feature) > -1) {
+    return features;
+  } else {
+    return `${features} | ${feature}`;
+  }
 }
 
 export default getTextFromImage
