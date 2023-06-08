@@ -48,7 +48,7 @@ export const loadTeams = async (app) => {
   // console.log('loaded teams', allTeams);
 }
 
-export const isTeam = (team, sport, year) => {
+export let isTeam = (team, sport, year) => {
   const testYear = year || 2000;
   const searchKey = team.toLowerCase();
   // console.log('searching for team', searchKey, sport,);

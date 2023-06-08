@@ -278,7 +278,7 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
 }
 
 export const cardDataExistsForRawImage = (rawImage, allCards) => {
-  if (rawImage) {
+  if (rawImage && !saveData.setData.reprocessImages) {
     const saved = Object.values(allCards).find(card => card.raw?.includes(rawImage));
     if (saved) {
       return saved;

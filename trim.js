@@ -45,64 +45,82 @@ const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
 const files = lsOutput.toString().split('\n')
 
 // set up the queues
-const queueReadImage = new Queue({results: [], autostart: true, concurrency: 3});
+const queueReadImage = new Queue({results: [], autostart: true, concurrency: 1});
 const queueGatherData = new Queue({results: [], autostart: true, concurrency: 1});
 const queueImageFiles = new Queue({results: [], autostart: true, concurrency: 3});
 
 //some debugging listeners
-const debugQueue = queue => {
-  queue.addEventListener('start', (job) => {
-    console.log('Gather Data Queue Started: ', job);
-  });
-  queue.addEventListener('success', (result) => {
-    console.log('Gather Data Queue success: ', result);
-  });
-  queue.addEventListener('error', (error, job) => {
-    console.log('Gather Data Queue error: ', error, job);
-  });
-  queue.addEventListener('timeout', (next, job) => {
-    console.log('Gather Data Queue timeout: ', next, job);
-  });
-  queue.addEventListener('end', (err) => {
-    console.log('Gather Data Queue end: ', err);
-  });
-}
-// debugQueue(queueReadImage);
-// debugQueue(queueGatherData);
-// debugQueue(queueImageFiles);
+// const debugQueue = (name, queue) => {
+//   queue.addEventListener('start', (job) => {
+//     console.log(`${name} Queue Started: `, job);
+//   });
+//   queue.addEventListener('success', (result) => {
+//     console.log(`${name} Queue success: `, result);
+//   });
+//   queue.addEventListener('error', (error, job) => {
+//     console.log(`${name} Queue error: `, error, job);
+//   });
+//   queue.addEventListener('timeout', (next, job) => {
+//     console.log(`${name} Queue timeout: `, next, job);
+//   });
+//   queue.addEventListener('end', (err) => {
+//     console.log(`${name} Queue end: `, err);
+//   });
+// }
+// debugQueue('read', queueReadImage);
+// debugQueue('gather data', queueGatherData);
+// debugQueue('images', queueImageFiles);
 
 //Here we run the actual process
 const preProcessPair = async (front, back) => {
-  // console.log('here!', front)
-  if (!cardDataExistsForRawImage(front, allCards)) {
-    // console.log('here2')
-    const imageDefaults = await imageRecognition(front, back, setData);
-    queueGatherData.push(() => processPair(front, back, imageDefaults));
+  let imageDefaults;
+  try {
+    // console.log('here!', front)
+    if (!cardDataExistsForRawImage(front, allCards)) {
+      // console.log('here2')
+      imageDefaults = await imageRecognition(front, back, setData);
+      queueGatherData.push(() => processPair(front, back, imageDefaults));
+    }
+  } catch (e) {
+    console.error('Failed while Preprocessing Card Data', front, back, imageDefaults)
+    console.error(e)
+    throw e;
   }
 }
 
 const processPair = async (front, back, imageDefaults) => {
-  if (!cardDataExistsForRawImage(front, allCards)) {
-    await processImage(front, imageDefaults, 1);
-    if (back) {
-      await processImage(back, imageDefaults, 2);
+  try {
+    if (!cardDataExistsForRawImage(front, allCards)) {
+      await processImage(front, imageDefaults, 1);
+      if (back) {
+        await processImage(back, imageDefaults, 2);
+      }
     }
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 
 const processImage = async (image, imageDefaults) => {
-  console.log(await terminalImage.file(image, {height: 25}));
-  const cardData = await getCardData(image, allCards, imageDefaults);
-  imageDefaults.cardNumber = cardData.cardNumber; //ick fix this side effect coding
-  const outputFile = await prepareImageFile(image, cardData, overrideImages);
-  if (outputFile) {
-    const filename = cardData.filename;
-    queueImageFiles.push(() => processImageFile(outputFile, filename));
+  try {
+    console.log(await terminalImage.file(image, {height: 25}));
+    const cardData = await getCardData(image, allCards, imageDefaults);
+    imageDefaults.cardNumber = cardData.cardNumber; //ick fix this side effect coding
+    const outputFile = await prepareImageFile(image, cardData, overrideImages);
+    if (outputFile) {
+      const filename = cardData.filename;
+      queueImageFiles.push(() => processImageFile(outputFile, filename));
+    }
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 }
 
 try {
   let i = 0;
+  console.log('Processing files: ', files);
   while (i < files.length - 1) {
 
     //move on to the next files
@@ -116,9 +134,15 @@ try {
 
   //wait for the 3 queues to finish before writing any outupt
   console.log('wait for the queues!')
-  await new Promise(resolve => queueReadImage.addEventListener('end', resolve));
-  await new Promise(resolve => queueGatherData.addEventListener('end', resolve));
-  await new Promise(resolve => queueImageFiles.addEventListener('end', resolve));
+  if (queueReadImage.length > 0) {
+    await new Promise(resolve => queueReadImage.addEventListener('end', resolve));
+  }
+  if (queueGatherData.length > 0) {
+    await new Promise(resolve => queueGatherData.addEventListener('end', resolve));
+  }
+  if (queueImageFiles.length > 0) {
+    await new Promise(resolve => queueImageFiles.addEventListener('end', resolve));
+  }
 
   //write the output
   await writeOutputFiles(allCards);

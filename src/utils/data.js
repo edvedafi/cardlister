@@ -10,7 +10,9 @@ export const titleCase = str => {
   if (!str) {
     return str;
   }
-  return str.split(' ').map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  return str.split(' ').map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+    .split('.').map(word => word[0].toUpperCase() + word.slice(1)).join('.')
+    .split("'").map(word => word[0].toUpperCase() + word.slice(1)).join("'");
 }
 
 export const byCardNumber = (a, b) => {

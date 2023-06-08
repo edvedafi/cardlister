@@ -5,6 +5,7 @@ import {titleCase} from "../utils/data.js";
 // import {nlp} from 'spacy-nlp';
 import {HfInference} from '@huggingface/inference'
 import dotenv from 'dotenv';
+import {ask} from "../utils/ask.js";
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -157,9 +158,10 @@ async function getTextFromImage(front, back, setData) {
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
 
   //Run NLP on the entire document first
+  // console.log('Search Paragraphs', searchParagraphs);
   defaults = {
     ...defaults,
-    ...await runNLP(searchParagraphs.map(block => block.word).join('. '))
+    ...await runNLP(searchParagraphs)
   };
 
   //first pass only check for near exact matches
@@ -187,7 +189,7 @@ const getCropHints = async (client, image) => {
   return {left, top, width: right - left, height: bottom - top};
 }
 
-const callNLP = async (text) => {
+export let callNLP = async (text) => {
   try {
     // console.log('calling NLP', text);
     return await hf.tokenClassification({
@@ -199,24 +201,94 @@ const callNLP = async (text) => {
     process.exit(1);
   }
 }
-const runNLP = async (text) => {
+export const runNLP = async (text) => {
+  const countWords = word => text.reduce((count, paragraph) => count + paragraph.lowerCase.includes(word), 0)
+  const wordCount = name => name.split(' ').length;
   const results = {};
-  const segments = await callNLP(text);
-  // console.log('segemnts', segemnts);
+  const textBlock = text.map(block => block.word).join('. ');
+  // console.log('nlp input: ', textBlock);
+  const segments = await callNLP(textBlock);
+  // console.log('segments', segments);
   const persons = segments.filter(segment => segment.entity_group === 'PER');
   // console.log('persons', persons)
+  // await ask('Continue?');
 
   if (persons.length === 1) {
     results.player = titleCase(persons[0].word);
   } else if (persons.length > 1) {
-    const names = persons.sort((a, b) => b.score - a.score).map(person => person.word);
-    // console.log('selecting persons from: ', persons)
-    if (names[0].includes(' ') || names[0] === names[1]) {
+    const names = persons
+      //replace # with wildcard regex search for letters only of the text input
+      .map(person => {
+        let finalWord;
+        if (person.word.includes('#')) {
+          let rawWord = text.find(word => word.lowerCase.match(person.word.replace(/#/g, "[A-Za-z.']+")))
+          if (rawWord) {
+            const end = person.word.replace(/#/g, '');
+            finalWord = rawWord.word.slice(0, rawWord.lowerCase.indexOf(end) + end.length);
+          }
+        }
+        return {...person, word: finalWord || person.word};
+      })
+      //remove any words that have a non alphabetic character, also all spaces, periods and hyphens
+      .filter(person => person.word.match(/^[A-Za-z\s.\-']+$/))
+      //remove duplicates
+      .filter((person, index, self) => index === self.findIndex(p => p.word === person.word))
+      //remove any names that are in the ignore list
+      .filter(person => !manufactures.includes(person.word) && !inserts.includes(person.word) && !sets.includes(person.word))
+      //remove any names that are substrings of other names
+      .filter(person => !persons.find(search => search.word !== person.word && search.word.includes(person.word)))
+      //count the number of times that a name appears in the text
+      .map(name => ({
+        ...name,
+        count: countWords(name.word),
+        wordCount: wordCount(name.word),
+      }))
+      //sort first by count and then by score
+      .sort((a, b) => {
+        if (b.wordCount === 2) {
+          return 1;
+        } else if (a.wordCount === 2) {
+          return -1;
+        } else {
+          return b.count - a.count || b.score - a.score
+        }
+      })
+      //remove all the excess info
+      .map(person => person.word)
+      //remove any team names
+      .filter(name => !isTeam(name));
+
+    // console.log('selecting persons from: ', names)
+    if (names[0].includes(' ')) {
       results.player = titleCase(names[0]);
     } else if (names[1].includes(' ')) {
       results.player = titleCase(names[0]);
+    } else if (names.length === 3) {
+      const firstInitial = names.find(name => name.length === 1);
+      const secondInitial = names.find(name => name.length === 1 && name !== firstInitial);
+      const lastName = names.find(name => name.length > 1);
+
+      if (countWords(`${firstInitial}${secondInitial} ${lastName}`) > 0) {
+        results.player = titleCase(`${firstInitial}${secondInitial} ${lastName}`);
+      } else if (countWords(`${firstInitial}.${secondInitial}. ${lastName}`) > 0) {
+        results.player = titleCase(`${firstInitial}.${secondInitial}. ${lastName}`);
+      } else if (countWords(`${firstInitial}. ${secondInitial}. ${lastName}`) > 0) {
+        results.player = titleCase(`${firstInitial}. ${secondInitial}. ${lastName}`);
+      } else {
+        results.player = titleCase(`${firstInitial} ${secondInitial} ${lastName}`);
+      }
     } else {
-      results.player = titleCase(`${names[0]} ${names[1]}`);
+      //check to see if any of our options are exact 2 words that both have letters in them
+      const twoWords = names.filter(name => {
+        const split = name.split(' ')
+        return split.length === 2 && split[0].match(/[A-Za-z]/) && split[1].match(/[A-Za-z]/)
+      });
+
+      if (twoWords.length === 1) {
+        results.player = titleCase(twoWords[0]);
+      } else {
+        results.player = titleCase(`${names[0]} ${names[1]}`);
+      }
     }
   }
 
