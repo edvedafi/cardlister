@@ -1,11 +1,8 @@
 import vision from '@google-cloud/vision'
-import {sports, isTeam, leagues} from "../utils/teams.js";
+import {isTeam, sports} from "../utils/teams.js";
 import {titleCase} from "../utils/data.js";
-// import {ask} from "../utils/ask.js";
-// import {nlp} from 'spacy-nlp';
 import {HfInference} from '@huggingface/inference'
 import dotenv from 'dotenv';
-import {ask} from "../utils/ask.js";
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -32,7 +29,8 @@ const inserts = ['invicta', 'next level', 'elite series', 'the rookies']
 const detectionFeatures = [
   {type: 'LABEL_DETECTION'},
   {type: 'LOGO_DETECTION'},
-  {type: 'DOCUMENT_TEXT_DETECTION'}
+  {type: 'DOCUMENT_TEXT_DETECTION'},
+  {type: 'OBJECT_LOCALIZATION'}
 ];
 
 async function getTextFromImage(front, back, setData) {
@@ -163,13 +161,18 @@ async function getTextFromImage(front, back, setData) {
 }
 
 export const extractData = async (searchParagraphs, defaults, setData) => {
+  // console.log('extractData', searchParagraphs);
   let result = {...defaults};
   // Sort the search paragraphs by confidence
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
-  // console.log('extractData', searchParagraphs);
 
-  //Run NLP on the entire document first
-  // console.log('Search Paragraphs', searchParagraphs);
+  //lets see if the card has the standard panini info
+  result = {
+    ...result,
+    ...paniniMatch(searchParagraphs)
+  }
+
+  //Run NLP on the entire document
   result = {
     ...result,
     ...await runNLP(searchParagraphs)
@@ -210,7 +213,14 @@ export let callNLP = async (text) => {
   }
 }
 export const runNLP = async (text) => {
-  const countWords = word => text.reduce((count, paragraph) => count + paragraph.lowerCase.includes(word), 0)
+  const countWords = word => {
+    if (word) {
+      const search = word.toLowerCase();
+      return text.reduce((count, paragraph) => count + paragraph.lowerCase.includes(search), 0)
+    } else {
+      return 0;
+    }
+  }
   const wordCount = name => name.split(' ').length;
   const results = {};
   const textBlock = text.map(block => block.word).join('. ');
@@ -239,6 +249,8 @@ export const runNLP = async (text) => {
       })
       //remove any words that have a non alphabetic character, also all spaces, periods and hyphens
       .filter(person => person.word.match(/^[A-Za-z\s.\-']+$/))
+      //names cannot start with a number or a symbol
+      .filter(person => !person.word.match(/^[^A-Za-z]/))
       //remove duplicates
       .filter((person, index, self) => index === self.findIndex(p => p.word === person.word))
       //remove any names that are in the ignore list
@@ -248,7 +260,7 @@ export const runNLP = async (text) => {
       //count the number of times that a name appears in the text
       .map(name => ({
         ...name,
-        count: countWords(name.word),
+        count: name.word.split(/\s/).reduce((count, word) => count + countWords(word), 0),
         wordCount: wordCount(name.word),
       }))
       //sort first by count and then by score
@@ -344,7 +356,7 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
       if (!results.cardNumber) {
         const firstWord = block.words[0].toLowerCase();
         if (wordCountBetween(2, 4) && ['no', 'no.'].includes(firstWord)) {
-          results.cardNumber = block.words.slice(1).join('');
+          results.cardNumber = block.words.slice(block.words.findIndex(word => word.indexOf('.') >= 0) + 1).join('');
           block.set = true;
         }
       }
@@ -370,6 +382,9 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
       if (!results.team) {
         block.words.find(word => {
           teamTest = isTeam(word, setData.sport);
+          if (teamTest && teamTest[0] === 'USA MLB') {
+            return false;
+          }
           return teamTest;
         });
 
@@ -449,6 +464,28 @@ const addFeature = (features, feature) => {
   } else {
     return `${features} | ${feature}`;
   }
+}
+
+export const paniniMatch = (searchParagraphs) => {
+  const results = {}
+  const match = searchParagraphs.find(block => block.lowerCase.match(/\d\d\d\d panini - /));
+  if (match) {
+    results.manufacture = 'Panini';
+    results.year = match.words[0];
+    results.setName = titleCase(match.words[3]);
+    let i = 4;
+    while (!sports.includes(match.words[i].toLowerCase())) {
+      const nextWord = titleCase(match.words[i]);
+      if (results.insert) {
+        results.insert += ` ${nextWord}`;
+      } else {
+        results.insert = nextWord;
+      }
+      i++;
+    }
+    results.sport = match.words[i]?.toLowerCase();
+  }
+  return results;
 }
 
 export default getTextFromImage

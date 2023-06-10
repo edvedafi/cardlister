@@ -1,9 +1,14 @@
-import {copyRightYearRegexMatch, extractData, runNLP} from './imageRecognition.js';
+import {copyRightYearRegexMatch, extractData, paniniMatch, runNLP} from './imageRecognition.js';
 import * as ImageRecognition from "./imageRecognition.js";
 import * as Teams from "../utils/teams.js";
 import {ask} from "../utils/ask.js";
 import {Score_2022_Adian_Hutchinson} from "./testData/2022_Score_Aidan_Hutchinson.js";
 import {BigLeague_2023_Willie_Mays, BigLeague_2023_Willie_Mays_NLP} from "./testData/BigLeague_2023_Willie_Mays.js";
+import {
+  Chronicles_2021_Crusade_McKenzie,
+  Chronicles_2021_Crusade_McKenzie_NLP
+} from "./testData/Chronicles_2021_Crusade_McKenzie.js";
+import {Chronicles_2021_Pujols} from "./testData/Chronicles_2021_Pujols.js";
 
 jest.mock('../utils/ask.js');
 
@@ -11,15 +16,20 @@ describe('Image Recognition', () => {
 
   beforeEach(() => {
     ask.mockReset();
+    //set up some default mock return values. If a test is validating one of these, it should override the mock
     Teams.isTeam = jest.fn().mockImplementation((team) => {
       return team.toLowerCase().includes('cowboys');
     });
     ask.mockResolvedValue('enter');
+    ImageRecognition.callNLP = jest.fn().mockResolvedValue([]);
   });
 
   afterEach(() => {
     ask.mockReset();
     Teams.isTeam.mockReset();
+    if (ImageRecognition.callNLP.mockReset) {
+      ImageRecognition.callNLP.mockReset();
+    }
   });
 
   describe('copyRightYearRegexMatch', () => {
@@ -28,6 +38,76 @@ describe('Image Recognition', () => {
     });
     it('should match "©2021"', () => {
       expect(copyRightYearRegexMatch('©2021')).toEqual('2021');
+    });
+  });
+
+  describe('titleCase', () => {
+
+  });
+
+  describe('paniniMatch', () => {
+    it('should not match "© 2021 Panini America, Inc. All Rights Reserved."', () => {
+      const input = [
+        {
+          word: '2021 Panini America , Inc. Produced in the USA . Officially Licensed Product of MLB Players , Inc.',
+          words: [
+            '2021', 'Panini',
+            'America', ',',
+            'Inc.', 'Produced',
+            'in', 'the',
+            'USA', '.',
+            'Officially', 'Licensed',
+            'Product', 'of',
+            'MLB', 'Players',
+            ',', 'Inc.'
+          ],
+          wordCount: 18,
+          confidence: 301.9749516248703,
+          isFront: false,
+          isNumber: false,
+          lowerCase: '2021 panini america , inc. produced in the usa . officially licensed product of mlb players , inc.'
+        }
+      ];
+      expect(paniniMatch(input)).toEqual({});
+    });
+    it('should match Chronicles: "2021 PANINI - CHRONICLES CRUSADE BASEBALL"', () => {
+      const input = [
+        {
+          word: '2021 PANINI - CHRONICLES CRUSADE BASEBALL',
+          words: ['2021', 'PANINI', '-', 'CHRONICLES', 'CRUSADE', 'BASEBALL'],
+          wordCount: 6,
+          confidence: 301.9749516248703,
+          isFront: false,
+          isNumber: false,
+          lowerCase: '2021 panini - chronicles crusade baseball'
+        }
+      ];
+      expect(paniniMatch(input)).toEqual({
+        year: '2021',
+        manufacture: 'Panini',
+        setName: 'Chronicles',
+        insert: 'Crusade',
+        sport: 'baseball'
+      });
+    });
+    it('should match a regular set: "2021 PANINI - SCORE FOOTBALL"', () => {
+      const input = [
+        {
+          word: '2022 PANINI - SCORE FOOTBALL',
+          words: ['2022', 'PANINI', '-', 'SCORE', 'FOOTBALL'],
+          wordCount: 5,
+          confidence: 301.9749516248703,
+          isFront: false,
+          isNumber: false,
+          lowerCase: '2021 panini - score football'
+        }
+      ];
+      expect(paniniMatch(input)).toEqual({
+        year: '2022',
+        manufacture: 'Panini',
+        setName: 'Score',
+        sport: 'football'
+      });
     });
   });
 
@@ -2003,6 +2083,12 @@ describe('Image Recognition', () => {
       });
     });
 
+    it('should use both first and last name to do the count', async () => {
+      ImageRecognition.callNLP = jest.fn().mockResolvedValue(Chronicles_2021_Crusade_McKenzie_NLP);
+      expect(await runNLP(Chronicles_2021_Crusade_McKenzie)).toEqual({
+        player: "Triston McKenzie",
+      });
+    });
   });
 
   describe('Data Extraction: ', () => {
@@ -2562,7 +2648,12 @@ describe('Image Recognition', () => {
         expect(await extractData(input, {}, {isSet: false})).toMatchObject({cardNumber: "307"});
       });
 
+      it('should not inlcude the . if the text is read with a space ("NO . 6" should be 6)', async () => {
+        expect(await extractData(Chronicles_2021_Pujols, {}, {isSet: false})).toMatchObject({cardNumber: "6"});
+      });
+
     });
+
     describe('Year', () => {
       it('should be based on copyright if it is available', async () => {
         expect(await extractData(Score_2022_Adian_Hutchinson, {}, {isSet: false})).toMatchObject({
@@ -2570,6 +2661,7 @@ describe('Image Recognition', () => {
         });
       });
     });
+
     describe('Features', () => {
       it('should include RC if it is a Rookie Card', async () => {
         expect(await extractData(Score_2022_Adian_Hutchinson, {}, {isSet: false})).toMatchObject({
@@ -2577,6 +2669,8 @@ describe('Image Recognition', () => {
         });
       });
     });
+
   });
+
 
 });

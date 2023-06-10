@@ -10,9 +10,20 @@ export const titleCase = str => {
   if (!str) {
     return str;
   }
-  return str.split(' ').map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(' ')
-    .split('.').map(word => word[0].toUpperCase() + word.slice(1)).join('.')
-    .split("'").map(word => word[0].toUpperCase() + word.slice(1)).join("'");
+  try {
+    return str.split(' ').map(word => {
+      if (word.length > 3 && word.toLowerCase().startsWith('mc')) {
+        return 'Mc' + word[2].toUpperCase() + word.slice(3).toLowerCase()
+      } else {
+        return word[0].toUpperCase() + word.slice(1).toLowerCase()
+      }
+    }).join(' ')
+      .split('.').map(word => word[0]?.toUpperCase() + word.slice(1)).join('.')
+      .split("'").map(word => word[0]?.toUpperCase() + word.slice(1)).join("'");
+  } catch (e) {
+    console.log('error title casing', str);
+    throw e
+  }
 }
 
 export const byCardNumber = (a, b) => {
