@@ -41,6 +41,7 @@ async function uploadToShopify(data) {
           status: ACTIVE,
           tags: [${getTags(card)}],
           title: "${card.title}",
+          ${getCollections(card)}
           variants: [
             {
               inventoryPolicy: DENY,
@@ -173,6 +174,18 @@ const getDescription = (card) => `<p><strong>Year:</strong> ${card.year}</p><p><
 
 const getHandle = (card) => `${card.directory}-${card.cardNumber}-${card.player}`
   .replaceAll(' ', '-').replaceAll('/', '-')
+
+const getCollections = (card) => {
+  const collections = [];
+  if (card.price > 1) {
+    collections.push("gid://shopify/Collection/445662953780");
+  }
+  if (collections.length > 0) {
+    return `collectionsToJoin: [${collections.reduce((str, collection) => str ? `"${collection}"` : `${str}, "${collection}"`, '')}], `;
+  } else {
+    return '';
+  }
+}
 
 export default uploadToShopify
 
