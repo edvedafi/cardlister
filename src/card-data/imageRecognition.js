@@ -166,7 +166,7 @@ export const extractData = async (searchParagraphs, defaults, setData) => {
   // Sort the search paragraphs by confidence
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence)
 
-  //lets see if the card has the standard panini info
+  //let's see if the card has the standard panini info
   result = {
     ...result,
     ...paniniMatch(searchParagraphs)
@@ -333,6 +333,21 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
         }
       }
 
+      //look for Philadelphia copyright info
+      const manufactureMatch = block.lowerCase.replace(/\s|[.]/g, '');
+      if (manufactureMatch.indexOf('pcg') > -1) {
+        results.manufacture = 'Philadelphia Gum';
+        results.setName = 'Philadelphia';
+        block.set = true;
+      }
+
+      //look for Topps copyright info
+      if (manufactureMatch.indexOf('tcg') > -1) {
+        results.manufacture = 'Topps';
+        results.setName = 'Topps';
+        block.set = true;
+      }
+
       if (setData.card_number_prefix && !results.cardNumber) {
         // concat all but the last value in the block.words array together
         const prefix = block.words.slice(0, -1).map(word => word.toLowerCase()).join('');
@@ -487,5 +502,6 @@ export const paniniMatch = (searchParagraphs) => {
   }
   return results;
 }
+
 
 export default getTextFromImage

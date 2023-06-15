@@ -9,6 +9,8 @@ import {
   Chronicles_2021_Crusade_McKenzie_NLP
 } from "./testData/Chronicles_2021_Crusade_McKenzie.js";
 import {Chronicles_2021_Pujols} from "./testData/Chronicles_2021_Pujols.js";
+import {Vintage_Philadelphia} from "./testData/Vintage_Philadelphia.js";
+import {Vintage_Topps} from "./testData/Vintage_Topps.js";
 
 jest.mock('../utils/ask.js');
 
@@ -2666,6 +2668,21 @@ describe('Image Recognition', () => {
       it('should include RC if it is a Rookie Card', async () => {
         expect(await extractData(Score_2022_Adian_Hutchinson, {}, {isSet: false})).toMatchObject({
           features: "RC"
+        });
+      });
+    });
+
+    describe('Vintage Card makers', () => {
+      it('should include Philadelphia as P. C. G.', async () => {
+        expect(await extractData(Vintage_Philadelphia, {}, {isSet: false})).toMatchObject({
+          manufacture: "Philadelphia Gum",
+          setName: "Philadelphia"
+        });
+      });
+      it('should include Topps as T. C. G.', async () => {
+        expect(await extractData(Vintage_Topps, {}, {isSet: false})).toMatchObject({
+          manufacture: "Topps",
+          setName: "Topps"
         });
       });
     });

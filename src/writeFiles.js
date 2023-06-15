@@ -8,11 +8,11 @@ import uploaddToEbay from "./listing-sites/ebayUpload.js";
 async function writeOutputFiles(allCards) {
   await Promise.all([
     uploadToShopify(allCards),
-    // writeSportLotsOutput(allCards),
-    // writeBuySportsCardsOutput(allCards),
-    // writeEbayFile(allCards),
-    // writeShopifyFile(allCards),
-    // uploaddToEbay(allCards)
+    writeSportLotsOutput(allCards),
+    writeBuySportsCardsOutput(allCards),
+    writeEbayFile(allCards),
+    writeShopifyFile(allCards),
+    uploaddToEbay(allCards)
   ]);
 }
 
