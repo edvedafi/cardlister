@@ -426,7 +426,8 @@ const runSecondPass = async (searchParagraphs, defaults, setData) => {
 
     if (block.isNumber) {
       if (!results.year && block.word > 1900 && block.word < 2100) {
-        results.year = block.word;
+        //convert block.word to a number and add 1
+        results.year = `${Number(block.word) + 1}`;
       } else if (!results.cardNumber && !setData.card_number_prefix && !block.isFront) {
         results.cardNumber = block.word;
       }

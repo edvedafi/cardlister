@@ -2662,6 +2662,11 @@ describe('Image Recognition', () => {
           year: "2022"
         });
       });
+      it('should do year + 1 if the value comes out of the body of the card', async () => {
+        expect(await extractData(Vintage_Topps, {}, {isSet: false})).toMatchObject({
+          year: "1963"
+        });
+      });
     });
 
     describe('Features', () => {

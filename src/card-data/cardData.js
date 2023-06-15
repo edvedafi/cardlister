@@ -147,6 +147,8 @@ async function getCardName(output) {
   return await ask('Card Name', cardName, {maxLength: maxCardNameLength});
 }
 
+const vintageYear = 1980;
+
 async function getNewCardData(cardNumber, defaults = {}) {
   let output = {
     cardNumber: saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix) ? `${saveData.setData.card_number_prefix}${cardNumber}` : cardNumber,
@@ -162,36 +164,40 @@ async function getNewCardData(cardNumber, defaults = {}) {
   [output.team, output.teamName] = findTeam(await ask('Team', defaults.team), output.sport, output.year);
   output.manufacture = saveData?.setData?.manufacture || await ask('Manufacturer', defaults.manufacture);
   output.setName = saveData?.setData?.setName || await ask('Set Name', defaults.setName);
-  if (!isNo(saveData?.setData?.parallel)) {
-    output.parallel = saveData?.setData?.parallel || await ask('Parallel', defaults.parallel);
-  }
-  if (saveData?.setData?.parallel === 'base') {
-    output.parallel = undefined;
-  }
-  if (!isNo(saveData?.setData?.insert)) {
-    output.insert = saveData?.setData?.insert || await ask('Insert', defaults.insert);
-  }
-  output.features = saveData?.setData?.features || await ask('Features (RC, etc)', defaults.features);
+  let skipShipping = await ask('Is base card?', true);
 
-  if (!isNo(saveData?.setData?.printRun)) {
-    output.printRun = await ask('Print Run', defaults.printRun);
-  }
-
-  if (!isNo(saveData?.setData?.autographed)) {
-    output.autographed = await ask('Autographed', defaults.autographed);
-    if (isYes(output.autographed)) {
-      output.autoFormat = await ask('Autograph Format', defaults.autoFormat || 'On Card');
+  if (skipShipping) {
+    output.title = await getCardTitle(output);
+    output.cardName = await getCardName(output);
+    output.quantity = 1;
+  } else {
+    if (!isNo(saveData?.setData?.parallel)) {
+      output.parallel = saveData?.setData?.parallel || await ask('Parallel', defaults.parallel);
     }
+    if (!isNo(saveData?.setData?.insert)) {
+      output.insert = saveData?.setData?.insert || await ask('Insert', defaults.insert);
+    }
+    output.features = saveData?.setData?.features || await ask('Features (RC, etc)', defaults.features);
+
+    if (!isNo(saveData?.setData?.printRun)) {
+      output.printRun = await ask('Print Run', defaults.printRun);
+    }
+
+    if (!isNo(saveData?.setData?.autographed)) {
+      output.autographed = await ask('Autographed', defaults.autographed);
+      if (isYes(output.autographed)) {
+        output.autoFormat = await ask('Autograph Format', defaults.autoFormat || 'On Card');
+      }
+    }
+    output.title = await getCardTitle(output);
+    output.cardName = await getCardName(output);
+
+    output.quantity = await ask('Quantity', defaults.quantity || 1);
+
+    skipShipping = await ask('Use Standard Card Size/Shipping?', true);
   }
 
-  output.title = await getCardTitle(output);
-  output.cardName = await getCardName(output);
-
-  output.quantity = await ask('Quantity', defaults.quantity || 1);
-
-  const skipShipping = await ask('Use Standard Card Size/Shipping?', 'Y');
-
-  if (isYes(skipShipping)) {
+  if (skipShipping) {
     output.size = 'Standard';
     output.material = 'Card Stock';
     output.thickness = '20pt';
