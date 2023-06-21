@@ -188,6 +188,39 @@ async function writeEbayFile(data) {
     console.log(e);
     throw e;
   }
+
+  await uploadEbayFile();
+}
+
+import {Builder, Browser, By, until} from 'selenium-webdriver';
+import {ask} from "../utils/ask.js";
+import {setTimeout} from "timers/promises";
+
+export const uploadEbayFile = async () => {
+  let driver
+  try {
+    driver = await new Builder().forBrowser(Browser.CHROME).build();
+    await driver.get('https://www.ebay.com/');
+    await driver.findElement(By.linkText('Sign in')).click();
+    await driver.get('https://www.ebay.com/sh/lst/active');
+    await driver.findElement(By.id('userid')).sendKeys(process.env.EBAY_ID);
+    await driver.findElement(By.id('signin-continue-btn')).click();
+    await setTimeout(1000);
+    const passwordField = await driver.wait(until.elementLocated(By.id('pass')));
+    await passwordField.sendKeys(process.env.EBAY_PASS);
+    await driver.findElement(By.id('sgnBt')).click();
+    const uploadButton = await driver.wait(until.elementLocated(By.xpath('//button[text()="Upload"]')));
+    await uploadButton.click()
+    await driver.findElement(By.xpath('//input[@type=\'file\']')).sendKeys(`/Users/jasonburich/workspace/cardlister/${filePath}`);
+
+  } catch (e) {
+    console.log(e);
+  } finally {
+    await ask('Press any key to continue...');
+    if (driver) {
+      await driver.quit();
+    }
+  }
 }
 
 export default writeEbayFile;

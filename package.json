@@ -19,6 +19,7 @@
     "ngrok": "^5.0.0-beta.2",
     "open": "^9.1.0",
     "queue": "^7.0.0",
+    "selenium-webdriver": "^4.10.0",
     "sharp": "^0.32.1",
     "shopify": "^0.1.0",
     "spacy": "^0.0.4",

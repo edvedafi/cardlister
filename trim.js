@@ -91,6 +91,10 @@ const preProcessPair = async (front, back) => {
 const processPair = async (front, back, imageDefaults) => {
   try {
     if (!cardDataExistsForRawImage(front, allCards)) {
+      console.log(await terminalImage.file(front, {height: 25}));
+      if (back) {
+        console.log(await terminalImage.file(back, {height: 25}));
+      }
       await processImage(front, imageDefaults, 1);
       if (back) {
         await processImage(back, imageDefaults, 2);
@@ -104,7 +108,6 @@ const processPair = async (front, back, imageDefaults) => {
 
 const processImage = async (image, imageDefaults) => {
   try {
-    console.log(await terminalImage.file(image, {height: 25}));
     const cardData = await getCardData(image, allCards, imageDefaults);
     imageDefaults.cardNumber = cardData.cardNumber; //ick fix this side effect coding
     const outputFile = await prepareImageFile(image, cardData, overrideImages);
