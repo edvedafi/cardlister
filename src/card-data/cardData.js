@@ -40,6 +40,8 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
   return saveData;
 }
 
+export const mockSavedSetData = (data) => saveData.setData = data;
+
 const saveAnswers = (cardData) => {
   if (cardData) {
     saveData.allCardData = cardData;
@@ -68,8 +70,10 @@ export const getSetData = async () => {
 
   if (isSet) {
     saveData.setData.isSet = true;
+    
     saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
     saveData.setData.year = await ask('Year', saveData.setData.year);
+    saveData.setData.player = await ask('Player', saveData.setData.player);
     saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
     saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
     saveData.setData.insert = await askWithNoToSkip('Insert', saveData.setData.insert);
@@ -149,21 +153,39 @@ async function getCardName(output) {
 
 const vintageYear = 1980;
 
+export async function addCardData(text, output, propName, defaultValues, options) {
+  if (  saveData?.setData &&  saveData?.setData[propName] ) {
+    if ( !isNo(saveData?.setData[propName]) ) {
+      output[propName] = saveData?.setData[propName];
+    }
+  } else {
+    output[propName] = await ask(text, defaultValues[propName], options);
+  }
+}
+
 async function getNewCardData(cardNumber, defaults = {}) {
+  const defaultValues = {
+    sport: 'football',
+    quantity: 1,
+    price: 0.99,
+    ...defaults
+  };
   let output = {
     cardNumber: saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix) ? `${saveData.setData.card_number_prefix}${cardNumber}` : cardNumber,
     count: 1,
     pics: [],
-    crop: defaults.crop
+    crop: defaultValues.crop
   };
 
-  output.sport = saveData?.setData?.sport || await ask('Sport', defaults.sport || 'football', {selectOptions: sports});
+
+  await addCardData('Sport', output, 'sport', defaultValues, {selectOptions: sports});
   output.league = findLeague(output.sport);
-  output.player = await ask('Player/Card Name', defaults.player);
-  output.year = saveData?.setData?.year || await ask('Year', defaults.year);
-  [output.team, output.teamName] = findTeam(await ask('Team', defaults.team), output.sport, output.year);
-  output.manufacture = saveData?.setData?.manufacture || await ask('Manufacturer', defaults.manufacture);
-  output.setName = saveData?.setData?.setName || await ask('Set Name', defaults.setName);
+  await addCardData('Player/Card Name', output, 'player', defaultValues);
+  await addCardData('Year', output, 'year', defaultValues);
+  [output.team, output.teamName] = findTeam(await ask('Team', defaultValues.team), output.sport, output.year);
+  await addCardData('Manufacturer', output, 'manufacture', defaultValues);
+  await addCardData('Set Name', output, 'setName', defaultValues);
+
   let skipShipping = await ask('Is base card?', true);
 
   if (skipShipping) {
@@ -171,28 +193,20 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.cardName = await getCardName(output);
     output.quantity = 1;
   } else {
-    if (!isNo(saveData?.setData?.parallel)) {
-      output.parallel = saveData?.setData?.parallel || await ask('Parallel', defaults.parallel);
-    }
-    if (!isNo(saveData?.setData?.insert)) {
-      output.insert = saveData?.setData?.insert || await ask('Insert', defaults.insert);
-    }
-    output.features = saveData?.setData?.features || await ask('Features (RC, etc)', defaults.features);
-
-    if (!isNo(saveData?.setData?.printRun)) {
-      output.printRun = await ask('Print Run', defaults.printRun);
-    }
-
-    if (!isNo(saveData?.setData?.autographed)) {
-      output.autographed = await ask('Autographed', defaults.autographed);
-      if (isYes(output.autographed)) {
-        output.autoFormat = await ask('Autograph Format', defaults.autoFormat || 'On Card');
-      }
+    await addCardData('Parallel', output, 'parallel', defaultValues);
+    await addCardData('Insert', output, 'insert', defaultValues);
+    await addCardData('Features (RC, etc)', output, 'features', defaultValues);
+    await addCardData('Print Run', output, 'printRun', defaultValues);
+    await addCardData('Autographed', output, 'autographed', defaultValues);
+    if (isYes(output.autographed)) {
+      await addCardData('Autographe Format', output, 'autoFormat', defaultValues);
+    } else {
+      output.autoFormat = output.autographed;
     }
     output.title = await getCardTitle(output);
     output.cardName = await getCardName(output);
 
-    output.quantity = await ask('Quantity', defaults.quantity || 1);
+    await addCardData('Quantity', output, 'quantity', defaultValues);
 
     skipShipping = await ask('Use Standard Card Size/Shipping?', true);
   }
@@ -207,24 +221,24 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.width = 4;
     output.depth = 1;
   } else {
-    output.size = await ask('Size', 'Standard');
-    output.material = await ask('Material', 'Card Stock');
-    output.thickness = await ask('Thickness', '20pt');
-    output.lbs = await ask('Weight (lbs)', '0');
-    output.oz = await ask('Weight (oz)', '1');
-    output.length = await ask('Length (in)', '6');
-    output.width = await ask('Width (in)', '4');
-    output.depth = await ask('Depth (in)', '1');
+    await addCardData('Size', output, 'size', defaultValues);
+    await addCardData('Material', output, 'material', defaultValues);
+    await addCardData('Thickness', output, 'thickness', defaultValues);
+    await addCardData('Weight (lbs)', output, 'lbs', defaultValues);
+    await addCardData('Weight (oz)', output, 'oz', defaultValues);
+    await addCardData('Length (in)', output, 'length', defaultValues);
+    await addCardData('Width (in)', output, 'width', defaultValues);
+    await addCardData('Depth (in)', output, 'depth', defaultValues);
   }
 
-
-  output.price = await ask('Price', saveData?.setData?.price || defaults.price || '0.99');
-  if (output.price === '0.99') {
+  await addCardData('Price', output, 'price', defaultValues);
+  if (output.price === '0.99' || output.price === 0.99) {
     output.autoOffer = '0.01';
-    // output.minOffer = '0.01';
+  } else if (output.price === '1.99' || output.price < 2.5) {
+    output.autoOffer = '1';
   } else {
-    output.autoOffer = await ask('Auto Accept Offer', saveData?.setData?.price || defaults.autoOffer);
-    // output.minOffer = await ask('Minimum Offer', defaults.minOffer);
+    await addCardData('Auto Accept Offer', output, 'autoOffer', defaultValues);
+    // await addCardData('Minimum Offer', output, 'minOffer', defaultValues);
   }
   output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ''}${output.parallel ? `/${output.parallel}` : ''}/`.replace(/\s/g, '_');
   return output;
