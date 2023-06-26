@@ -6,13 +6,15 @@ dotenv.config();
 import terminalImage from 'terminal-image';
 import {cert, initializeApp} from "firebase-admin/app";
 import {loadTeams} from "./src/utils/teams.js";
-import {ask, getInputDirectory} from "./src/utils/ask.js";
+import {ask} from "./src/utils/ask.js";
 import {initializeStorage, prepareImageFile, processImageFile} from "./src/image-processing/imageProcessor.js";
 import {cardDataExistsForRawImage, getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
-import {readFileSync} from 'fs';
+import {mkdir, readFileSync} from 'fs';
 import writeOutputFiles from "./src/writeFiles.js";
+import { unzip } from 'zlib';
+import { getInputs } from './src/inputs.js';
 
 $.verbose = false;
 
@@ -33,7 +35,7 @@ initializeStorage(app);
 await loadTeams(app);
 
 // Set up full run information
-let input_directory = await getInputDirectory()
+let input_directory = await getInputs()
 const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
@@ -155,3 +157,4 @@ try {
   //print all the title values in allCards
   Object.values(allCards).forEach(t => console.log(t.title));
 }
+

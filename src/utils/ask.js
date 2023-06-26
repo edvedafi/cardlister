@@ -53,16 +53,3 @@ export const ask = async (questionText, defaultAnswer = undefined, {maxLength, s
 export const confirm = async (questionText, defaultAnswer) => {
   return await ask(questionText, defaultAnswer, {isYN: true});
 }
-
-export const getInputDirectory = async () => {
-  let input_directory = await ask('Input Directory', 'input');
-  if (input_directory === 'input') {
-    input_directory = 'input/'
-  } else if (input_directory.indexOf('/') !== input_directory.length - 1) {
-    input_directory = `input/${input_directory}/`;
-  } else {
-    input_directory = `input/${input_directory}`;
-  }
-  console.log(`Input Directory: ${input_directory}`);
-  return input_directory;
-}
