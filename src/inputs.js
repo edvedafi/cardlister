@@ -23,7 +23,7 @@ export const getInputDirectory = async () => {
     input_directory = 'input/'
   } else if (input_directory.indexOf('/') !== input_directory.length - 1) {
     input_directory = `input/${input_directory}/`;
-  } else {
+  } else {          
     input_directory = `input/${input_directory}`;
   }
   console.log(`Input Directory: ${input_directory}`);
