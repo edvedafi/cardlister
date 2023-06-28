@@ -174,17 +174,18 @@ async function getNewCardData(cardNumber, defaults = {}) {
     cardNumber: saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix) ? `${saveData.setData.card_number_prefix}${cardNumber}` : cardNumber,
     count: 1,
     pics: [],
-    crop: defaultValues.crop
+    ...defaultValues
   };
 
+  const askFor = async (text, propName, options) => await addCardData(text, output, propName, defaultValues, options);
 
-  await addCardData('Sport', output, 'sport', defaultValues, {selectOptions: sports});
+  await askFor('Sport', 'sport', {selectOptions: sports});
   output.league = findLeague(output.sport);
-  await addCardData('Player/Card Name', output, 'player', defaultValues);
-  await addCardData('Year', output, 'year', defaultValues);
-  [output.team, output.teamName] = findTeam(await ask('Team', defaultValues.team), output.sport, output.year);
-  await addCardData('Manufacturer', output, 'manufacture', defaultValues);
-  await addCardData('Set Name', output, 'setName', defaultValues);
+  await askFor('Player/Card Name', 'player');
+  await askFor('Year', 'year');
+    [output.team, output.teamName] = findTeam(await ask('Team', defaultValues.team), output.sport, output.year);
+  await askFor('Manufacturer', 'manufacture');
+  await askFor('Set Name', 'setName');
 
   let skipShipping = await ask('Is base card?', true);
 
@@ -193,20 +194,20 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.cardName = await getCardName(output);
     output.quantity = 1;
   } else {
-    await addCardData('Parallel', output, 'parallel', defaultValues);
-    await addCardData('Insert', output, 'insert', defaultValues);
-    await addCardData('Features (RC, etc)', output, 'features', defaultValues);
-    await addCardData('Print Run', output, 'printRun', defaultValues);
-    await addCardData('Autographed', output, 'autographed', defaultValues);
+    await askFor('Parallel', 'parallel');
+    await askFor('Insert', 'insert');
+    await askFor('Features (RC, etc)', 'features');
+    await askFor('Print Run', 'printRun');
+    await askFor('Autographed', 'autographed');
     if (isYes(output.autographed)) {
-      await addCardData('Autographe Format', output, 'autoFormat', defaultValues);
+      await askFor('Autographe Format', 'autoFormat');
     } else {
       output.autoFormat = output.autographed;
     }
     output.title = await getCardTitle(output);
     output.cardName = await getCardName(output);
 
-    await addCardData('Quantity', output, 'quantity', defaultValues);
+    await askFor('Quantity', 'quantity');
 
     skipShipping = await ask('Use Standard Card Size/Shipping?', true);
   }
@@ -221,24 +222,24 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.width = 4;
     output.depth = 1;
   } else {
-    await addCardData('Size', output, 'size', defaultValues);
-    await addCardData('Material', output, 'material', defaultValues);
-    await addCardData('Thickness', output, 'thickness', defaultValues);
-    await addCardData('Weight (lbs)', output, 'lbs', defaultValues);
-    await addCardData('Weight (oz)', output, 'oz', defaultValues);
-    await addCardData('Length (in)', output, 'length', defaultValues);
-    await addCardData('Width (in)', output, 'width', defaultValues);
-    await addCardData('Depth (in)', output, 'depth', defaultValues);
+    await askFor('Size', 'size');
+    await askFor('Material', 'material');
+    await askFor('Thickness', 'thickness');
+    await askFor('Weight (lbs)', 'lbs');
+    await askFor('Weight (oz)', 'oz');
+    await askFor('Length (in)', 'length');
+    await askFor('Width (in)', 'width');
+    await askFor('Depth (in)', 'depth');
   }
 
-  await addCardData('Price', output, 'price', defaultValues);
+  await askFor('Price', 'price');
   if (output.price === '0.99' || output.price === 0.99) {
     output.autoOffer = '0.01';
   } else if (output.price === '1.99' || output.price < 2.5) {
     output.autoOffer = '1';
   } else {
-    await addCardData('Auto Accept Offer', output, 'autoOffer', defaultValues);
-    // await addCardData('Minimum Offer', output, 'minOffer', defaultValues);
+    await askFor('Auto Accept Offer', 'autoOffer');
+    // await askFor('Minimum Offer', 'minOffer');
   }
   output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ''}${output.parallel ? `/${output.parallel}` : ''}/`.replace(/\s/g, '_');
   return output;
