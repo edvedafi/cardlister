@@ -202,6 +202,13 @@ export const uploadEbayFile = async () => {
     driver = await new Builder().forBrowser(Browser.CHROME).build();
     await driver.get('https://www.ebay.com/');
     await driver.findElement(By.linkText('Sign in')).click();
+    await setTimeout(10000);
+
+    await driver.wait(until.frameToBeAvailableAndSwitchToIt(By.xpath("//iframe[starts-with(@name, 'a-') and starts-with(@src, 'https://www.google.com/recaptcha')]")));
+
+    const checkbox = await driver.wait(until.elementLocated(By.css("div.recaptcha-checkbox-checkmark")));
+    await checkbox.click();
+
     await driver.get('https://www.ebay.com/sh/lst/active');
     await driver.findElement(By.id('userid')).sendKeys(process.env.EBAY_ID);
     await driver.findElement(By.id('signin-continue-btn')).click();
