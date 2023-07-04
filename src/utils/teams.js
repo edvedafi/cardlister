@@ -1,4 +1,5 @@
 //load up the possible team names
+import e from "express";
 import {getFirestore} from "firebase-admin/firestore";
 
 const teams = [];
@@ -45,6 +46,23 @@ export const loadTeams = async (app) => {
     }
   });
 
+  // sort nfl before ncaa
+  allTeams['football'] = allTeams['football'].sort((a, b) => {
+    if (a.league === 'ncaa' && b.league === 'nfl') {
+      return 1;
+    } else if (a.league === 'nfl' && b.league === 'ncaa') {
+      return -1;
+    } else {
+      if (a.endYear && !b.endYear) {
+        return 1;
+      } else if (!a.endYear && b.endYear) {
+        return -1;
+      } else {
+        return a.searchExact.localeCompare(b.searchExact);
+      }
+    }
+  });
+
   // console.log('loaded teams', allTeams);
 }
 
@@ -84,3 +102,13 @@ export const findLeague = (sport) => {
 }
 
 export const sports = Object.keys(allTeams);
+
+export const getTeams = (sport) => {
+  return allTeams[sport].map(team => `${team.location} ${team.team}${team.endYear && team.endYear < 9999 ? ` (${team.startYear}-${team.endYear})` : '' }`);
+}
+
+export const getTeamSelections = (sport) => allTeams[sport].map(team => ({
+  name: `${team.location} ${team.team}`,
+  description: `${team.location} ${team.team}${team.endYear && team.endYear < 9999 ? ` (${team.startYear}-${team.endYear})` : '' }`,
+  value: [`${team.location} ${team.team}`, team.team, team.sport],
+}))

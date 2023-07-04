@@ -1,5 +1,5 @@
 import {ask, confirm} from "../utils/ask.js";
-import {findLeague, findTeam, sports} from "../utils/teams.js";
+import {findLeague, findTeam, getTeamSelections, sports} from "../utils/teams.js";
 import {isNo, isYes} from "../utils/data.js";
 import fs from 'fs-extra';
 
@@ -74,6 +74,8 @@ export const getSetData = async () => {
     saveData.setData.sport = await ask('Sport', saveData.setData.sport || 'Football', {selectOptions: sports});
     saveData.setData.year = await ask('Year', saveData.setData.year);
     saveData.setData.player = await ask('Player', saveData.setData.player);
+    saveData.setData.league = findLeague(saveData.setData.sport);
+    [saveData.setData.team, saveData.setData.teamName] = await ask('Team', saveData.setData.team, {selectOptions: getTeamSelections(saveData.setData.sport)});
     saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
     saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
     saveData.setData.insert = await askWithNoToSkip('Insert', saveData.setData.insert);
@@ -103,25 +105,30 @@ async function getCardTitle(output) {
   let parallel = add(output.parallel, 'Parallel');
   let features = add(output.features).replace('|', '');
   let printRun = output.printRun ? ` /${output.printRun}` : '';
+  let setName = output.setName.startsWith(output.manufacture) ? output.setName : `${output.manufacture} ${output.setName}`;
 
-  output.longTitle = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
+  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
   let title = output.longTitle;
+  if (title.length > maxTitleLength && ['Panini', 'Leaf'].includes(output.manufacture)) {
+    setName = output.setName;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
+  }
   if (title.length > maxTitleLength) {
     insert = add(output.insert);
-    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
     parallel = add(output.parallel);
-    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.teamName}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.teamName}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${output.setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}`
   }
 
   title = title.replace(/  /g, ' ');
@@ -171,10 +178,10 @@ async function getNewCardData(cardNumber, defaults = {}) {
     ...defaults
   };
   let output = {
+    ...defaultValues,
     cardNumber: saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix) ? `${saveData.setData.card_number_prefix}${cardNumber}` : cardNumber,
     count: 1,
     pics: [],
-    ...defaultValues
   };
 
   const askFor = async (text, propName, options) => await addCardData(text, output, propName, defaultValues, options);
@@ -183,7 +190,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
   output.league = findLeague(output.sport);
   await askFor('Player/Card Name', 'player');
   await askFor('Year', 'year');
-    [output.team, output.teamName] = findTeam(await ask('Team', defaultValues.team), output.sport, output.year);
+  [output.team, output.teamName] = await ask('Team', defaultValues.team, { selectOptions: getTeamSelections(output.sport) });
   await askFor('Manufacturer', 'manufacture');
   await askFor('Set Name', 'setName');
 
@@ -246,7 +253,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
 }
 
 let cardNumber = 1;
-export const getCardData = async (rawImage, allCards, imageDefaults) => {
+export const getCardData = async (allCards, imageDefaults) => {
 
   //first kick out if we already have data saved for this image
 
@@ -256,24 +263,21 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
     cardNumber = imageDefaults.cardNumber;
   }
 
-  if (!allCards[cardNumber]) {
-    cardNumber = await ask('Card Number', cardNumber);
+  if (!cardNumber) {
+    cardNumber = await ask('Card Number', cardNumber);    
   }
 
-  let output = allCards[cardNumber];
-  let bumpCardNumber = false;
+  let output = allCards[imageDefaults.key || cardNumber];
 
   //see if we already have that card number
   if (output) {
     output.count = output.count + 1;
-    if (output.count > 1) {
-      bumpCardNumber = true;
-    }
   } else {
     //if we haven't found it yet, lets get the new data!
     output = await getNewCardData(cardNumber, {
-      ...output,
-      ...imageDefaults
+      key: imageDefaults.key || cardNumber,
+      ...imageDefaults,
+      ...output
     });
 
     console.log('Card Info: ', output);
@@ -288,12 +292,8 @@ export const getCardData = async (rawImage, allCards, imageDefaults) => {
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`
   output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
-  allCards[output.cardNumber] = output;
+  allCards[output.key] = output;
   saveAnswers(allCards);
-
-  if (bumpCardNumber) {
-    cardNumber++;
-  }
 
   return output
 }

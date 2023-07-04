@@ -17,6 +17,7 @@
     "firebase": "^9.19.1",
     "firebase-admin": "^11.6.0",
     "fs-extra": "^11.1.1",
+    "fuse.js": "^6.6.2",
     "ngrok": "^5.0.0-beta.2",
     "open": "^9.1.0",
     "queue": "^7.0.0",
@@ -41,7 +42,8 @@
     "process": "ts-node trim.js",
     "rewrite": "ts-node src/rewriteFiles.js",
     "test": "jest --watch",
-    "tunnel": "ngrok http 3000"
+    "tunnel": "ngrok http 3000",
+    "testselect": "ts-node src/testselect.js"
   },
   "opencv4nodejs": {
     "disableAutoBuild": 1,

@@ -1,6 +1,7 @@
 //comment out the body of this to be prompted
 import {select, confirm as confirmPrompt, input} from '@inquirer/prompts';
 import {isNo, isYes} from "./data.js";
+import filterSelectPrompt from './filterSelectPrompt.js';
 
 export const ask = async (questionText, defaultAnswer = undefined, {maxLength, selectOptions, isYN} = {}) => {
   if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
@@ -9,20 +10,21 @@ export const ask = async (questionText, defaultAnswer = undefined, {maxLength, s
   let answer;
   if (selectOptions) {
     let choices = selectOptions.map((option) => typeof option === 'string' ? {value: option} : option);
-    if (defaultAnswer) {
-      choices = choices.sort((a, b) => {
-        if (a.value === defaultAnswer) {
-          return -1;
-        } else if (b.value === defaultAnswer) {
-          return 1;
-        } else {
-          return 0;
-        }
-      });
-    }
-    answer = await select({
+    // if (defaultAnswer) {
+    //   choices = choices.sort((a, b) => {
+    //     if (a.value === defaultAnswer) {
+    //       return -1;
+    //     } else if (b.value === defaultAnswer) {
+    //       return 1;
+    //     } else {
+    //       return 0;
+    //     }
+    //   });
+    // }
+    answer = await filterSelectPrompt({
       message: questionText,
       choices: choices,
+      'default': defaultAnswer
     });
   } else {
     let displayText = questionText;

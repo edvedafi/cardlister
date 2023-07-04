@@ -8,7 +8,7 @@ import {cert, initializeApp} from "firebase-admin/app";
 import {loadTeams} from "./src/utils/teams.js";
 import {ask} from "./src/utils/ask.js";
 import {initializeStorage, prepareImageFile, processImageFile} from "./src/image-processing/imageProcessor.js";
-import {cardDataExistsForRawImage, getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
+import {addCardData, cardDataExistsForRawImage, getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
 import 'zx/globals';
 import {mkdir, readFileSync} from 'fs';
@@ -97,9 +97,21 @@ const processPair = async (front, back, imageDefaults) => {
       if (back) {
         console.log(await terminalImage.file(back, {height: 25}));
       }
-      await processImage(front, imageDefaults, 1);
+      await addCardData('Card Number', imageDefaults, 'cardNumber', imageDefaults);
+      const oldCard = allCards[imageDefaults.cardNumber];
+      if ( oldCard ) {
+        const addImages = await ask('Add Images to existing card?', false );
+        if (addImages) {
+          imageDefaults.key = imageDefaults.cardNumber;
+        } else {
+          imageDefaults.key = `${oldCard.cardNumber}-${oldCard.setNmae}-${oldCard.insert}-${oldCard.parallel}-${oldCard.features}`
+        }
+      } else {
+        imageDefaults.key = imageDefaults.cardNumber;
+      }
+      await processImage(front, imageDefaults);
       if (back) {
-        await processImage(back, imageDefaults, 2);
+        await processImage(back, imageDefaults);
       }
     }
   } catch (e) {
@@ -110,8 +122,7 @@ const processPair = async (front, back, imageDefaults) => {
 
 const processImage = async (image, imageDefaults) => {
   try {
-    const cardData = await getCardData(image, allCards, imageDefaults);
-    imageDefaults.cardNumber = cardData.cardNumber; //ick fix this side effect coding
+    const cardData = await getCardData(allCards, imageDefaults);
     const outputFile = await prepareImageFile(image, cardData, overrideImages);
     if (outputFile) {
       const filename = cardData.filename;

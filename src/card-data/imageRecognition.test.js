@@ -114,6 +114,14 @@ describe('Image Recognition', () => {
   });
 
   describe('runNLP', () => {
+
+    it("should not run NLP if player name is already defined on the set data", async () => {
+      expect(await runNLP(BigLeague_2023_Willie_Mays, {player: 'player from Set Data'})).toEqual({
+        player: 'player from Set Data'
+      });
+      expect(ImageRecognition.callNLP).not.toHaveBeenCalled();
+    });
+
     it("should pick out the name that is most visible if there is more than one", async () => {
       const input = [
         {
@@ -508,12 +516,12 @@ describe('Image Recognition', () => {
       const expected = {
         player: 'Cooper Kupp'
       };
-      expect(await runNLP(input)).toEqual(expected);
+      expect(await runNLP(input, {})).toEqual(expected);
     });
 
     it("should pick out the name that is most visible if there is more than one", async () => {
       ImageRecognition.callNLP = jest.fn().mockResolvedValue(BigLeague_2023_Willie_Mays_NLP);
-      expect(await runNLP(BigLeague_2023_Willie_Mays)).toEqual({
+      expect(await runNLP(BigLeague_2023_Willie_Mays, {})).toEqual({
         player: 'Willie Mays'
       });
     });
@@ -968,7 +976,7 @@ describe('Image Recognition', () => {
         }
       ]);
       ask.mockResolvedValue('enter');
-      expect(await runNLP(input)).toEqual({
+      expect(await runNLP(input, {})).toEqual({
         player: 'A.J. Brown'
       });
     });
@@ -1412,7 +1420,7 @@ describe('Image Recognition', () => {
         return team.toLowerCase().includes('cowboys');
       });
       ask.mockResolvedValue('enter');
-      expect(await runNLP(input)).toEqual({
+      expect(await runNLP(input, {})).toEqual({
         //I know this should be CeeDee but right now have no idea how to know that would be the correct spelling
         player: 'Ceedee Lamb',
       });
@@ -2080,14 +2088,14 @@ describe('Image Recognition', () => {
           end: 813
         }
       ]);
-      expect(await runNLP(input)).toEqual({
+      expect(await runNLP(input, {})).toEqual({
         player: "Daniel Jones",
       });
     });
 
     it('should use both first and last name to do the count', async () => {
       ImageRecognition.callNLP = jest.fn().mockResolvedValue(Chronicles_2021_Crusade_McKenzie_NLP);
-      expect(await runNLP(Chronicles_2021_Crusade_McKenzie)).toEqual({
+      expect(await runNLP(Chronicles_2021_Crusade_McKenzie, {})).toEqual({
         player: "Triston McKenzie",
       });
     });
