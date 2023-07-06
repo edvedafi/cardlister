@@ -26,19 +26,22 @@ const value = await filterSelectPrompt({
     { value: 'football' },
     { value: 'baseball' },
     { value: 'basketball' },
-  ]
+  ],
+  'default': 'football',
 });
-console.log(value);
+console.log('value: ', value);
 
 const teams = getTeamSelections(value);
-console.log(teams);
+// console.log(teams);
 
-let defaultTeam;
+let defaultTeam = teams[13].value;
+console.log(defaultTeam)
 
 const team = await filterSelectPrompt({
   message: 'Select a card',
   choices: teams,
-  'default': defaultTeam
+  'default': defaultTeam,
+  cancelable: true
 });
 
-console.log(team);
+console.log(`team: ${team.display}`);

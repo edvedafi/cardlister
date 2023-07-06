@@ -24,7 +24,8 @@ export const ask = async (questionText, defaultAnswer = undefined, {maxLength, s
     answer = await filterSelectPrompt({
       message: questionText,
       choices: choices,
-      'default': defaultAnswer
+      'default': defaultAnswer,
+      cancelable: true
     });
   } else {
     let displayText = questionText;

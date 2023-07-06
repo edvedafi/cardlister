@@ -162,7 +162,7 @@ const getTags = (card) => {
   addTag(card.year);
   addTag(card.setName);
   addTag(card.player);
-  addTag(card.team);
+  addTag(card.team.display);
   if (card.grade) {
     addTag(card.grade);
   }
@@ -170,7 +170,7 @@ const getTags = (card) => {
   return tags;
 }
 
-const getDescription = (card) => `<p><strong>Year:</strong> ${card.year}</p><p><strong>Manufacture:</strong> ${card.manufacture}</p><p><strong>Set:</strong> ${card.setName}</p><p><strong>Insert:</strong> ${card.insert}</p><p><strong>Parallel:</strong> ${card.parallel}</p><p><strong>Card Number:</strong> #${card.cardNumber}</p><p><strong>Player:</strong> ${card.player}</p><p><strong>Team:</strong> ${card.team}</p><p><strong>Sport:</strong> ${card.sport}</p>`;
+const getDescription = (card) => `<p><strong>Year:</strong> ${card.year}</p><p><strong>Manufacture:</strong> ${card.manufacture}</p><p><strong>Set:</strong> ${card.setName}</p><p><strong>Insert:</strong> ${card.insert}</p><p><strong>Parallel:</strong> ${card.parallel}</p><p><strong>Card Number:</strong> #${card.cardNumber}</p><p><strong>Player:</strong> ${card.player}</p><p><strong>Team:</strong> ${card.team.display}</p><p><strong>Sport:</strong> ${card.sport}</p>`;
 
 const getHandle = (card) => `${card.directory}-${card.cardNumber}-${card.player}`
   .replaceAll(' ', '-').replaceAll('/', '-')

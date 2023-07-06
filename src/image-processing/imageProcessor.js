@@ -64,6 +64,12 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
 
       if (!goodImage) {
         goodImage = await cropImage(async () => {
+          await sharp(input).trim('black').trim('green').trim('black').trim('green').toFile(tempImage);
+        });
+      }
+
+      if (!goodImage) {
+        goodImage = await cropImage(async () => {
           await $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`
         });
       }
@@ -97,13 +103,42 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
       goodImage = false;
     }
 
+    let preResize;;
     if (goodImage) {
-      await fs.copyFile(tempImage, outputFile);
+      preResize = tempImage;
     } else {
       await $`open -Wn ${input}`;
-      await fs.copyFile(input, outputFile);
+      preResize = input;
     }
 
+    const maxSizeInBytes = 10 * 1000 * 1000; // slightly under 10MB
+
+    sharp(preResize)
+      .resize({ fit: 'inside', width: 1024, height: 1024 }) 
+      .toBuffer((err, buffer) => {
+        if (err) {
+          console.error('Error resizing the image:', err);
+        } else {
+          if (buffer.length > maxSizeInBytes) {
+            const compressionRatio = maxSizeInBytes / buffer.length;
+            const outputQuality = Math.floor(compressionRatio * 100);
+
+            sharp(buffer)
+              .jpeg({ quality: outputQuality })
+              .toFile(outputFile, (err) => {
+                if (err) {
+                  console.error('Error saving the resized image:', err);
+                } else {
+                  console.log('Resized image saved successfully!');
+                }
+              });
+          } else {
+            fs.writeFileSync(outputFile, buffer);
+            // console.log('Image size iWE s already within the limit. Saved as is.');
+          }
+        }
+      });
+    
     return outputFile
   }
 }

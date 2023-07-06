@@ -56,7 +56,7 @@ async function writeEbayFile(data) {
       {id: 'setName', title: '*C:Set'},
       {id: 'grade', title: '*C:Grade'},
       {id: 'grader', title: '*C:Professional Grader'},
-      {id: 'team', title: '*C:Team'},
+      {id: 'teamDisplay', title: '*C:Team'},
       {id: 'league', title: '*C:League'},
       {id: 'autographed', title: '*C:Autographed'},
       {id: 'condition', title: '*C:Card Condition'},
@@ -174,6 +174,8 @@ async function writeEbayFile(data) {
     card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`
 
     card.setName = `${card.year} ${card.setName}`;
+
+    card.teamDisplay = card.team.display;
 
     return card;
   });

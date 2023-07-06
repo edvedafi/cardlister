@@ -35,8 +35,9 @@ export const loadTeams = async (app) => {
       sport: sport,
       league: doc.data().league,
       searchExact: `${doc.data().location?.toLowerCase()} ${doc.data().team?.toLowerCase()}`,
-      startYear: doc.data().startYear || 1800,
-      endYear: doc.data().endYear || 9999,
+      startYear: doc.data().startYear || "1800",
+      endYear: doc.data().endYear || "9999",
+      display: `${doc.data().location} ${doc.data().team}`
     }
     teams.push(team);
     if (allTeams[sport]) {
@@ -86,7 +87,7 @@ export let isTeam = (team, sport, year) => {
     });
   }
   // console.log('found team', foundTeam);
-  return foundTeam ? foundTeam.team ? [`${foundTeam.location} ${foundTeam.team}`, foundTeam.team, foundTeam.sport] : foundTeam : false;
+  return foundTeam;
 }
 
 export const findTeam = (team, sport, year) => {
@@ -110,5 +111,5 @@ export const getTeams = (sport) => {
 export const getTeamSelections = (sport) => allTeams[sport].map(team => ({
   name: `${team.location} ${team.team}`,
   description: `${team.location} ${team.team}${team.endYear && team.endYear < 9999 ? ` (${team.startYear}-${team.endYear})` : '' }`,
-  value: [`${team.location} ${team.team}`, team.team, team.sport],
+  value: team,
 }))

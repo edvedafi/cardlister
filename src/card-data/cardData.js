@@ -75,7 +75,7 @@ export const getSetData = async () => {
     saveData.setData.year = await ask('Year', saveData.setData.year);
     saveData.setData.player = await ask('Player', saveData.setData.player);
     saveData.setData.league = findLeague(saveData.setData.sport);
-    [saveData.setData.team, saveData.setData.teamName] = await ask('Team', saveData.setData.team, {selectOptions: getTeamSelections(saveData.setData.sport)});
+    saveData.setData.team = await ask('Team', saveData.setData.team, {selectOptions: getTeamSelections(saveData.setData.sport)});
     saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
     saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
     saveData.setData.insert = await askWithNoToSkip('Insert', saveData.setData.insert);
@@ -107,22 +107,22 @@ async function getCardTitle(output) {
   let printRun = output.printRun ? ` /${output.printRun}` : '';
   let setName = output.setName.startsWith(output.manufacture) ? output.setName : `${output.manufacture} ${output.setName}`;
 
-  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
+  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
   let title = output.longTitle;
   if (title.length > maxTitleLength && ['Panini', 'Leaf'].includes(output.manufacture)) {
     setName = output.setName;
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     insert = add(output.insert);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
     parallel = add(output.parallel);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.teamName}${features}${printRun}`
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.team}${features}${printRun}`
   }
   if (title.length > maxTitleLength) {
     title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`
@@ -161,12 +161,13 @@ async function getCardName(output) {
 const vintageYear = 1980;
 
 export async function addCardData(text, output, propName, defaultValues, options) {
-  if (  saveData?.setData &&  saveData?.setData[propName] ) {
+  if (saveData?.setData && saveData?.setData[propName] && !options?.allowUpdates) {
     if ( !isNo(saveData?.setData[propName]) ) {
       output[propName] = saveData?.setData[propName];
     }
   } else {
-    output[propName] = await ask(text, defaultValues[propName], options);
+    const defaultValue = defaultValues[propName] ? defaultValues[propName].display || defaultValues[propName] : '';
+    output[propName] = await ask(text, defaultValue, options);
   }
 }
 
@@ -190,7 +191,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
   output.league = findLeague(output.sport);
   await askFor('Player/Card Name', 'player');
   await askFor('Year', 'year');
-  [output.team, output.teamName] = await ask('Team', defaultValues.team, { selectOptions: getTeamSelections(output.sport) });
+  await askFor('Team', 'team', {selectOptions: getTeamSelections(output.sport)});
   await askFor('Manufacturer', 'manufacture');
   await askFor('Set Name', 'setName');
 
@@ -239,13 +240,13 @@ async function getNewCardData(cardNumber, defaults = {}) {
     await askFor('Depth (in)', 'depth');
   }
 
-  await askFor('Price', 'price');
+  await askFor('Price', 'price', {allowUpdates: true});
   if (output.price === '0.99' || output.price === 0.99) {
     output.autoOffer = '0.01';
   } else if (output.price === '1.99' || output.price < 2.5) {
     output.autoOffer = '1';
   } else {
-    await askFor('Auto Accept Offer', 'autoOffer');
+    await askFor('Auto Accept Offer', 'autoOffer', {allowUpdates: true});
     // await askFor('Minimum Offer', 'minOffer');
   }
   output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ''}${output.parallel ? `/${output.parallel}` : ''}/`.replace(/\s/g, '_');

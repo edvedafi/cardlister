@@ -22,6 +22,10 @@ function isSelectableChoice(
   return choice != null && !choice.disabled;
 }
 
+function isEsacpeKey(key) {
+  return key.name === 'escape';
+}
+
 export default createPrompt(
   (
     config,
@@ -35,24 +39,32 @@ export default createPrompt(
     const [status, setStatus] = useState('pending');
     const [searchTerm, setSearchTerm] = useState(config.default || '');
 
-    const defaultFuse = useRef(new Fuse(config.choices, {
-      keys: [
-        "name", "description", "value"
-      ]
-    })).current;
-    const [choices, setChoices] = useState(config.default ? defaultFuse.search(searchTerm).map((result) => result.item): config.choices);
+    const keys = config.choices[0].name && config.choices[0].description ? ["name", "description"] : ["value"];
+
+    const defaultFuse = useRef(new Fuse(config.choices, { keys })).current;
+    const [choices, setChoices] = useState(config.default ? defaultFuse.search(config?.default?.display || config.default).map((result) => result.item): config.choices);
     
     const [cursorPosition, setCursorPos] = useState(0);
 
     // Safe to assume the cursor position always point to a Choice.
-
     const choice = choices[cursorPosition];
 
     useKeypress((key) => {
+      // console.log(key);
       if (isEnterKey(key)) {
         setSearchTerm('');
         setStatus('done');
         done(choice.value);
+      } else if (isEsacpeKey(key)) {
+        if (config.cancelable && searchTerm === '') {
+          setChoices([]);
+          setStatus('aborted');
+          done(undefined);
+        } else {
+          setSearchTerm('');
+          setChoices(config.choices);
+          setCursorPos(0);
+        }
       } else if (isUpKey(key) || isDownKey(key)) {
         let newCursorPosition = cursorPosition;
         const offset = isUpKey(key) ? -1 : 1;
@@ -78,12 +90,6 @@ export default createPrompt(
         setCursorPos(newCursorPosition);
       } else {
         //search choices for the closest matches
-
-        const fuse = new Fuse(choices, {
-          keys: [
-            "name", "description", "value"
-          ]
-        });
 
         // Change the pattern
         const pattern = isBackspaceKey(key) ? searchTerm.slice(0, -1) : searchTerm + key.sequence;
@@ -137,6 +143,6 @@ export default createPrompt(
     // console.log(allChoices);
     const choiceDescription = choice ? choice.description ? `\n${choice.description}` : `` : 'No Matches';
 
-    return `${prefix} ${message}\n${windowedChoices}${choiceDescription}${ansiEscapes.cursorHide}`;
+    return status === 'aborted' ? `${prefix} ${message}` : `${prefix} ${message}\n${windowedChoices}${choiceDescription}${ansiEscapes.cursorHide}`;
   }
 );

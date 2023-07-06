@@ -285,7 +285,7 @@ export const runNLP = async (text, setData) => {
       // console.log('selecting persons from: ', names)
       if (names[0].includes(' ')) {
         results.player = titleCase(names[0]);
-      } else if (names[1].includes(' ')) {
+      } else if (names[1]?.includes(' ')) {
         results.player = titleCase(names[0]);
       } else if (names.length === 3) {
         const firstInitial = names.find(name => name.length === 1);
@@ -402,7 +402,7 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
       if (!results.team) {
         block.words.find(word => {
           teamTest = isTeam(word, setData.sport);
-          if (teamTest && teamTest[0] === 'USA MLB') {
+          if (teamTest && teamTest.display === 'USA MLB') {
             return false;
           }
           return teamTest;
@@ -410,10 +410,10 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
 
         if (teamTest) {
           // console.log(teamTest)
-          results.team = teamTest[0];
+          results.team = teamTest;
           block.set = true;
           if (!results.sport) {
-            results.sport = teamTest[2];
+            results.sport = team.sport;
           }
         }
       }

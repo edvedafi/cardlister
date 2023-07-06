@@ -121,7 +121,7 @@ async function writeShopifyFile(data) {
     addTag(card.year);
     addTag(card.setName);
     addTag(card.player);
-    addTag(card.team);
+    addTag(card.team.display);
     if (card.grade) {
       addTag(card.grade);
     }
@@ -136,7 +136,7 @@ async function writeShopifyFile(data) {
 <p><strong>Parallel:</strong> ${card.parallel}</p>
 <p><strong>Card Number:</strong> #${card.cardNumber}</p>
 <p><strong>Player:</strong> ${card.player}</p>
-<p><strong>Team:</strong> ${card.team}</p>
+<p><strong>Team:</strong> ${card.team.display}</p>
 <p><strong>Sport:</strong> ${card.sport}</p>
 `;
 
