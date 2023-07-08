@@ -8,6 +8,7 @@ import fs from 'fs-extra';
 // import cv from '@u4/opencv4nodejs';
 
 const output_directory = 'output/';
+const MAX_IMAGE_SIZE = 10 * 1000 * 1000; // slightly under 10MB
 
 let storage;
 
@@ -52,92 +53,41 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         input = `${output_directory}temp.rotated.jpg`;
       }
 
-      const cropImage = async (cropCommand) => {
-        try {
-          await cropCommand();
+      const cropAttempts = [
+        () => $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`,
+        () => sharp(input).extract(cardData.crop).toFile(tempImage),
+        () => sharp(input).trim({ threshold: 50 }).toFile(tempImage),
+        () => $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`,
+        () => $`cp ${input} ${tempImage} && open -Wn ${tempImage}`
+      ];
+      let found = false;
+      let i=0;
+      while (!found && i < cropAttempts.length) {
+        try {          
+          await cropAttempts[i]();
           console.log(await terminalImage.file(tempImage, {height: 25}));
-          return await ask('Did Image render correct?', true);
+          found = await ask('Did Image render correct?', true);
         } catch (e) {
-          console.log(`${cropCommand} failed`, e);
+          console.log(`Crop Attempt failed`, e);
         }
+        i++;
       }
-
-      if (!goodImage) {
-        goodImage = await cropImage(async () => {
-          await sharp(input).trim('black').trim('green').trim('black').trim('green').toFile(tempImage);
-        });
-      }
-
-      if (!goodImage) {
-        goodImage = await cropImage(async () => {
-          await $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`
-        });
-      }
-
-      if (!goodImage) {
-        goodImage = await cropImage(async () => {
-          await sharp(input).extract(cardData.crop).toFile(tempImage);
-        });
-      }
-
-      if (!goodImage) {
-        goodImage = await cropImage(async () => {
-          await $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`
-        });
-      }
-
-      if (!goodImage) {
-        goodImage = await cropImage(async () => {
-          await sharp(input).trim({threshold: 50}).toFile(tempImage);
-        });
-      }
-
-      if (!goodImage && cardData.crop) {
-        goodImage = await cropImage(async () => {
-          await sharp(input).extract(cardData.crop).toFile(tempImage);
-        });
+         
+      const buffer = await sharp(tempImage).toBuffer();
+      if (buffer.length > MAX_IMAGE_SIZE) {
+        const compressionRatio = MAX_IMAGE_SIZE / buffer.length;
+        const outputQuality = Math.floor(compressionRatio * 100);
+        await sharp(buffer).jpeg({ quality: outputQuality }).toFile(outputFile);
+        await $`rm ${tempImage}`;
+      } else {
+        console.log('here?')
+        await $`mv ${tempImage} ${outputFile}`;
       }
 
     } catch (e) {
       console.error('Error cropping image', e);
       goodImage = false;
     }
-
-    let preResize;;
-    if (goodImage) {
-      preResize = tempImage;
-    } else {
-      await $`open -Wn ${input}`;
-      preResize = input;
-    }
-
-    const maxSizeInBytes = 10 * 1000 * 1000; // slightly under 10MB
-
-    sharp(preResize)
-      .resize({ fit: 'inside', width: 1024, height: 1024 }) 
-      .toBuffer((err, buffer) => {
-        if (err) {
-          console.error('Error resizing the image:', err);
-        } else {
-          if (buffer.length > maxSizeInBytes) {
-            const compressionRatio = maxSizeInBytes / buffer.length;
-            const outputQuality = Math.floor(compressionRatio * 100);
-
-            sharp(buffer)
-              .jpeg({ quality: outputQuality })
-              .toFile(outputFile, (err) => {
-                if (err) {
-                  console.error('Error saving the resized image:', err);
-                } else {
-                  console.log('Resized image saved successfully!');
-                }
-              });
-          } else {
-            fs.writeFileSync(outputFile, buffer);
-            // console.log('Image size iWE s already within the limit. Saved as is.');
-          }
-        }
-      });
     
     return outputFile
   }

@@ -7,8 +7,8 @@
 import Cocoa
 import CoreImage
 
-print(CommandLine.arguments[1])
-print(CommandLine.arguments[2])
+//print(CommandLine.arguments[1])
+//print(CommandLine.arguments[2])
 
 let padding: CGFloat = 30
 
