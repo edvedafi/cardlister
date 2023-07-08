@@ -543,11 +543,10 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
         });
 
         if (teamTest) {
-          // console.log(teamTest)
           results.team = teamTest;
           block.set = true;
           if (!results.sport) {
-            results.sport = team.sport;
+            results.sport = teamTest.sport;
           }
         }
       }
