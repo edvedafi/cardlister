@@ -10,7 +10,7 @@ async function writeOutputFiles(allCards) {
     writeSportLotsOutput(allCards),
     writeBuySportsCardsOutput(allCards),
     writeEbayFile(allCards),
-    writeShopifyFile(allCards)
+    writeShopifyFile(allCards),
   ]);
 }
 

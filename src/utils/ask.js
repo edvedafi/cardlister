@@ -1,15 +1,25 @@
 //comment out the body of this to be prompted
-import {select, confirm as confirmPrompt, input} from '@inquirer/prompts';
-import {isNo, isYes} from "./data.js";
-import filterSelectPrompt from './filterSelectPrompt.js';
+import { select, confirm as confirmPrompt, input } from "@inquirer/prompts";
+import { isNo, isYes } from "./data.js";
+import filterSelectPrompt from "./filterSelectPrompt.js";
 
-export const ask = async (questionText, defaultAnswer = undefined, {maxLength, selectOptions, isYN} = {}) => {
-  if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
+export const ask = async (
+  questionText,
+  defaultAnswer = undefined,
+  { maxLength, selectOptions, isYN } = {},
+) => {
+  if (
+    typeof defaultAnswer === "boolean" ||
+    isYes(defaultAnswer) ||
+    isNo(defaultAnswer)
+  ) {
     isYN = true;
   }
   let answer;
   if (selectOptions) {
-    let choices = selectOptions.map((option) => typeof option === 'string' ? {value: option} : option);
+    let choices = selectOptions.map((option) =>
+      typeof option === "string" ? { value: option } : option,
+    );
     // if (defaultAnswer) {
     //   choices = choices.sort((a, b) => {
     //     if (a.value === defaultAnswer) {
@@ -24,8 +34,8 @@ export const ask = async (questionText, defaultAnswer = undefined, {maxLength, s
     answer = await filterSelectPrompt({
       message: questionText,
       choices: choices,
-      'default': defaultAnswer,
-      cancelable: true
+      default: defaultAnswer,
+      cancelable: true,
     });
   } else {
     let displayText = questionText;
@@ -39,20 +49,23 @@ export const ask = async (questionText, defaultAnswer = undefined, {maxLength, s
 
     displayText = `${displayText}:`;
     if (isYN) {
-      answer = await confirmPrompt({message: displayText, 'default': defaultAnswer});
+      answer = await confirmPrompt({
+        message: displayText,
+        default: defaultAnswer,
+      });
     } else {
       // answer = await question(`${displayText}: `);
-      answer = await input({message: displayText, 'default': defaultAnswer});
+      answer = await input({ message: displayText, default: defaultAnswer });
     }
   }
 
   if (maxLength && answer.length > maxLength) {
-    answer = await ask(questionText, answer, {maxLength});
+    answer = await ask(questionText, answer, { maxLength });
   }
 
   return answer;
-}
+};
 
 export const confirm = async (questionText, defaultAnswer) => {
-  return await ask(questionText, defaultAnswer, {isYN: true});
-}
+  return await ask(questionText, defaultAnswer, { isYN: true });
+};

@@ -1,4 +1,4 @@
 #!/usr/bin/env zx
-import spacy from 'spacy-nlp';
+import spacy from "spacy-nlp";
 
-var spacySocketIO = spacy.server({port: '6466'});
+var spacySocketIO = spacy.server({ port: "6466" });

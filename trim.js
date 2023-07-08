@@ -1,25 +1,37 @@
-import dotenv from 'dotenv';
-import Queue from 'queue'
+import dotenv from "dotenv";
+import Queue from "queue";
 
 dotenv.config();
 
-import terminalImage from 'terminal-image';
-import {cert, initializeApp} from "firebase-admin/app";
-import {loadTeams} from "./src/utils/teams.js";
-import {ask} from "./src/utils/ask.js";
-import {initializeStorage, prepareImageFile, processImageFile} from "./src/image-processing/imageProcessor.js";
-import {addCardData, cardDataExistsForRawImage, getCardData, getSetData, initializeAnswers} from "./src/card-data/cardData.js";
+import terminalImage from "terminal-image";
+import { cert, initializeApp } from "firebase-admin/app";
+import { loadTeams } from "./src/utils/teams.js";
+import { ask } from "./src/utils/ask.js";
+import {
+  initializeStorage,
+  prepareImageFile,
+  processImageFile,
+} from "./src/image-processing/imageProcessor.js";
+import {
+  addCardData,
+  cardDataExistsForRawImage,
+  getCardData,
+  getSetData,
+  initializeAnswers,
+} from "./src/card-data/cardData.js";
 import imageRecognition from "./src/card-data/imageRecognition.js";
-import 'zx/globals';
-import {mkdir, readFileSync} from 'fs';
+import "zx/globals";
+import { mkdir, readFileSync } from "fs";
 import writeOutputFiles from "./src/writeFiles.js";
-import { unzip } from 'zlib';
-import { getInputs } from './src/inputs.js';
+import { unzip } from "zlib";
+import { getInputs } from "./src/inputs.js";
 
 $.verbose = false;
 
 //instantiate firebase
-const hofDBJSON = JSON.parse(readFileSync('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json'));
+const hofDBJSON = JSON.parse(
+  readFileSync("./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json"),
+);
 const firebaseConfig = {
   credential: cert(hofDBJSON),
   apiKey: process.env.FIREBASE_API_KEY,
@@ -28,14 +40,14 @@ const firebaseConfig = {
   storageBucket: "hofdb-2038e.appspot.com",
   messagingSenderId: "78796187147",
   appId: "1:78796187147:web:aa89f01d66d63dfc5d490e",
-  measurementId: "G-4T1D5KNQ7N"
+  measurementId: "G-4T1D5KNQ7N",
 };
 const app = initializeApp(firebaseConfig);
 initializeStorage(app);
 await loadTeams(app);
 
 // Set up full run information
-let input_directory = await getInputs()
+let input_directory = await getInputs();
 const savedAnswers = await initializeAnswers(input_directory);
 const overrideImages = savedAnswers.metadata.reprocessImages;
 const allCards = savedAnswers.allCardData || {};
@@ -44,12 +56,24 @@ const setData = await getSetData();
 
 //gather the list of files that we will process
 const lsOutput = await $`ls ${input_directory}PXL*.jpg`;
-const files = lsOutput.toString().split('\n')
+const files = lsOutput.toString().split("\n");
 
 // set up the queues
-const queueReadImage = new Queue({results: [], autostart: true, concurrency: 1});
-const queueGatherData = new Queue({results: [], autostart: true, concurrency: 1});
-const queueImageFiles = new Queue({results: [], autostart: true, concurrency: 3});
+const queueReadImage = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 1,
+});
+const queueGatherData = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 1,
+});
+const queueImageFiles = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 3,
+});
 
 //some debugging listeners
 // const debugQueue = (name, queue) => {
@@ -84,27 +108,37 @@ const preProcessPair = async (front, back) => {
       queueGatherData.push(() => processPair(front, back, imageDefaults));
     }
   } catch (e) {
-    console.error('Failed while Preprocessing Card Data', front, back, imageDefaults)
-    console.error(e)
+    console.error(
+      "Failed while Preprocessing Card Data",
+      front,
+      back,
+      imageDefaults,
+    );
+    console.error(e);
     throw e;
   }
-}
+};
 
 const processPair = async (front, back, imageDefaults) => {
   try {
     if (!cardDataExistsForRawImage(front, allCards)) {
-      console.log(await terminalImage.file(front, {height: 25}));
+      console.log(await terminalImage.file(front, { height: 25 }));
       if (back) {
-        console.log(await terminalImage.file(back, {height: 25}));
+        console.log(await terminalImage.file(back, { height: 25 }));
       }
-      await addCardData('Card Number', imageDefaults, 'cardNumber', imageDefaults);
+      await addCardData(
+        "Card Number",
+        imageDefaults,
+        "cardNumber",
+        imageDefaults,
+      );
       const oldCard = allCards[imageDefaults.cardNumber];
-      if ( oldCard ) {
-        const addImages = await ask('Add Images to existing card?', false );
+      if (oldCard) {
+        const addImages = await ask("Add Images to existing card?", false);
         if (addImages) {
           imageDefaults.key = imageDefaults.cardNumber;
         } else {
-          imageDefaults.key = `${oldCard.cardNumber}-${oldCard.setNmae}-${oldCard.insert}-${oldCard.parallel}-${oldCard.features}`
+          imageDefaults.key = `${oldCard.cardNumber}-${oldCard.setNmae}-${oldCard.insert}-${oldCard.parallel}-${oldCard.features}`;
         }
       } else {
         imageDefaults.key = imageDefaults.cardNumber;
@@ -118,7 +152,7 @@ const processPair = async (front, back, imageDefaults) => {
     console.error(e);
     throw e;
   }
-}
+};
 
 const processImage = async (image, imageDefaults) => {
   try {
@@ -132,32 +166,37 @@ const processImage = async (image, imageDefaults) => {
     console.error(e);
     throw e;
   }
-}
+};
 
 try {
   let i = 0;
-  console.log('Processing files: ', files);
+  console.log("Processing files: ", files);
   while (i < files.length - 1) {
-
     //move on to the next files
     const front = files[i++];
     let back;
     if (i < files.length - 1) {
-      back = files [i++];
+      back = files[i++];
     }
     queueReadImage.push(() => preProcessPair(front, back));
   }
 
   //wait for the 3 queues to finish before writing any outupt
-  console.log('wait for the queues!')
+  console.log("wait for the queues!");
   if (queueReadImage.length > 0) {
-    await new Promise(resolve => queueReadImage.addEventListener('end', resolve));
+    await new Promise((resolve) =>
+      queueReadImage.addEventListener("end", resolve),
+    );
   }
   if (queueGatherData.length > 0) {
-    await new Promise(resolve => queueGatherData.addEventListener('end', resolve));
+    await new Promise((resolve) =>
+      queueGatherData.addEventListener("end", resolve),
+    );
   }
   if (queueImageFiles.length > 0) {
-    await new Promise(resolve => queueImageFiles.addEventListener('end', resolve));
+    await new Promise((resolve) =>
+      queueImageFiles.addEventListener("end", resolve),
+    );
   }
 
   //write the output
@@ -166,6 +205,5 @@ try {
   console.log(e);
 } finally {
   //print all the title values in allCards
-  Object.values(allCards).forEach(t => console.log(t.title));
+  Object.values(allCards).forEach((t) => console.log(t.title));
 }
-
