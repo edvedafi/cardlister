@@ -60,7 +60,14 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         () => sharp(input).trim({ threshold: 50 }).toFile(tempImage),
         () =>
           $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`,
-        () => $`cp ${input} ${tempImage} && open -Wn ${tempImage}`,
+        async () => {
+          await $`cp ${input} ${tempImage}`;
+          const openCommand = $`open -Wn ${tempImage}`;
+          process.on('SIGINT', function () {
+            openCommand ? openCommand.kill() : process.exit();
+          });
+          return openCommand;
+        },
       ];
       let found = false;
       let i = 0;
