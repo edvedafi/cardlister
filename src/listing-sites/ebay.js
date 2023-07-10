@@ -182,12 +182,12 @@ async function writeEbayFile(data) {
         ? card.sport.slice(0, 1).toUpperCase() +
           card.sport.slice(1).toLowerCase()
         : "N/A";
-
+ 
       card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
 
       card.setName = `${card.year} ${card.setName}`;
 
-      card.teamDisplay = card.team.display;
+      card.teamDisplay = card.team?.display || 'N/A';
 
       return card;
     });

@@ -122,7 +122,7 @@ export const getTeams = (sport) => {
   );
 };
 
-export const getTeamSelections = (sport) =>
+export const getTeamSelections = (sport) => allTeams[sport] ?
   allTeams[sport].map((team) => ({
     name: `${team.location} ${team.team}`,
     description: `${team.location} ${team.team}${
@@ -131,4 +131,4 @@ export const getTeamSelections = (sport) =>
         : ""
     }`,
     value: team,
-  }));
+  })) : [];

@@ -61,10 +61,12 @@ async function writeShopifyFile(data) {
     .filter((card) => card.cardNumber)
     .map((card) => {
       const addTag = (tag) => {
-        if (card.tags && card.tags.length > 0) {
-          card.tags = `${card.tags}, ${tag}`;
-        } else {
-          card.tags = tag;
+        if (tag && tag.trim().length > 0 && tag !== "undefined") {
+          if (card.tags && card.tags.length > 0) {
+            card.tags = `${card.tags}, ${tag}`;
+          } else {
+            card.tags = tag;
+          }
         }
       };
 
@@ -125,7 +127,7 @@ async function writeShopifyFile(data) {
       addTag(card.year);
       addTag(card.setName);
       addTag(card.player);
-      addTag(card.team.display);
+      addTag(card.team?.display);
       if (card.grade) {
         addTag(card.grade);
       }
@@ -140,7 +142,7 @@ async function writeShopifyFile(data) {
 <p><strong>Parallel:</strong> ${card.parallel}</p>
 <p><strong>Card Number:</strong> #${card.cardNumber}</p>
 <p><strong>Player:</strong> ${card.player}</p>
-<p><strong>Team:</strong> ${card.team.display}</p>
+<p><strong>Team:</strong> ${card.team?.display || 'N/A'}</p>
 <p><strong>Sport:</strong> ${card.sport}</p>
 `;
 

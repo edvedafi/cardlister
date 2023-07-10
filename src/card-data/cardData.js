@@ -87,7 +87,7 @@ export const getSetData = async () => {
 
     saveData.setData.sport = await ask(
       "Sport",
-      saveData.setData.sport || "Football",
+      saveData.setData.sport,
       { selectOptions: sports },
     );
     saveData.setData.year = await ask("Year", saveData.setData.year);
@@ -157,25 +157,25 @@ async function getCardTitle(output) {
     ? output.setName
     : `${output.manufacture} ${output.setName}`;
 
-  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
+  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
   let title = output.longTitle;
   if (
     title.length > maxTitleLength &&
     ["Panini", "Leaf"].includes(output.manufacture)
   ) {
     setName = output.setName;
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     insert = add(output.insert);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     parallel = add(output.parallel);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team.team}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.team}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`;

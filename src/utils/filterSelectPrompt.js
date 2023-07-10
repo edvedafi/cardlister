@@ -33,7 +33,7 @@ export default createPrompt((config, done) => {
   const [searchTerm, setSearchTerm] = useState(config.default || "");
 
   const keys =
-    config.choices[0].name && config.choices[0].description
+    config.choices && config.choices.length > 0 && config.choices[0].name && config.choices[0].description
       ? ["name", "description"]
       : ["value"];
 
@@ -54,9 +54,10 @@ export default createPrompt((config, done) => {
   useKeypress((key) => {
     // console.log(key);
     if (isEnterKey(key)) {
+      const typedValue = searchTerm;
       setSearchTerm("");
       setStatus("done");
-      done(choice.value);
+      done(choice?.value || typedValue);
     } else if (isEsacpeKey(key)) {
       if (config.cancelable && searchTerm === "") {
         setChoices([]);
@@ -118,7 +119,7 @@ export default createPrompt((config, done) => {
   }
 
   if (status === "done") {
-    return `${prefix} ${message} ${chalk.cyan(choice.name || choice.value)}`;
+    return `${prefix} ${message} ${chalk.cyan(choice?.name || choice?.value || searchTerm)}`;
   }
 
   const allChoices = choices
