@@ -50,24 +50,58 @@ async function processSingles(savedAnswers, setData, files) {
 
     //wait for the 3 queues to finish before writing any output
     console.log("wait for the queues!");
-    if (queueReadImage.length > 0) {
+    let hasQueueError = false;
+    const watchForError = (name, queue) =>
+      queue.addEventListener("error", (error, job) => {
+        hasQueueError = true;
+        console.log(`${name} Queue error: `, error, job);
+        queueReadImage.stop();
+        queueGatherData.stop();
+        queueImageFiles.stop();
+      });
+    watchForError("Read", queueReadImage);
+    watchForError("Gather", queueGatherData);
+    watchForError("Process Images", queueImageFiles);
+
+    if (queueReadImage.length > 0 && !hasQueueError) {
       await new Promise((resolve) =>
         queueReadImage.addEventListener("end", resolve),
       );
+    } else {
+      console.log(
+        "Not waiting for queueReadImage",
+        queueReadImage.length,
+        hasQueueError,
+      );
     }
-    if (queueGatherData.length > 0) {
+    if (queueGatherData.length > 0 && !hasQueueError) {
       await new Promise((resolve) =>
         queueGatherData.addEventListener("end", resolve),
       );
+    } else {
+      console.log(
+        "Not waiting for queueGatherData",
+        queueGatherData.length,
+        hasQueueError,
+      );
     }
-    if (queueImageFiles.length > 0) {
+    if (queueImageFiles.length > 0 && !hasQueueError) {
       await new Promise((resolve) =>
         queueImageFiles.addEventListener("end", resolve),
+      );
+    } else {
+      console.log(
+        "Not waiting for queueImageFiles",
+        queueImageFiles.length,
+        hasQueueError,
       );
     }
 
     //write the output
-    await writeOutputFiles(allCards);
+    console.log(hasQueueError);
+    if (!hasQueueError) {
+      await writeOutputFiles(allCards);
+    }
   } catch (e) {
     console.log(e);
   } finally {

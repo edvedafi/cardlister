@@ -1,10 +1,5 @@
 import { ask, confirm } from "../utils/ask.js";
-import {
-  findLeague,
-  findTeam,
-  getTeamSelections,
-  sports,
-} from "../utils/teams.js";
+import { findLeague, getTeamSelections, sports } from "../utils/teams.js";
 import { isNo, isYes } from "../utils/data.js";
 import fs from "fs-extra";
 
@@ -19,30 +14,32 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
   answerFile = `${inputDirectory}input.json`;
 
   try {
-    const answerInput = await fs.readJSON(answerFile);
-    // console.log('answerInput', answerInput);
+    if (await fs.exists(answerFile)) {
+      const answerInput = await fs.readJSON(answerFile);
+      // console.log('answerInput', answerInput);
 
-    saveData.metadata = answerInput.metadata;
-    saveData.metadata.reprocessImages = readExact
-      ? false
-      : await ask("Reprocess existing images", false);
+      saveData.metadata = answerInput.metadata;
+      saveData.metadata.reprocessImages = readExact
+        ? false
+        : await ask("Reprocess existing images", false);
 
-    saveData.allCardData = readExact
-      ? answerInput.allCardData
-      : Object.values(answerInput.allCardData)
-          .map((card) => ({
-            ...card,
-            //clear out the pics property because it is appended to every run
-            pics: saveData.metadata.reprocessImages ? "" : card.pics,
-            //reset the count to 0 if we want to reuse the existing images
-            count: saveData.metadata.reprocessImages ? 0 : card.count,
-          }))
-          .reduce((acc, card) => {
-            acc[card.cardNumber] = card;
-            return acc;
-          }, {});
-    saveData.setData = answerInput.setData;
-    console.log("saveData", saveData);
+      saveData.allCardData = readExact
+        ? answerInput.allCardData
+        : Object.values(answerInput.allCardData)
+            .map((card) => ({
+              ...card,
+              //clear out the pics property because it is appended to every run
+              pics: saveData.metadata.reprocessImages ? "" : card.pics,
+              //reset the count to 0 if we want to reuse the existing images
+              count: saveData.metadata.reprocessImages ? 0 : card.count,
+            }))
+            .reduce((acc, card) => {
+              acc[card.cardNumber] = card;
+              return acc;
+            }, {});
+      saveData.setData = answerInput.setData;
+      console.log("saveData", saveData);
+    }
   } catch (e) {
     console.log(e);
     console.log("No prefilled answers file found");
@@ -68,28 +65,12 @@ export const getSetData = async () => {
     isYes(saveData.setData?.isSet),
   );
 
-  const askWithNoToSkip = async (question, defaultValue) => {
-    let dv;
-    if (typeof defaultValue === "boolean") {
-      if (defaultValue === true) {
-        dv = true;
-      } else {
-        dv = "n";
-      }
-    } else {
-      dv = `${defaultValue}`;
-    }
-    return await ask(`${question} (enter No to skip)`, defaultValue);
-  };
-
   if (isSet) {
     saveData.setData.isSet = true;
 
-    saveData.setData.sport = await ask(
-      "Sport",
-      saveData.setData.sport,
-      { selectOptions: sports },
-    );
+    saveData.setData.sport = await ask("Sport", saveData.setData.sport, {
+      selectOptions: sports,
+    });
     saveData.setData.year = await ask("Year", saveData.setData.year);
     saveData.setData.player = await ask("Player", saveData.setData.player);
     saveData.setData.league = findLeague(saveData.setData.sport);
@@ -153,9 +134,11 @@ async function getCardTitle(output) {
   let parallel = add(output.parallel, "Parallel");
   let features = add(output.features).replace("|", "");
   let printRun = output.printRun ? ` /${output.printRun}` : "";
-  let setName = output.setName.startsWith(output.manufacture)
-    ? output.setName
-    : `${output.manufacture} ${output.setName}`;
+  let setName = output.setName
+    ? output.setName.startsWith(output.manufacture)
+      ? output.setName
+      : `${output.manufacture} ${output.setName}`
+    : "";
 
   output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
   let title = output.longTitle;
@@ -184,9 +167,46 @@ async function getCardTitle(output) {
     title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}`;
   }
 
-  title = title.replace(/  /g, " ");
+  title = title.replace(/ {2}/g, " ");
 
   return await ask(`Title`, title, { maxLength: maxTitleLength });
+}
+async function getLotTitle(output) {
+  const maxTitleLength = 80;
+
+  let lotCount = output.lotCount > 1 ? ` (Lot #${output.lotCount})` : "";
+  let teamDisplay = output.teamDisplay;
+
+  const updateTitle = () =>
+    `Hall of Fame Player Lot: ${output.player} ${teamDisplay}${lotCount}`.replace(
+      / {2}/g,
+      " ",
+    );
+
+  output.longTitle = updateTitle();
+  let title = output.longTitle;
+  if (title.length > maxTitleLength + 3 && lotCount) {
+    lotCount = ` Lot ${output.lotCount}`;
+    title = updateTitle();
+  }
+  if (title.length > maxTitleLength && lotCount) {
+    lotCount = ` #${output.lotCount}`;
+    title = updateTitle();
+  }
+  if (title.length > maxTitleLength && output.team.length > 0) {
+    teamDisplay = output.team.map((team) => team.team).join(" | ");
+    title = updateTitle();
+  }
+  if (title.length > maxTitleLength && output.team.length > 0) {
+    teamDisplay = output.team.map((team) => team.team).join(" ");
+    title = updateTitle();
+  }
+
+  if (title.length > maxTitleLength) {
+    return await ask(`Title`, title, { maxLength: maxTitleLength });
+  } else {
+    return title;
+  }
 }
 
 async function getCardName(output) {
@@ -207,11 +227,15 @@ async function getCardName(output) {
   if (cardName.length > maxCardNameLength) {
     cardName = `${output.setName}${insert}${parallel}`;
   }
-  cardName = cardName.replace(/  /g, " ");
+  cardName = cardName.replace(/ {2}/g, " ");
   return await ask("Card Name", cardName, { maxLength: maxCardNameLength });
 }
 
-const vintageYear = 1980;
+const findStoreCategory = (sport) => {
+  return (
+    { baseball: "10796384017", football: "10796385017" }[sport] || "10796387017"
+  );
+};
 
 export async function addCardData(
   text,
@@ -259,11 +283,11 @@ async function getNewCardData(cardNumber, defaults = {}) {
 
   await askFor("Sport", "sport", { selectOptions: sports });
   output.league = findLeague(output.sport);
+  output.storeCategory = findStoreCategory(output.sport);
   await askFor("Player/Card Name", "player");
   await askFor("Year", "year");
-  await askFor("Team", "team", {
-    selectOptions: getTeamSelections(output.sport),
-  });
+  output.team = await getTeam(output);
+  output.teamDisplay = getTeamDisplay(output.team);
   await askFor("Manufacturer", "manufacture");
   await askFor("Set Name", "setName");
 
@@ -280,7 +304,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
     await askFor("Print Run", "printRun");
     await askFor("Autographed", "autographed");
     if (isYes(output.autographed)) {
-      await askFor("Autographe Format", "autoFormat");
+      await askFor("Autograph Format", "autoFormat");
     } else {
       output.autoFormat = output.autographed;
     }
@@ -302,6 +326,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.width = 4;
     output.depth = 1;
   } else {
+    // noinspection DuplicatedCode
     await askFor("Size", "size");
     await askFor("Material", "material");
     await askFor("Thickness", "thickness");
@@ -374,6 +399,27 @@ export const getCardData = async (allCards, imageDefaults) => {
   return output;
 };
 
+export const getTeam = async (defaults) => {
+  const teams = [];
+  let newTeam = await ask("Teams", defaults?.team, {
+    selectOptions: getTeamSelections(defaults.sport),
+  });
+  while (newTeam) {
+    teams.push(newTeam);
+    newTeam = await ask("Teams", undefined, {
+      selectOptions: getTeamSelections(defaults.sport),
+    });
+  }
+  return teams;
+};
+
+export const getTeamDisplay = (teams) =>
+  teams?.reduce(
+    (display, team) =>
+      display?.length > 0 ? `${display} | ${team.display}` : team.display,
+    undefined,
+  );
+
 export const cardDataExistsForRawImage = (rawImage, allCards) => {
   if (rawImage && !saveData.setData.reprocessImages) {
     const saved = Object.values(allCards).find((card) =>
@@ -385,3 +431,90 @@ export const cardDataExistsForRawImage = (rawImage, allCards) => {
   }
   return false;
 };
+
+export const getLotData = async (imageDefaults, allCards) => {
+  let output = {
+    sport: "football",
+    quantity: 1,
+    price: 5,
+    autoOffer: 3,
+    category: "261329",
+    storeCategory: "37612238017",
+    count: 1,
+    pics: [],
+    size: "Standard",
+    material: "Card Stock",
+    thickness: "20pt",
+    lbs: 0,
+    oz: 3,
+    length: 6,
+    width: 4,
+    depth: 1,
+    numberOfCards: 25,
+    year: "1989",
+    ...imageDefaults,
+  };
+
+  const askFor = async (text, propName, options) => {
+    await addCardData(text, output, propName, output, options);
+  };
+
+  await askFor("Sport", "sport", { selectOptions: sports });
+  output.league = findLeague(output.sport);
+  output.manufacture = output.sport === "baseball" ? "Topps" : "Panini";
+  await askFor("Player/Card Name", "player");
+  output.team = await getTeam(output);
+  output.teamDisplay = getTeamDisplay(output.team);
+
+  const skipShipping = await ask(
+    "Use Standard Lot Size,Shipping, Price?",
+    true,
+  );
+
+  if (!skipShipping) {
+    await askFor("Oldest Card", "year");
+    await askFor("Quantity", "quantity");
+    // noinspection DuplicatedCode
+    await askFor("Size", "size");
+    await askFor("Material", "material");
+    await askFor("Thickness", "thickness");
+    await askFor("Weight (lbs)", "lbs");
+    await askFor("Weight (oz)", "oz");
+    await askFor("Length (in)", "length");
+    await askFor("Width (in)", "width");
+    await askFor("Depth (in)", "depth");
+    await askFor("Price", "price");
+    if (output.price !== 5 && output.price !== "5") {
+      await askFor("Auto Accept Offer", "autoOffer");
+    }
+  }
+
+  const playerKey = output.player.replace(/\s/g, "_");
+  output.directory = `HOF_Lots/${playerKey}/`;
+
+  output.lotCount = 1;
+  output.key = `${playerKey}_${output.lotCount}`;
+  const keyExists = async () =>
+    allCards[output.key] ||
+    (await fs.pathExists(`${output.directory}/${output.key}`));
+  while ((await keyExists()) && output.lotCount < 99) {
+    output.key = `${playerKey}_${++output.lotCount}`;
+  }
+  output.filename = `${output.key}.jpg`;
+  output.title = await getLotTitle(output);
+
+  const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
+  output.pics =
+    output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
+
+  output.description = `25 Card Hall of Fame Player Lot: ${output.player} ${output.teamDisplay}<br>Typically these lots contain base cards, some lower end RCs, and lower end inserts.<br>All shipping is BMWT for $5. Buy as many lots as you would like for the single $5 shipping charge.`;
+
+  allCards[output.key] = output;
+
+  console.log(output);
+  saveAnswers(allCards);
+
+  return output;
+};
+
+//Troy Aikman

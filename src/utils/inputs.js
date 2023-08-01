@@ -1,10 +1,10 @@
-import { ask } from "./utils/ask.js";
+import { ask } from "./ask.js";
 import { ensureDir } from "fs-extra/esm";
 import unzip from "decompress";
 
 export async function getInputs() {
   if (process.argv.length > 2) {
-    console.log(process.argv[2]);
+    // console.log(process.argv[2]);
     const zipFile = process.argv[2];
     const dir = `input/${zipFile
       .split("/")
@@ -31,4 +31,12 @@ export const getInputDirectory = async () => {
   }
   console.log(`Input Directory: ${input_directory}`);
   return input_directory;
+};
+
+export const getFiles = async (inputDirectory) => {
+  const lsOutput = await $`ls ${inputDirectory}PXL*.jpg`;
+  return lsOutput
+    .toString()
+    .split("\n")
+    .filter((image) => image !== "");
 };

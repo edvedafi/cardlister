@@ -85,7 +85,7 @@ const detectionFeatures = [
   { type: "OBJECT_LOCALIZATION" },
 ];
 
-async function getTextFromImage(front, back, setData) {
+async function getTextFromImage(front, back = undefined, setData = {}) {
   let defaults = { ...setData };
   defaults.raw = [front, back];
 
@@ -103,19 +103,21 @@ async function getTextFromImage(front, back, setData) {
     features: detectionFeatures,
   });
 
-  const [backResult] = await client.annotateImage({
-    image: {
-      source: {
-        filename: back,
-      },
-    },
-    features: detectionFeatures,
-  });
+  const [backResult] = back
+    ? await client.annotateImage({
+        image: {
+          source: {
+            filename: back,
+          },
+        },
+        features: detectionFeatures,
+      })
+    : [];
 
   defaults = {
     ...defaults,
     crop: await getCropHints(client, front),
-    cropBack: await getCropHints(client, back),
+    cropBack: back ? await getCropHints(client, back) : undefined,
   };
 
   /**
@@ -144,77 +146,83 @@ async function getTextFromImage(front, back, setData) {
   let searchParagraphs = [];
   // Performs label detection on the image file
   const addLabelsToSearch = (labelAnnotations, isFront) => {
-    searchParagraphs.concat(
-      labelAnnotations.map((label) => {
-        const searchValue = {
-          word: label.description,
-          words: label.description.split(" "),
-          confidence: (isFront ? 102 : 101) + label.score,
-          isFront,
-        };
-        searchValue.wordCount = searchValue.words.length;
-        searchValue.isNumber = !isNaN(searchValue.word);
-        searchValue.lowerCase = searchValue.word.toLowerCase();
-        searchParagraphs.push(searchValue);
-      }),
-    );
+    if (labelAnnotations) {
+      searchParagraphs.concat(
+        labelAnnotations.map((label) => {
+          const searchValue = {
+            word: label.description,
+            words: label.description.split(" "),
+            confidence: (isFront ? 102 : 101) + label.score,
+            isFront,
+          };
+          searchValue.wordCount = searchValue.words.length;
+          searchValue.isNumber = !isNaN(searchValue.word);
+          searchValue.lowerCase = searchValue.word.toLowerCase();
+          searchParagraphs.push(searchValue);
+        }),
+      );
+    }
   };
   addLabelsToSearch(frontResult.labelAnnotations, true);
-  addLabelsToSearch(backResult.labelAnnotations, false);
+  addLabelsToSearch(backResult?.labelAnnotations, false);
 
   const addLogosToSearch = (logoAnnotations, isFront) => {
-    searchParagraphs.concat(
-      logoAnnotations.map((logo) => {
-        const searchValue = {
-          word: logo.description,
-          words: logo.description.split(" "),
-          confidence: (isFront ? 602 : 601) + logo.score,
-          isFront,
-        };
-        searchValue.wordCount = searchValue.words.length;
-        searchValue.isNumber = !isNaN(searchValue.word);
-        searchValue.lowerCase = searchValue.word.toLowerCase();
-        searchParagraphs.push(searchValue);
-      }),
-    );
+    if (logoAnnotations) {
+      searchParagraphs.concat(
+        logoAnnotations.map((logo) => {
+          const searchValue = {
+            word: logo.description,
+            words: logo.description.split(" "),
+            confidence: (isFront ? 602 : 601) + logo.score,
+            isFront,
+          };
+          searchValue.wordCount = searchValue.words.length;
+          searchValue.isNumber = !isNaN(searchValue.word);
+          searchValue.lowerCase = searchValue.word.toLowerCase();
+          searchParagraphs.push(searchValue);
+        }),
+      );
+    }
   };
   addLogosToSearch(frontResult.logoAnnotations, true);
-  addLogosToSearch(backResult.logoAnnotations, false);
+  addLogosToSearch(backResult?.logoAnnotations, false);
 
   const addSearch = async (textResult, isFront) => {
-    const textBlocks =
-      textResult.fullTextAnnotation?.pages[0]?.blocks?.filter(
-        (block) => block.blockType === "TEXT",
-      ) || [];
+    if (textResult) {
+      const textBlocks =
+        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter(
+          (block) => block.blockType === "TEXT",
+        ) || [];
 
-    const blocks = await Promise.all(
-      textBlocks.map(async (block) => {
-        return await Promise.all(
-          block.paragraphs?.map(async (paragraph) => {
-            const searchValue = {
-              word: paragraph.words
-                .map((word) =>
+      const blocks = await Promise.all(
+        textBlocks.map(async (block) => {
+          return await Promise.all(
+            block.paragraphs?.map(async (paragraph) => {
+              const searchValue = {
+                word: paragraph.words
+                  .map((word) =>
+                    word.symbols.map((symbol) => symbol.text).join(""),
+                  )
+                  .join(" "),
+                words: paragraph.words.map((word) =>
                   word.symbols.map((symbol) => symbol.text).join(""),
-                )
-                .join(" "),
-              words: paragraph.words.map((word) =>
-                word.symbols.map((symbol) => symbol.text).join(""),
-              ),
-              wordCount: paragraph.words.length,
-              confidence: (isFront ? 302 : 301) + block.confidence,
-              isFront,
-            };
-            searchValue.isNumber = !isNaN(searchValue.word);
-            searchValue.lowerCase = searchValue.word.toLowerCase();
-            return searchValue;
-          }),
-        );
-      }),
-    );
-    // console.log('blocks:', blocks)
-    searchParagraphs = searchParagraphs.concat(
-      blocks.reduce((acc, val) => acc.concat(val), []),
-    );
+                ),
+                wordCount: paragraph.words.length,
+                confidence: (isFront ? 302 : 301) + block.confidence,
+                isFront,
+              };
+              searchValue.isNumber = !isNaN(searchValue.word);
+              searchValue.lowerCase = searchValue.word.toLowerCase();
+              return searchValue;
+            }),
+          );
+        }),
+      );
+      // console.log('blocks:', blocks)
+      searchParagraphs = searchParagraphs.concat(
+        blocks.reduce((acc, val) => acc.concat(val), []),
+      );
+    }
   };
   // console.log(frontResult.fullTextAnnotation)
   await Promise.all([
@@ -644,16 +652,29 @@ export const paniniMatch = (searchParagraphs) => {
     results.year = match.words[0];
     results.setName = titleCase(match.words[3]);
     let i = 4;
-    while (!sports.includes(match.words[i].toLowerCase())) {
-      const nextWord = titleCase(match.words[i]);
-      if (results.insert) {
-        results.insert += ` ${nextWord}`;
+    while (
+      !match.words[i].startsWith("Ⓒ") &&
+      !sports.includes(match.words[i].toLowerCase())
+    ) {
+      if (
+        match.words[i].toLowerCase() === "draft" &&
+        match.words[i + 1]?.toLowerCase() === "picks"
+      ) {
+        results.setName = `${results.setName} Draft Picks`;
+        i++;
       } else {
-        results.insert = nextWord;
+        const nextWord = titleCase(match.words[i]);
+        if (results.insert) {
+          results.insert += ` ${nextWord}`;
+        } else {
+          results.insert = nextWord;
+        }
       }
       i++;
     }
-    results.sport = match.words[i]?.toLowerCase();
+    if (sports.includes(match.words[i].toLowerCase())) {
+      results.sport = match.words[i]?.toLowerCase();
+    }
   }
   return results;
 };

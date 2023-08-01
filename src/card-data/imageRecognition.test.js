@@ -126,6 +126,41 @@ describe("Image Recognition", () => {
         sport: "football",
       });
     });
+    it('should match a set without a sport: "2021 PANINI - SCORE FOOTBALL"', () => {
+      const input = [
+        {
+          word: "2021 PANINI - PRIZM DRAFT DRAFT Ⓒ2021 Panini America, Inc. Produced in the USA.",
+          words: [
+            "2021",
+            "PANINI",
+            "-",
+            "PRIZM",
+            "DRAFT",
+            "PICKS",
+            "Ⓒ2021",
+            "Panini",
+            "America",
+            ",",
+            "Inc.",
+            "Produced",
+            "in",
+            "the",
+            "USA",
+            ".",
+          ],
+          wordCount: 5,
+          confidence: 301.9749516248703,
+          isFront: false,
+          isNumber: false,
+          lowerCase: "2021 panini - score football",
+        },
+      ];
+      expect(paniniMatch(input)).toEqual({
+        year: "2021",
+        manufacture: "Panini",
+        setName: "Prizm Draft Picks",
+      });
+    });
   });
 
   describe("runNLP", () => {

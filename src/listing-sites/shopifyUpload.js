@@ -12,7 +12,7 @@ async function uploadToShopify(data) {
     // scopes: ['write_products'],
     hostName: process.env.SHOPIFY_URL,
   };
-  console.log("shopifyConfig", shopifyConfig);
+  // console.log("shopifyConfig", shopifyConfig);
   const shopify = shopifyApi({
     ...shopifyConfig,
   });
@@ -171,7 +171,7 @@ const getTags = (card) => {
   addTag(card.year);
   addTag(card.setName);
   addTag(card.player);
-  addTag(card.team?.display);
+  addTag(card.teamDisplay || card.team?.display);
   if (card.grade) {
     addTag(card.grade);
   }
@@ -180,7 +180,22 @@ const getTags = (card) => {
 };
 
 const getDescription = (card) =>
-  `<p><strong>Year:</strong> ${card.year}</p><p><strong>Manufacture:</strong> ${card.manufacture}</p><p><strong>Set:</strong> ${card.setName}</p><p><strong>Insert:</strong> ${card.insert}</p><p><strong>Parallel:</strong> ${card.parallel}</p><p><strong>Card Number:</strong> #${card.cardNumber}</p><p><strong>Player:</strong> ${card.player}</p><p><strong>Team:</strong> ${card.team?.display || 'N/A'}</p><p><strong>Sport:</strong> ${card.sport}</p>`;
+  card.description ||
+  `<p><strong>Year:</strong> ${card.year}</p><p><strong>Manufacture:</strong> ${
+    card.manufacture
+  }</p><p><strong>Set:</strong> ${
+    card.setName
+  }</p><p><strong>Insert:</strong> ${
+    card.insert
+  }</p><p><strong>Parallel:</strong> ${
+    card.parallel
+  }</p><p><strong>Card Number:</strong> #${
+    card.cardNumber
+  }</p><p><strong>Player:</strong> ${
+    card.player
+  }</p><p><strong>Team:</strong> ${
+    card.teamDisplay || card.team?.display || "N/A"
+  }</p><p><strong>Sport:</strong> ${card.sport}</p>`;
 
 const getHandle = (card) =>
   `${card.directory}-${card.cardNumber}-${card.player}`

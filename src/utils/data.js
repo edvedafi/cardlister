@@ -35,11 +35,16 @@ export const titleCase = (str) => {
 
 export const byCardNumber = (a, b) => {
   //extract card number from cardNumber string
-  if (parseInt(a.cardNumber) && parseInt(b.cardNumber)) {
+  if (
+    a.cardNumber &&
+    parseInt(a.cardNumber) &&
+    b.cardNumber &&
+    parseInt(b.cardNumber)
+  ) {
     return parseInt(a.cardNumber) - parseInt(b.cardNumber);
   }
-  const aMatcher = a.cardNumber.match(/\d+/);
-  const bMatcher = b.cardNumber.match(/\d+/);
+  const aMatcher = a.cardNumber?.match(/\d+/) || [];
+  const bMatcher = b.cardNumber?.match(/\d+/) || [];
   if (aMatcher && aMatcher.length > 0 && bMatcher && bMatcher.length > 0) {
     const aNumber = parseInt(aMatcher[0]);
     const bNumber = parseInt(bMatcher[0]);
@@ -48,5 +53,6 @@ export const byCardNumber = (a, b) => {
     if (a.cardNumber < b.cardNumber) return -1;
     if (a.cardNumber > b.cardNumber) return 1;
   }
-  return 0;
+
+  return a.player < b.player ? -1 : a.player > b.player ? 1 : 0;
 };

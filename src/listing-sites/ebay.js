@@ -104,95 +104,98 @@ async function writeEbayFile(data) {
       { id: "depth", title: "PackageDepth" },
       { id: "packageType", title: "PackageType" },
       { id: "quantity", title: "*Quantity" },
+      { id: "numberOfCards", title: "*C:Number of Cards" },
     ],
   });
 
   //ebay mapping logic
-  let csvData = Object.values(data)
-    .filter((card) => card.cardNumber)
-    .map((card) => {
-      const addFeature = (feature) => {
-        if (card.features && card.features.length > 0) {
-          card.features = `${card.features}|${feature}`;
-        } else {
-          card.features = feature;
-        }
-      };
-
-      if (isYes(card.autographed)) {
-        card.signedBy = card.player;
-        card.autoAuth = card.manufacture;
-        card.autographed = "Yes";
-        if (["Label", "Sticker"].includes(card.autoFormat)) {
-          card.autoFormat = "Label or Sticker";
-        }
+  let csvData = Object.values(data).map((card) => {
+    const addFeature = (feature) => {
+      if (card.features && card.features.length > 0) {
+        card.features = `${card.features}|${feature}`;
       } else {
-        card.autographed = "No";
+        card.features = feature;
       }
+    };
 
-      if (parseInt(card.year) < 1987) {
-        card.vintage = "Yes";
+    if (isYes(card.autographed)) {
+      card.signedBy = card.player;
+      card.autoAuth = card.manufacture;
+      card.autographed = "Yes";
+      if (["Label", "Sticker"].includes(card.autoFormat)) {
+        card.autoFormat = "Label or Sticker";
+      }
+    } else {
+      card.autographed = "No";
+    }
+
+    if (parseInt(card.year) < 1987) {
+      card.vintage = "Yes";
+    } else {
+      card.vintage = "No";
+    }
+
+    if (card.thickness.indexOf("pt") < 0) {
+      card.thickness = `${card.thickness}pt`;
+    }
+
+    if (!card.parallel || isNo(card.parallel)) {
+      if (card.insert && !isNo(card.insert)) {
+        card.parallel = "Base Insert";
       } else {
-        card.vintage = "No";
+        card.parallel = "Base Set";
       }
-
-      if (card.thickness.indexOf("pt") < 0) {
-        card.thickness = `${card.thickness}pt`;
+    } else {
+      addFeature("Parallel/Variety");
+      if (card.parallel.toLowerCase().indexOf("refractor") > -1) {
+        addFeature("Refractor");
       }
+    }
 
-      if (!card.parallel || isNo(card.parallel)) {
-        if (card.insert && !isNo(card.insert)) {
-          card.parallel = "Base Insert";
-        } else {
-          card.parallel = "Base Set";
-        }
-      } else {
-        addFeature("Parallel/Variety");
-        if (card.parallel.toLowerCase().indexOf("refractor") > -1) {
-          addFeature("Refractor");
-        }
-      }
+    if (!card.insert || isNo(card.insert)) {
+      card.insert = "Base Set";
+    } else {
+      addFeature("Insert");
+    }
 
-      if (!card.insert || isNo(card.insert)) {
-        card.insert = "Base Set";
-      } else {
-        addFeature("Insert");
-      }
+    if (card.printRun && card.printRun > 0) {
+      addFeature("Serial Numbered");
+    }
 
-      if (card.printRun && card.printRun > 0) {
-        addFeature("Serial Numbered");
-      }
+    if (!card.features || isNo(card.features)) {
+      card.features = "Base";
+    }
 
-      if (!card.features || isNo(card.features)) {
-        card.features = "Base";
-      }
+    card.features = card.features.replace("RC", "Rookie");
 
-      card.features = card.features.replace("RC", "Rookie");
+    card.league = card.league
+      ? {
+          mlb: "Major League (MLB)",
+          nfl: "National Football League (NFL)",
+          nba: "National Basketball Association (NBA)",
+          nhl: "National Hockey League (NHL)",
+        }[card.league?.toLowerCase()] || card.league
+      : "N/A";
 
-      card.league = card.league
-        ? {
-            mlb: "Major League (MLB)",
-            nfl: "National Football League (NFL)",
-            nba: "National Basketball Association (NBA)",
-            nhl: "National Hockey League (NHL)",
-          }[card.league?.toLowerCase()] || card.league
-        : "N/A";
+    card.sport = card.sport
+      ? card.sport.slice(0, 1).toUpperCase() + card.sport.slice(1).toLowerCase()
+      : "N/A";
 
-      card.sport = card.sport
-        ? card.sport.slice(0, 1).toUpperCase() +
-          card.sport.slice(1).toLowerCase()
-        : "N/A";
- 
-      card.description = `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
+    card.description =
+      card.description ||
+      `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
 
-      card.setName = `${card.year} ${card.setName}`;
+    card.setName = `${card.year} ${card.setName}`;
 
-      card.teamDisplay = card.team?.display || 'N/A';
+    if (!card.teamDisplay) {
+      card.teamDisplay = card.team?.display || "N/A";
+    }
 
-      return card;
-    });
+    return card;
+  });
 
   // merge defaults
+  console.log("csv data size: ", csvData.length);
   csvData = csvData.map((card) => ({ ...defaultValues, ...card }));
 
   try {
@@ -210,7 +213,6 @@ import { Builder, Browser, By, until } from "selenium-webdriver";
 import { ask } from "../utils/ask.js";
 import { setTimeout } from "timers/promises";
 
-
 export const uploadEbayFile = async () => {
   let driver;
   try {
@@ -221,28 +223,30 @@ export const uploadEbayFile = async () => {
 
     const waitForElement = async (locator) => {
       await driver.wait(until.elementLocated(locator));
-      const element = driver.findElement(locator); 
+      const element = driver.findElement(locator);
       await driver.wait(until.elementIsVisible(element));
       await driver.wait(until.elementIsEnabled(element));
       return element;
     };
 
     let signInButton = await Promise.race([
-      waitForElement(By.id('userid')),
-      waitForElement(By.xpath(
+      waitForElement(By.id("userid")),
+      waitForElement(
+        By.xpath(
           "//iframe[starts-with(@name, 'a-') and starts-with(@src, 'https://www.google.com/recaptcha')]",
-        ))  
+        ),
+      ),
     ]);
 
-    const id = await signInButton.getAttribute('id');
-    if (id === 'userid') {
+    const id = await signInButton.getAttribute("id");
+    if (id === "userid") {
       //do nothing because we found the right button
     } else {
       const checkbox = await driver.wait(
         until.elementLocated(By.css("div.recaptcha-checkbox-checkmark")),
       );
       await checkbox.click();
-      signInButton = waitForElement(By.id('userid'));
+      signInButton = waitForElement(By.id("userid"));
     }
 
     await signInButton.sendKeys(process.env.EBAY_ID);
@@ -253,16 +257,17 @@ export const uploadEbayFile = async () => {
     await driver.findElement(By.id("sgnBt")).click();
 
     await driver.get("https://www.ebay.com/sh/lst/active");
-    const uploadButton = await waitForElement(By.xpath('//button[text()="Upload"]'));  
+    const uploadButton = await waitForElement(
+      By.xpath('//button[text()="Upload"]'),
+    );
     await uploadButton.click();
 
     await driver
       .findElement(By.xpath("//input[@type='file']"))
       .sendKeys(`${process.cwd()}/${filePath}`);
-    
-    const result = await waitForElement(By.id('Listing-popup-title'));
+
+    const result = await waitForElement(By.id("Listing-popup-title"));
     console.log(await result.getText());
-    
   } catch (e) {
     console.log(e);
     await ask("Press any key to continue...");

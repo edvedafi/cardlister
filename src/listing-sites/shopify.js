@@ -57,84 +57,84 @@ async function writeShopifyFile(data) {
   });
 
   //shopify mapping logic
-  let csvData = Object.values(data)
-    .filter((card) => card.cardNumber)
-    .map((card) => {
-      const addTag = (tag) => {
-        if (tag && tag.trim().length > 0 && tag !== "undefined") {
-          if (card.tags && card.tags.length > 0) {
-            card.tags = `${card.tags}, ${tag}`;
-          } else {
-            card.tags = tag;
-          }
+  let csvData = Object.values(data).map((card) => {
+    const addTag = (tag) => {
+      if (tag && tag.trim().length > 0 && tag !== "undefined") {
+        if (card.tags && card.tags.length > 0) {
+          card.tags = `${card.tags}, ${tag}`;
+        } else {
+          card.tags = tag;
         }
-      };
-
-      card.handle = `${card.directory.replaceAll("/", "-")}${
-        card.cardNumber
-      }-${card.player.replaceAll(" ", "-")}`;
-
-      if (isYes(card.autographed)) {
-        addTag("Autographed");
       }
+    };
 
-      if (parseInt(card.year) < 1987) {
-        addTag("Vintage");
-      } else if (parseInt(card.year) > 2000) {
-        addTag("Modern");
-      }
+    card.handle = `${card.directory.replaceAll("/", "-")}${
+      card.cardNumber
+    }-${card.player.replaceAll(" ", "-")}`;
 
-      if (card.thickness.indexOf("pt") < 0) {
-        card.thickness = `${card.thickness}pt`;
-      }
-      addTag(card.thickness);
+    if (isYes(card.autographed)) {
+      addTag("Autographed");
+    }
 
-      if (isYes(card.parallel)) {
-        addTag("Parallel");
-      } else if (card.parallel && card.parallel.length > 0) {
-        addTag("Parallel");
-        addTag(titleCase(card.parallel));
-      }
+    if (parseInt(card.year) < 1987) {
+      addTag("Vintage");
+    } else if (parseInt(card.year) > 2000) {
+      addTag("Modern");
+    }
 
-      if (isYes(card.insert)) {
-        addTag("Insert");
-      } else if (card.insert && card.insert.length > 0) {
-        addTag("Insert");
-        addTag(titleCase(card.insert));
-      }
+    if (card.thickness.indexOf("pt") < 0) {
+      card.thickness = `${card.thickness}pt`;
+    }
+    addTag(card.thickness);
 
-      if (card.printRun && card.printRun > 0) {
-        addTag("Serial Numbered");
-      }
+    if (isYes(card.parallel)) {
+      addTag("Parallel");
+    } else if (card.parallel && card.parallel.length > 0) {
+      addTag("Parallel");
+      addTag(titleCase(card.parallel));
+    }
 
-      if (card.features && !isNo(card.features) && card.features.length > 0) {
-        card.features.split("|").forEach(addTag);
-      }
+    if (isYes(card.insert)) {
+      addTag("Insert");
+    } else if (card.insert && card.insert.length > 0) {
+      addTag("Insert");
+      addTag(titleCase(card.insert));
+    }
 
-      if (card.league && card.league.length > 0) {
-        addTag(card.league.toUpperCase());
-      }
+    if (card.printRun && card.printRun > 0) {
+      addTag("Serial Numbered");
+    }
 
-      if (card.sport) {
-        card.sport = titleCase(card.sport);
-        addTag(card.sport);
-        card.type = `${card.sport} Card`;
-      } else {
-        card.sport = "N/A";
-        card.type = `Sports Card`;
-      }
+    if (card.features && !isNo(card.features) && card.features.length > 0) {
+      card.features.split("|").forEach(addTag);
+    }
 
-      addTag(card.year);
-      addTag(card.setName);
-      addTag(card.player);
-      addTag(card.team?.display);
-      if (card.grade) {
-        addTag(card.grade);
-      }
+    if (card.league && card.league.length > 0) {
+      addTag(card.league.toUpperCase());
+    }
 
-      card.weight = card.lbs * 453.59237 + card.oz * 28.3495231;
+    if (card.sport) {
+      card.sport = titleCase(card.sport);
+      addTag(card.sport);
+      card.type = `${card.sport} Card`;
+    } else {
+      card.sport = "N/A";
+      card.type = `Sports Card`;
+    }
 
-      card.description = `
+    addTag(card.year);
+    addTag(card.setName);
+    addTag(card.player);
+    addTag(card.teamDisplay || card.team?.display);
+    if (card.grade) {
+      addTag(card.grade);
+    }
+
+    card.weight = card.lbs * 453.59237 + card.oz * 28.3495231;
+
+    card.description =
+      card.description ||
+      `
 <p><strong>Year:</strong> ${card.year}</p>
 <p><strong>Manufacture:</strong> ${card.manufacture}</p>
 <p><strong>Set:</strong> ${card.setName}</p>
@@ -142,14 +142,14 @@ async function writeShopifyFile(data) {
 <p><strong>Parallel:</strong> ${card.parallel}</p>
 <p><strong>Card Number:</strong> #${card.cardNumber}</p>
 <p><strong>Player:</strong> ${card.player}</p>
-<p><strong>Team:</strong> ${card.team?.display || 'N/A'}</p>
+<p><strong>Team:</strong> ${card.teamDisplay || card.team?.display || "N/A"}</p>
 <p><strong>Sport:</strong> ${card.sport}</p>
 `;
 
-      card.setName = `${card.year} ${card.setName}`;
+    card.setName = `${card.year} ${card.setName}`;
 
-      return card;
-    });
+    return card;
+  });
 
   // make a second record for each image
   const secondImages = [];
