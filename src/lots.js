@@ -7,11 +7,10 @@ import {
   prepareImageFile,
   processImageFile,
 } from "./image-processing/imageProcessor.js";
-import uploadToShopify from "./listing-sites/shopifyUpload.js";
-import writeSportLotsOutput from "./listing-sites/sportlots.js";
-import writeBuySportsCardsOutput from "./listing-sites/bsc.js";
 import writeEbayFile from "./listing-sites/ebay.js";
 import writeShopifyFile from "./listing-sites/shopify.js";
+import uploadToShopify from "./listing-sites/shopifyUpload.js";
+import { ask } from "./utils/ask.js";
 
 // set up the queues
 const queueReadImage = new Queue({
@@ -30,6 +29,8 @@ const queueImageFiles = new Queue({
   concurrency: 3,
 });
 
+let lotType = "Hall of Fame";
+
 const preProcessImage = async (image, allCards) => {
   let imageDefaults;
   try {
@@ -37,6 +38,7 @@ const preProcessImage = async (image, allCards) => {
     if (!cardDataExistsForRawImage(image, allCards)) {
       // console.log('here2')
       imageDefaults = await imageRecognition(image);
+      imageDefaults.lotType = lotType;
       queueGatherData.push(() => processImage(image, imageDefaults, allCards));
     }
   } catch (e) {
@@ -45,39 +47,7 @@ const preProcessImage = async (image, allCards) => {
     throw e;
   }
 };
-//
-// const processImage = async (image, imageDefaults, allCards) => {
-//
-//   try {
-//     if (!cardDataExistsForRawImage(image, allCards)) {
-//       console.log(await terminalImage.file(image, { height: 25 }));
-//       await addCardData(
-//           "Card Number",
-//           imageDefaults,
-//           "cardNumber",
-//           imageDefaults,
-//       );
-//       const oldCard = allCards[imageDefaults.cardNumber];
-//       if (oldCard) {
-//         const addImages = await ask("Add Images to existing card?", false);
-//         if (addImages) {
-//           imageDefaults.key = imageDefaults.cardNumber;
-//         } else {
-//           imageDefaults.key = `${oldCard.cardNumber}-${oldCard.setNmae}-${oldCard.insert}-${oldCard.parallel}-${oldCard.features}`;
-//         }
-//       } else {
-//         imageDefaults.key = imageDefaults.cardNumber;
-//       }
-//       await processImage(front, imageDefaults, allCards, overrideImages);
-//       if (back) {
-//         await processImage(back, imageDefaults, allCards, overrideImages);
-//       }
-//     }
-//   } catch (e) {
-//     console.error(e);
-//     throw e;
-//   }
-// }
+
 const processImage = async (image, imageDefaults, allCards) => {
   try {
     console.log(await terminalImage.file(image, { height: 25 }));
@@ -95,6 +65,7 @@ const processImage = async (image, imageDefaults, allCards) => {
 
 async function processLots(savedAnswers, files) {
   const allCards = savedAnswers.allCardData || {};
+  lotType = await ask("Lot Type?", lotType);
   try {
     console.log("Processing files: ", files);
     files.forEach((image) =>
@@ -153,7 +124,7 @@ async function processLots(savedAnswers, files) {
     //write the output
     if (!hasQueueError) {
       await Promise.all([
-        // uploadToShopify(allCards),
+        uploadToShopify(allCards),
         writeEbayFile(allCards),
         writeShopifyFile(allCards),
       ]);

@@ -139,26 +139,35 @@ async function getCardTitle(output) {
       ? output.setName
       : `${output.manufacture} ${output.setName}`
     : "";
+  let teamDisplay = output.teamDisplay;
 
-  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
+  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
   let title = output.longTitle;
   if (
     title.length > maxTitleLength &&
     ["Panini", "Leaf"].includes(output.manufacture)
   ) {
     setName = output.setName;
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+  }
+  if (title.length > maxTitleLength) {
+    teamDisplay = output.team.map((team) => team.team).join(" | ");
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+  }
+  if (title.length > maxTitleLength) {
+    teamDisplay = output.team.map((team) => team.team).join(" ");
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     insert = add(output.insert);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     parallel = add(output.parallel);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.display}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${output.team?.team}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
   }
   if (title.length > maxTitleLength) {
     title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`;
@@ -169,7 +178,11 @@ async function getCardTitle(output) {
 
   title = title.replace(/ {2}/g, " ");
 
-  return await ask(`Title`, title, { maxLength: maxTitleLength });
+  if (title.length > maxTitleLength) {
+    title = await ask(`Title`, output.longTitle, { maxLength: maxTitleLength });
+  }
+
+  return title;
 }
 async function getLotTitle(output) {
   const maxTitleLength = 80;
@@ -178,7 +191,7 @@ async function getLotTitle(output) {
   let teamDisplay = output.teamDisplay;
 
   const updateTitle = () =>
-    `Hall of Fame Player Lot: ${output.player} ${teamDisplay}${lotCount}`.replace(
+    `25 Card ${output.lotType} Lot: ${output.player} ${teamDisplay}${lotCount}`.replace(
       / {2}/g,
       " ",
     );
@@ -228,7 +241,14 @@ async function getCardName(output) {
     cardName = `${output.setName}${insert}${parallel}`;
   }
   cardName = cardName.replace(/ {2}/g, " ");
-  return await ask("Card Name", cardName, { maxLength: maxCardNameLength });
+
+  if (cardName.length > maxCardNameLength) {
+    cardName = await ask("Card Name", cardName, {
+      maxLength: maxCardNameLength,
+    });
+  }
+
+  return cardName;
 }
 
 const findStoreCategory = (sport) => {
@@ -311,10 +331,9 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.title = await getCardTitle(output);
     output.cardName = await getCardName(output);
 
-    await askFor("Quantity", "quantity");
-
     skipShipping = await ask("Use Standard Card Size/Shipping?", true);
   }
+  await askFor("Quantity", "quantity");
 
   if (skipShipping) {
     output.size = "Standard";
@@ -404,12 +423,13 @@ export const getTeam = async (defaults) => {
   let newTeam = await ask("Teams", defaults?.team, {
     selectOptions: getTeamSelections(defaults.sport),
   });
-  while (newTeam) {
-    teams.push(newTeam);
-    newTeam = await ask("Teams", undefined, {
-      selectOptions: getTeamSelections(defaults.sport),
-    });
-  }
+  teams.push(newTeam);
+  // while (newTeam) {
+  //   teams.push(newTeam);
+  //   newTeam = await ask("Teams", undefined, {
+  //     selectOptions: getTeamSelections(defaults.sport),
+  //   });
+  // }
   return teams;
 };
 
@@ -465,6 +485,7 @@ export const getLotData = async (imageDefaults, allCards) => {
   await askFor("Player/Card Name", "player");
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
+  await askFor("Quantity", "quantity");
 
   const skipShipping = await ask(
     "Use Standard Lot Size,Shipping, Price?",
@@ -473,7 +494,6 @@ export const getLotData = async (imageDefaults, allCards) => {
 
   if (!skipShipping) {
     await askFor("Oldest Card", "year");
-    await askFor("Quantity", "quantity");
     // noinspection DuplicatedCode
     await askFor("Size", "size");
     await askFor("Material", "material");
@@ -490,7 +510,7 @@ export const getLotData = async (imageDefaults, allCards) => {
   }
 
   const playerKey = output.player.replace(/\s/g, "_");
-  output.directory = `HOF_Lots/${playerKey}/`;
+  output.directory = `${output.lotType}_Lots/${playerKey}/`.replace(/\s/g, "_");
 
   output.lotCount = 1;
   output.key = `${playerKey}_${output.lotCount}`;
@@ -507,7 +527,7 @@ export const getLotData = async (imageDefaults, allCards) => {
   output.pics =
     output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
-  output.description = `25 Card Hall of Fame Player Lot: ${output.player} ${output.teamDisplay}<br>Typically these lots contain base cards, some lower end RCs, and lower end inserts.<br>All shipping is BMWT for $5. Buy as many lots as you would like for the single $5 shipping charge.`;
+  output.description = `${output.longTitle}<br><br>Typically these lots contain base cards, lower end RCs, and lower end inserts. You are not necessarily getting the exact cards pictured as I have multiple lots for every player and just list with quantities. If you are interested in the player and want to ensure you get specifically one or more of the cards pictured please message me so that I can ensure you get those cards.<br><br>Please note I try to make these lots are all unique cards, but sometimes I am not perfect at that.`;
 
   allCards[output.key] = output;
 

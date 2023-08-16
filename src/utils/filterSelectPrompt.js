@@ -30,10 +30,15 @@ export default createPrompt((config, done) => {
 
   const prefix = usePrefix();
   const [status, setStatus] = useState("pending");
-  const [searchTerm, setSearchTerm] = useState(config.default || "");
+  const [searchTerm, setSearchTerm] = useState(
+    config.default?.display || config.default || "",
+  );
 
   const keys =
-    config.choices && config.choices.length > 0 && config.choices[0].name && config.choices[0].description
+    config.choices &&
+    config.choices.length > 0 &&
+    config.choices[0].name &&
+    config.choices[0].description
       ? ["name", "description"]
       : ["value"];
 
@@ -119,7 +124,9 @@ export default createPrompt((config, done) => {
   }
 
   if (status === "done") {
-    return `${prefix} ${message} ${chalk.cyan(choice?.name || choice?.value || searchTerm)}`;
+    return `${prefix} ${message} ${chalk.cyan(
+      choice?.name || choice?.value || searchTerm,
+    )}`;
   }
 
   const allChoices = choices
