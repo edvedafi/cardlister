@@ -6,7 +6,14 @@ const defaultValues = {
   action: "Add",
   category: "261328",
   storeCategory: "10796387017",
-  condition: "3000",
+
+  // ungraded
+  condition: "4000",
+  conditionDetail: "400011", //Excellent
+
+  //graded
+  //condition: "3000",
+  // conditionDetail: "40001",
   graded: "No",
   grade: "Not Graded",
   grader: "Not Graded",
@@ -17,6 +24,7 @@ const defaultValues = {
   certNumber: "Not Graded",
   cardType: "Sports Trading Card",
   autoAuth: "N/A",
+  signedBy: "N/A",
   country: "United States",
   original: "Original",
   language: "English",
@@ -64,7 +72,8 @@ async function writeEbayFile(data) {
       { id: "teamDisplay", title: "*C:Team" },
       { id: "league", title: "*C:League" },
       { id: "autographed", title: "*C:Autographed" },
-      { id: "condition", title: "*C:Card Condition" },
+      // { id: "conditionDetail", title: "*C:Card Condition" },
+      { id: "conditionDetail", title: "CD:Card Condition - (ID: 40001)" },
       { id: "cardName", title: "*C:Card Name" },
       { id: "cardNumber", title: "*C:Card Number" },
       { id: "certNumber", title: "*C:Certification Number" },
@@ -266,8 +275,12 @@ export const uploadEbayFile = async () => {
       .findElement(By.xpath("//input[@type='file']"))
       .sendKeys(`${process.cwd()}/${filePath}`);
 
-    const result = await waitForElement(By.id("Listing-popup-title"));
-    console.log(await result.getText());
+    const resultTitle = await waitForElement(By.id("Listing-popup-title"));
+    const result = await resultTitle.getText();
+    if (result === "Not everything was uploaded.") {
+      await ask("Press any key to continue...");
+    }
+    console.log(result);
   } catch (e) {
     console.log(e);
     await ask("Press any key to continue...");
