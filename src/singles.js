@@ -40,7 +40,7 @@ async function processSingles(savedAnswers, setData, files) {
       //move on to the next files
       const front = files[i++];
       let back;
-      if (i < files.length - 1) {
+      if (i < files.length) {
         back = files[i++];
       }
       queueReadImage.push(() =>
