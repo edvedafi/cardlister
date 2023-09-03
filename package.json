@@ -22,7 +22,7 @@
     "open": "^9.1.0",
     "prettier": "^3.0.0",
     "queue": "^7.0.0",
-    "selenium-webdriver": "^4.10.0",
+    "selenium-webdriver": "^4.11.1",
     "sharp": "^0.32.1",
     "shopify": "^0.1.0",
     "spacy": "^0.0.4",
