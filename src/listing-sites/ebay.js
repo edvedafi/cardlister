@@ -7,9 +7,9 @@ const defaultValues = {
   category: "261328",
   storeCategory: "10796387017",
 
+  // Ebay Condition guide: https://developer.ebay.com/devzone/merchant-products/mipng/user-guide-en/content/condition-descriptor-ids-for-trading-cards.html
   // ungraded
   condition: "4000",
-  conditionDetail: "400011", //Excellent
 
   //graded
   //condition: "3000",
@@ -21,7 +21,7 @@ const defaultValues = {
   features: "Base",
   team: "N/A",
   autographed: "No",
-  certNumber: "Not Graded",
+  // certNumber: "Not Graded",
   cardType: "Sports Trading Card",
   autoAuth: "N/A",
   signedBy: "N/A",
@@ -41,6 +41,58 @@ const defaultValues = {
   acceptOffers: "TRUE",
   weightUnit: "LB",
   packageType: "Letter",
+};
+
+const gradeIds = {
+  10: 275020,
+  9.5: 275021,
+  9: 275022,
+  8.5: 275023,
+  8: 275024,
+  7.5: 275025,
+  7: 275026,
+  6.5: 275027,
+  6: 275028,
+  5.5: 275029,
+  5: 2750210,
+  4.5: 2750211,
+  4: 2750212,
+  3.5: 2750213,
+  3: 2750214,
+  2.5: 2750215,
+  2: 2750216,
+  1.5: 2750217,
+  1: 2750218,
+  Authentic: 2750219,
+  "Authentic Altered": 2750220,
+  "Authentic - Trimmed": 2750221,
+  "Authentic - Coloured": 2750222,
+};
+
+export const graderIds = {
+  PSA: 275010,
+  BCCG: 275011,
+  BVG: 275012,
+  BGS: 275013,
+  CSG: 275014,
+  CGC: 275015,
+  SGC: 275016,
+  KSA: 275017,
+  GMA: 275018,
+  HGA: 275019,
+  ISA: 2750110,
+  PCA: 2750111,
+  GSG: 2750112,
+  PGS: 2750113,
+  MNT: 2750114,
+  TAG: 2750115,
+  Rare: 2750116,
+  RCG: 2750117,
+  PCG: 2750118,
+  Ace: 2750119,
+  CGA: 2750120,
+  TCG: 2750121,
+  ARK: 2750122,
 };
 
 const filePath = "output/ebay.csv";
@@ -72,8 +124,10 @@ async function writeEbayFile(data) {
       { id: "teamDisplay", title: "*C:Team" },
       { id: "league", title: "*C:League" },
       { id: "autographed", title: "*C:Autographed" },
-      // { id: "conditionDetail", title: "*C:Card Condition" },
       { id: "conditionDetail", title: "CD:Card Condition - (ID: 40001)" },
+      { id: "graderID", title: "CD:Card Condition - (ID: 27501)" },
+      { id: "gradeID", title: "CD:Card Condition - (ID: 27502)" },
+      // { id: "certNumber", title: "CD:Card Condition - (ID: 27503)" },
       { id: "cardName", title: "*C:Card Name" },
       { id: "cardNumber", title: "*C:Card Number" },
       { id: "certNumber", title: "*C:Certification Number" },
@@ -200,6 +254,15 @@ async function writeEbayFile(data) {
       card.teamDisplay = card.team?.display || "N/A";
     }
 
+    if (isYes(card.graded)) {
+      card.condition = "2750";
+      card.gradeID = gradeIds[card.grade];
+      card.graderID = graderIds[card.grader] || 2750123;
+      card.certNumber = `"${card.certNumber}"`;
+    } else {
+      card.conditionDetail = "400011"; //Excellent
+    }
+
     return card;
   });
 
@@ -224,20 +287,8 @@ import { setTimeout } from "timers/promises";
 
 export const uploadEbayFile = async () => {
   let driver;
-  try {
-    driver = await new Builder().forBrowser(Browser.CHROME).build();
-    await driver.get("https://www.ebay.com/");
-    await driver.findElement(By.linkText("Sign in")).click();
-    // await setTimeout(10000);
 
-    const waitForElement = async (locator) => {
-      await driver.wait(until.elementLocated(locator));
-      const element = driver.findElement(locator);
-      await driver.wait(until.elementIsVisible(element));
-      await driver.wait(until.elementIsEnabled(element));
-      return element;
-    };
-
+  async function signIn(waitForElement) {
     let signInButton = await Promise.race([
       waitForElement(By.id("userid")),
       waitForElement(
@@ -264,6 +315,23 @@ export const uploadEbayFile = async () => {
     const passwordField = await waitForElement(By.id("pass"));
     await passwordField.sendKeys(process.env.EBAY_PASS);
     await driver.findElement(By.id("sgnBt")).click();
+  }
+
+  try {
+    driver = await new Builder().forBrowser(Browser.CHROME).build();
+    await driver.get("https://www.ebay.com/");
+    await driver.findElement(By.linkText("Sign in")).click();
+    // await setTimeout(10000);
+
+    const waitForElement = async (locator) => {
+      await driver.wait(until.elementLocated(locator));
+      const element = driver.findElement(locator);
+      await driver.wait(until.elementIsVisible(element));
+      await driver.wait(until.elementIsEnabled(element));
+      return element;
+    };
+    await signIn(waitForElement);
+    // await signIn(waitForElement);
 
     await driver.get("https://www.ebay.com/sh/lst/active");
     const uploadButton = await waitForElement(

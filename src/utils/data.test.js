@@ -1,4 +1,5 @@
-import { byCardNumber } from "./data.js";
+import { byCardNumber, graders } from "./data.js";
+import { graderIds } from "../listing-sites/ebay.js";
 
 describe("sortByCardNumber", () => {
   it("should sort an all numeric array correctly", () => {
@@ -69,5 +70,11 @@ describe("sortByCardNumber", () => {
       { cardNumber: "FS99" },
       { cardNumber: "FS111" },
     ]);
+  });
+});
+
+describe("Graders List", () => {
+  it("should match the keys of ebay graders", () => {
+    expect(graders).toEqual(Object.keys(graderIds));
   });
 });

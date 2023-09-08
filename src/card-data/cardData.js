@@ -1,6 +1,6 @@
 import { ask, confirm } from "../utils/ask.js";
 import { findLeague, getTeamSelections, sports } from "../utils/teams.js";
-import { isNo, isYes } from "../utils/data.js";
+import { graders, isNo, isYes } from "../utils/data.js";
 import fs from "fs-extra";
 
 //Set up the card name and track with previous for front/back situations
@@ -68,7 +68,7 @@ export const getSetData = async () => {
   if (isSet) {
     saveData.setData.isSet = true;
 
-    saveData.setData.sport = await ask("Sport", saveData.setData.sport, {
+    saveData.setData.sport = await ask("Sport", sav3eData.setData.sport, {
       selectOptions: sports,
     });
     saveData.setData.year = await ask("Year", saveData.setData.year);
@@ -100,6 +100,8 @@ export const getSetData = async () => {
       saveData.setData.autographed,
     );
 
+    saveData.setData.graded = await ask("Graded", saveData.setData.graded);
+
     saveData.setData.card_number_prefix = await ask(
       "Enter Card Number Prefix",
       saveData.setData.card_number_prefix,
@@ -126,6 +128,30 @@ const add = (info, modifier) => {
   }
 };
 
+const psaGrades = {
+  10: "GEM-MT",
+  9.5: "MINT",
+  9: "MINT",
+  8.5: "NM-MT",
+  8: "NM-MT",
+  7.5: "NM",
+  7: "NM",
+  6.5: "EX-MT",
+  6: "EX-MT",
+  5.5: "EX",
+  5: "EX",
+  4.5: "VG-EX",
+  4: "VG-EX",
+  3.5: "VG",
+  3: "VG",
+  2.5: "G",
+  2: "G",
+  1.5: "PF",
+  1: "PF",
+  0.5: "PF",
+  0: "PO",
+};
+
 //try to get to the best 80 character title that we can
 async function getCardTitle(output) {
   const maxTitleLength = 80;
@@ -140,40 +166,43 @@ async function getCardTitle(output) {
       : `${output.manufacture} ${output.setName}`
     : "";
   let teamDisplay = output.teamDisplay;
+  let graded = isYes(output.graded)
+    ? ` ${output.grader} ${output.grade} ${psaGrades[output.grade]}`
+    : "";
 
-  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+  output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   let title = output.longTitle;
   if (
     title.length > maxTitleLength &&
     ["Panini", "Leaf"].includes(output.manufacture)
   ) {
     setName = output.setName;
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
     teamDisplay = output.team.map((team) => team.team).join(" | ");
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
     teamDisplay = output.team.map((team) => team.team).join(" ");
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
     insert = add(output.insert);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
     parallel = add(output.parallel);
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${features}${printRun}${graded}`;
   }
   if (title.length > maxTitleLength) {
-    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}`;
+    title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player}${printRun}${graded}`;
   }
 
   title = title.replace(/ {2}/g, " ");
@@ -285,6 +314,9 @@ async function getNewCardData(cardNumber, defaults = {}) {
     sport: "football",
     quantity: 1,
     price: 0.99,
+    graded: false,
+    // grade: "Not Graded",
+    // grader: "Not Graded",
     ...defaults,
   };
   let output = {
@@ -328,6 +360,14 @@ async function getNewCardData(cardNumber, defaults = {}) {
     } else {
       output.autoFormat = output.autographed;
     }
+
+    await askFor("Graded", "graded");
+    if (isYes(output.graded)) {
+      await askFor("Grader", "grader", { selectOptions: graders });
+      await askFor("Grade", "grade");
+      await askFor("Cert Number", "certNumber");
+    }
+
     output.title = await getCardTitle(output);
     output.cardName = await getCardName(output);
 

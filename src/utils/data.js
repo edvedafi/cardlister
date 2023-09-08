@@ -56,3 +56,29 @@ export const byCardNumber = (a, b) => {
 
   return a.player < b.player ? -1 : a.player > b.player ? 1 : 0;
 };
+
+export const graders = [
+  "PSA",
+  "BCCG",
+  "BVG",
+  "BGS",
+  "CSG",
+  "CGC",
+  "SGC",
+  "KSA",
+  "GMA",
+  "HGA",
+  "ISA",
+  "PCA",
+  "GSG",
+  "PGS",
+  "MNT",
+  "TAG",
+  "Rare",
+  "RCG",
+  "PCG",
+  "Ace",
+  "CGA",
+  "TCG",
+  "ARK",
+];
