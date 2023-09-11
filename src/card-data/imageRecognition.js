@@ -327,17 +327,23 @@ export const runNLP = async (text, setData) => {
         //replace # with wildcard regex search for letters only of the text input
         .map((person) => {
           let finalWord;
-          if (person.word.includes("#")) {
-            let rawWord = text.find((word) =>
-              word.lowerCase.match(person.word.replace(/#/g, "[A-Za-z.']+")),
-            );
-            if (rawWord) {
-              const end = person.word.replace(/#/g, "");
-              finalWord = rawWord.word.slice(
-                0,
-                rawWord.lowerCase.indexOf(end) + end.length,
+          try {
+            if (person.word.includes("#") && !person.word.includes("/")) {
+              let rawWord = text.find((word) =>
+                word?.lowerCase?.match(
+                  person?.word?.replace(/#/g, "[A-Za-z.']+"),
+                ),
               );
+              if (rawWord) {
+                const end = person.word.replace(/#/g, "");
+                finalWord = rawWord.word.slice(
+                  0,
+                  rawWord.lowerCase.indexOf(end) + end.length,
+                );
+              }
             }
+          } catch (e) {
+            console.error(`Failed to process ${person} for wild card regexes`);
           }
           return { ...person, word: finalWord || person.word };
         })

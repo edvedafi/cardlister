@@ -63,7 +63,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         async () => {
           await $`cp ${input} ${tempImage}`;
           const openCommand = $`open -Wn ${tempImage}`;
-          process.on('SIGINT', function () {
+          process.on("SIGINT", function () {
             openCommand ? openCommand.kill() : process.exit();
           });
           return openCommand;
@@ -89,7 +89,6 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         await sharp(buffer).jpeg({ quality: outputQuality }).toFile(outputFile);
         await $`rm ${tempImage}`;
       } else {
-        console.log("here?");
         await $`mv ${tempImage} ${outputFile}`;
       }
     } catch (e) {

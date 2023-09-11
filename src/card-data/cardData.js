@@ -68,7 +68,7 @@ export const getSetData = async () => {
   if (isSet) {
     saveData.setData.isSet = true;
 
-    saveData.setData.sport = await ask("Sport", sav3eData.setData.sport, {
+    saveData.setData.sport = await ask("Sport", saveData.setData.sport, {
       selectOptions: sports,
     });
     saveData.setData.year = await ask("Year", saveData.setData.year);
