@@ -651,7 +651,7 @@ const addFeature = (features, feature) => {
 export const paniniMatch = (searchParagraphs) => {
   const results = {};
   const match = searchParagraphs.find((block) =>
-    block.lowerCase.match(/\d\d\d\d panini - /),
+    block.lowerCase.match(/^\d\d\d\d panini - /),
   );
   if (match) {
     results.manufacture = "Panini";
@@ -659,6 +659,7 @@ export const paniniMatch = (searchParagraphs) => {
     results.setName = titleCase(match.words[3]);
     let i = 4;
     while (
+      match.words[i] &&
       !match.words[i].startsWith("Ⓒ") &&
       !sports.includes(match.words[i].toLowerCase())
     ) {
@@ -678,7 +679,7 @@ export const paniniMatch = (searchParagraphs) => {
       }
       i++;
     }
-    if (sports.includes(match.words[i].toLowerCase())) {
+    if (sports.includes(match.words[i]?.toLowerCase())) {
       results.sport = match.words[i]?.toLowerCase();
     }
   }

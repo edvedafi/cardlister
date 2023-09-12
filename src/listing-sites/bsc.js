@@ -1,7 +1,27 @@
 import { byCardNumber } from "../utils/data.js";
+import open from "open";
+import url from "url";
+import FormData from "form-data";
+import Queue from "queue";
+// set up the queues
+
+$.verbose = false;
+
+const uploadQueue = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 5,
+});
 
 async function writeBuySportsCardsOutput(allCards) {
   const years = {};
+
+  //queue up all of the cards for writing in real time
+  Object.values(allCards).forEach((card) => {
+    uploadQueue.push(async () => writeToAPI(card));
+  });
+
+  // uploadQueue.push(async () => writeToAPI(allCards["165"]));
 
   //group cards
   Object.values(allCards).forEach((card) => {
@@ -55,6 +75,172 @@ async function writeBuySportsCardsOutput(allCards) {
     console.error("Failed to write bsc.txt");
     console.error(err);
     throw err;
+  }
+
+  await new Promise((resolve) => uploadQueue.addEventListener("end", resolve));
+}
+
+const baseHeaders = () => ({
+  accept: "application/json, text/plain, */*",
+  "accept-language": "en-US,en;q=0.9",
+  assumedrole: "sellers",
+  authorization: "Bearer " + process.env.BSC_TOKEN,
+  "content-type": "application/json",
+});
+
+async function post(path, body) {
+  const responseObject = await fetch(
+    `https://api-prod.buysportscards.com/${path}`,
+    {
+      headers: baseHeaders(),
+      body: JSON.stringify(body),
+      method: "POST",
+    },
+  );
+
+  return responseObject.json();
+}
+async function postImage(path, imagePath) {
+  const formData = new FormData();
+
+  formData.append("attachment", fs.createReadStream(imagePath));
+
+  const responseObject = await fetch(
+    `https://api-prod.buysportscards.com/${path}`,
+    {
+      headers: {
+        ...baseHeaders(),
+        ...formData.getHeaders(),
+      },
+      body: formData,
+      method: "POST",
+    },
+  );
+
+  return responseObject.json();
+}
+
+async function put(path, body) {
+  const responseObject = await fetch(
+    `https://api-prod.buysportscards.com/${path}`,
+    {
+      headers: baseHeaders(),
+      body: JSON.stringify(body),
+      method: "PUT",
+    },
+  );
+
+  return responseObject.json();
+}
+
+const get = async (path) =>
+  (
+    await fetch(`https://api-prod.buysportscards.com/${path}`, {
+      headers: baseHeaders(),
+      method: "GET",
+    })
+  ).json();
+
+async function writeToAPI(card) {
+  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`
+    .replaceAll("& ", "")
+    .replaceAll(" ", "+");
+  // console.log(`Searching for: ${searchPath}`);
+  const filters = {
+    cardNo: [card.cardNumber],
+    sport: [card.sport],
+    variant: [],
+    variantName: [],
+    year: [card.year],
+  };
+
+  if (card.parallel) {
+    filters.variant.push("parallel");
+    filters.variantName.push(card.parallel.toLowerCase().replaceAll(" ", "-"));
+  }
+
+  if (card.insert) {
+    filters.variant.push("insert");
+    filters.variantName.push(card.insert.toLowerCase().replaceAll(" ", "-"));
+  }
+
+  if (filters.variant.length === 0) {
+    filters.variant.push("base");
+  }
+
+  const listResponse = await post(searchPath, {
+    condition: "all",
+    filters: filters,
+    myInventory: "false",
+    page: 0,
+    sellerId: "cf987f7871",
+    size: 2,
+    sort: "default",
+  });
+
+  // console.log(JSON.stringify(listResponse, null, 2));
+
+  if (listResponse.totalResults === 1) {
+    //should probably only proceed if there is a single listing returned rather than assuming the first is correct
+    const listingId = listResponse.results[0].id;
+
+    // console.log("First Result = " + listingId);
+
+    const settingsResponse = await get(
+      `seller/card-listing/${listingId}/settings`,
+    );
+
+    const frontResponse = await postImage(
+      `common/card/${listingId}/product/e484609d38/attachment`,
+      `output/${card.directory}${card.frontImage}`,
+    );
+
+    const backResponse = await postImage(
+      `common/card/${listingId}/product/e484609d38/attachment`,
+      `output/${card.directory}${card.backImage}`,
+    );
+
+    const saveResponse = await put(`seller/card-listing/${listingId}/product`, {
+      action: "add",
+      listing: {
+        productType: "raw",
+        condition: "near_mint",
+        grade: "",
+        price: card.price,
+        quantity: card.quantity,
+        gradingCompany: "",
+        productId: settingsResponse.productId,
+        sportId: card.sport,
+        availableQuantity: card.quantity,
+        sellerImgFront: frontResponse.objectKey,
+        sellerImgBack: backResponse.objectKey,
+      },
+    });
+
+    // console.log(
+    //   "saveResponse Result = " + JSON.stringify(saveResponse, null, 2),
+    // );
+    if (saveResponse.listings?.length > 0) {
+      console.log(`Successfully uploaded ${card.longTitle} to BSC`);
+    } else {
+      await open(
+        `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
+          card.cardName.replaceAll("&", ""),
+        )}`,
+      );
+    }
+  } else {
+    console.log(
+      `Found ${listResponse.totalResults} results for ${card.cardName}`,
+    );
+    console.log("  " + searchPath);
+    console.log("  " + JSON.stringify(filters));
+    console.log("  " + "Opening BSC now");
+    await open(
+      `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
+        card.cardName.replaceAll("&", ""),
+      )}`,
+    );
   }
 }
 

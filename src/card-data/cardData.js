@@ -448,6 +448,12 @@ export const getCardData = async (allCards, imageDefaults) => {
     .replace(/\s/g, "_")
     .replace(/\//g, "_")
     .replace(/\|/g, "_");
+  if (output.count === 1) {
+    output.frontImage = output.filename;
+  } else if (output.count === 2) {
+    output.backImage = output.filename;
+  }
+
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
   output.pics =
     output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;

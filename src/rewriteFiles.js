@@ -15,8 +15,8 @@ const savedAnswers = await initializeAnswers(inputDirectory, true);
 await Promise.all([
   // uploadToShopify(savedAnswers.allCardData),
   // writeSportLotsOutput(savedAnswers.allCardData),
-  // writeBuySportsCardsOutput(savedAnswers.allCardData),
-  writeEbayFile(savedAnswers.allCardData),
+  writeBuySportsCardsOutput(savedAnswers.allCardData),
+  // writeEbayFile(savedAnswers.allCardData),
   // writeShopifyFile(savedAnswers.allCardData),
 ]);
 Object.values(savedAnswers.allCardData).forEach((t) => console.log(t.title));
