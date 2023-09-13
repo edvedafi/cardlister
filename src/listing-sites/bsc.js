@@ -63,7 +63,7 @@ async function writeBuySportsCardsOutput(allCards) {
         .forEach((setName) => {
           years[year][setName].sort(byCardNumber).forEach((card) => {
             output.push(
-              `    ${card.year} ${setName} ${card.cardNumber} ${card.player} ${card.price} (${card.quantity})`,
+              `    ${card.year} ${setName} ${card.cardNumber} ${card.player} ${card.bscPrice} (${card.quantity})`,
             );
           });
         });
@@ -206,7 +206,7 @@ async function writeToAPI(card) {
         productType: "raw",
         condition: "near_mint",
         grade: "",
-        price: card.price,
+        price: card.bscPrice,
         quantity: card.quantity,
         gradingCompany: "",
         productId: settingsResponse.productId,

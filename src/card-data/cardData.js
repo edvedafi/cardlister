@@ -107,6 +107,10 @@ export const getSetData = async () => {
       saveData.setData.card_number_prefix,
     );
     saveData.setData.price = await ask("Default Price", saveData.setData.price);
+    saveData.setData.bscPrice = await ask(
+      "BSC Price",
+      saveData.setData.bscPrice,
+    );
     saveData.setData.autoOffer = await ask(
       "Default Auto Accept Offer",
       saveData.setData.autoOffer,
@@ -405,6 +409,15 @@ async function getNewCardData(cardNumber, defaults = {}) {
     await askFor("Auto Accept Offer", "autoOffer", { allowUpdates: true });
     // await askFor('Minimum Offer', 'minOffer');
   }
+
+  //inserts, parallels or cards worth more than $1 default to 10% of the Ebay price otherwise drop it to a quarter
+  if (output.insert || output.parallel || output.price > 1) {
+    output.bscPrice = Math.round(output.price * 10) / 100;
+  } else {
+    output.bscPrice = 0.25;
+  }
+  await askFor("BSC Price", "bscPrice", { allowUpdates: true });
+
   output.directory = `${output.year}/${output.setName}${
     output.insert ? `/${output.insert}` : ""
   }${output.parallel ? `/${output.parallel}` : ""}/`.replace(/\s/g, "_");
