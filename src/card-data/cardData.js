@@ -217,6 +217,7 @@ async function getCardTitle(output) {
 
   return title;
 }
+
 async function getLotTitle(output) {
   const maxTitleLength = 80;
 
@@ -313,7 +314,7 @@ export async function addCardData(
   }
 }
 
-async function getNewCardData(cardNumber, defaults = {}) {
+async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   const defaultValues = {
     sport: "football",
     quantity: 1,
@@ -337,39 +338,46 @@ async function getNewCardData(cardNumber, defaults = {}) {
   const askFor = async (text, propName, options) =>
     await addCardData(text, output, propName, defaultValues, options);
 
-  await askFor("Sport", "sport", { selectOptions: sports });
+  await askFor("Sport", "sport", {
+    selectOptions: sports,
+    allowUpdates: resetAll,
+  });
   output.league = findLeague(output.sport);
   output.storeCategory = findStoreCategory(output.sport);
-  await askFor("Player/Card Name", "player");
-  await askFor("Year", "year");
+  await askFor("Player/Card Name", "player", { allowUpdates: resetAll });
+  await askFor("Year", "year", { allowUpdates: resetAll });
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
-  await askFor("Manufacturer", "manufacture");
-  await askFor("Set Name", "setName");
+  await askFor("Manufacturer", "manufacture", { allowUpdates: resetAll });
+  await askFor("Set Name", "setName", { allowUpdates: resetAll });
 
-  let skipShipping = await ask("Is base card?", true);
+  let skipShipping = await ask("Is base card?", true, {
+    allowUpdates: resetAll,
+  });
 
   if (skipShipping) {
     output.title = await getCardTitle(output);
     output.cardName = await getCardName(output);
     output.quantity = 1;
   } else {
-    await askFor("Parallel", "parallel");
-    await askFor("Insert", "insert");
-    await askFor("Features (RC, etc)", "features");
-    await askFor("Print Run", "printRun");
-    await askFor("Autographed", "autographed");
+    await askFor("Parallel", "parallel", { allowUpdates: resetAll });
+    await askFor("Insert", "insert", { allowUpdates: resetAll });
+    await askFor("Features (RC, etc)", "features", { allowUpdates: resetAll });
+    await askFor("Print Run", "printRun", { allowUpdates: resetAll });
+    await askFor("Autographed", "autographed", { allowUpdates: resetAll });
     if (isYes(output.autographed)) {
-      await askFor("Autograph Format", "autoFormat");
+      await askFor("Autograph Format", "autoFormat", {
+        allowUpdates: resetAll,
+      });
     } else {
       output.autoFormat = output.autographed;
     }
 
-    await askFor("Graded", "graded");
+    await askFor("Graded", "graded", { allowUpdates: resetAll });
     if (isYes(output.graded)) {
       await askFor("Grader", "grader", { selectOptions: graders });
-      await askFor("Grade", "grade");
-      await askFor("Cert Number", "certNumber");
+      await askFor("Grade", "grade", { allowUpdates: resetAll });
+      await askFor("Cert Number", "certNumber", { allowUpdates: resetAll });
     }
 
     output.title = await getCardTitle(output);
@@ -377,7 +385,7 @@ async function getNewCardData(cardNumber, defaults = {}) {
 
     skipShipping = await ask("Use Standard Card Size/Shipping?", true);
   }
-  await askFor("Quantity", "quantity");
+  await askFor("Quantity", "quantity", { allowUpdates: resetAll });
 
   if (skipShipping) {
     output.size = "Standard";
@@ -390,14 +398,14 @@ async function getNewCardData(cardNumber, defaults = {}) {
     output.depth = 1;
   } else {
     // noinspection DuplicatedCode
-    await askFor("Size", "size");
-    await askFor("Material", "material");
-    await askFor("Thickness", "thickness");
-    await askFor("Weight (lbs)", "lbs");
-    await askFor("Weight (oz)", "oz");
-    await askFor("Length (in)", "length");
-    await askFor("Width (in)", "width");
-    await askFor("Depth (in)", "depth");
+    await askFor("Size", "size", { allowUpdates: resetAll });
+    await askFor("Material", "material", { allowUpdates: resetAll });
+    await askFor("Thickness", "thickness", { allowUpdates: resetAll });
+    await askFor("Weight (lbs)", "lbs", { allowUpdates: resetAll });
+    await askFor("Weight (oz)", "oz", { allowUpdates: resetAll });
+    await askFor("Length (in)", "length", { allowUpdates: resetAll });
+    await askFor("Width (iyeah)", "width", { allowUpdates: resetAll });
+    await askFor("Depth (in)", "depth", { allowUpdates: resetAll });
   }
 
   await askFor("Price", "price", { allowUpdates: true });
@@ -452,7 +460,7 @@ export const getCardData = async (allCards, imageDefaults) => {
 
     console.log("Card Info: ", output);
     while (!(await confirm("Proceed with card?"))) {
-      output = await getNewCardData(cardNumber, output);
+      output = await getNewCardData(cardNumber, output, true);
       console.log("Card Info: ", output);
     }
   }
@@ -479,7 +487,22 @@ export const getCardData = async (allCards, imageDefaults) => {
 
 export const getTeam = async (defaults) => {
   const teams = [];
-  let newTeam = await ask("Teams", defaults?.team, {
+  let defaultTeam;
+  if (defaults.team) {
+    console.log("team = ", defaults.team);
+    if (typeof defaults.team === "string") {
+      defaultTeam = defaults.team;
+    } else if (defaults.team.searchExact) {
+      defaultTeam = defaults.team.searchExact;
+    } else if (
+      defaults.team.length === 1 &&
+      defaults.team[0] &&
+      defaults.team[0].searchExact
+    ) {
+      defaultTeam = defaults.team[0].searchExact;
+    }
+  }
+  let newTeam = await ask("Teams", defaultTeam, {
     selectOptions: getTeamSelections(defaults.sport),
   });
   teams.push(newTeam);
