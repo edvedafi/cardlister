@@ -1,17 +1,11 @@
 import Queue from "queue";
-import {
-  addCardData,
-  cardDataExistsForRawImage,
-  getCardData,
-} from "./card-data/cardData.js";
+import { addCardData, cardDataExistsForRawImage, getCardData } from "./card-data/cardData.js";
 import imageRecognition from "./card-data/imageRecognition.js";
 import terminalImage from "terminal-image";
 import { ask } from "./utils/ask.js";
-import {
-  prepareImageFile,
-  processImageFile,
-} from "./image-processing/imageProcessor.js";
+import { prepareImageFile, processImageFile } from "./image-processing/imageProcessor.js";
 import writeOutputFiles from "./writeFiles.js";
+import collectBulkListings from "./bulk.js";
 
 // set up the queues
 const queueReadImage = new Queue({
@@ -43,9 +37,7 @@ async function processSingles(savedAnswers, setData, files) {
       if (i < files.length) {
         back = files[i++];
       }
-      queueReadImage.push(() =>
-        preProcessPair(front, back, allCards, setData, overrideImages),
-      );
+      queueReadImage.push(() => preProcessPair(front, back, allCards, setData, overrideImages));
     }
 
     //wait for the 3 queues to finish before writing any output
@@ -64,43 +56,27 @@ async function processSingles(savedAnswers, setData, files) {
     watchForError("Process Images", queueImageFiles);
 
     if (queueReadImage.length > 0 && !hasQueueError) {
-      await new Promise((resolve) =>
-        queueReadImage.addEventListener("end", resolve),
-      );
+      await new Promise((resolve) => queueReadImage.addEventListener("end", resolve));
     } else {
-      console.log(
-        "Not waiting for queueReadImage",
-        queueReadImage.length,
-        hasQueueError,
-      );
+      console.log("Not waiting for queueReadImage", queueReadImage.length, hasQueueError);
     }
     if (queueGatherData.length > 0 && !hasQueueError) {
-      await new Promise((resolve) =>
-        queueGatherData.addEventListener("end", resolve),
-      );
+      await new Promise((resolve) => queueGatherData.addEventListener("end", resolve));
     } else {
-      console.log(
-        "Not waiting for queueGatherData",
-        queueGatherData.length,
-        hasQueueError,
-      );
+      console.log("Not waiting for queueGatherData", queueGatherData.length, hasQueueError);
     }
     if (queueImageFiles.length > 0 && !hasQueueError) {
-      await new Promise((resolve) =>
-        queueImageFiles.addEventListener("end", resolve),
-      );
+      await new Promise((resolve) => queueImageFiles.addEventListener("end", resolve));
     } else {
-      console.log(
-        "Not waiting for queueImageFiles",
-        queueImageFiles.length,
-        hasQueueError,
-      );
+      console.log("Not waiting for queueImageFiles", queueImageFiles.length, hasQueueError);
     }
 
     //write the output
     console.log(hasQueueError);
     if (!hasQueueError) {
-      await writeOutputFiles(allCards);
+      const bulk = await collectBulkListings(savedAnswers, setData);
+
+      await writeOutputFiles(allCards, bulk);
     }
   } catch (e) {
     console.log(e);
@@ -133,54 +109,30 @@ async function processSingles(savedAnswers, setData, files) {
 // debugQueue('images', queueImageFiles);
 
 //Here we run the actual process
-const preProcessPair = async (
-  front,
-  back,
-  allCards,
-  setData,
-  overrideImages,
-) => {
+const preProcessPair = async (front, back, allCards, setData, overrideImages) => {
   let imageDefaults;
   try {
     // console.log('here!', front)
     if (!cardDataExistsForRawImage(front, allCards)) {
       // console.log('here2')
       imageDefaults = await imageRecognition(front, back, setData);
-      queueGatherData.push(() =>
-        processPair(front, back, imageDefaults, allCards, overrideImages),
-      );
+      queueGatherData.push(() => processPair(front, back, imageDefaults, allCards, overrideImages));
     }
   } catch (e) {
-    console.error(
-      "Failed while Preprocessing Card Data",
-      front,
-      back,
-      imageDefaults,
-    );
+    console.error("Failed while Preprocessing Card Data", front, back, imageDefaults);
     console.error(e);
     throw e;
   }
 };
 
-const processPair = async (
-  front,
-  back,
-  imageDefaults,
-  allCards,
-  overrideImages,
-) => {
+const processPair = async (front, back, imageDefaults, allCards, overrideImages) => {
   try {
     if (!cardDataExistsForRawImage(front, allCards)) {
       console.log(await terminalImage.file(front, { height: 25 }));
       if (back) {
         console.log(await terminalImage.file(back, { height: 25 }));
       }
-      await addCardData(
-        "Card Number",
-        imageDefaults,
-        "cardNumber",
-        imageDefaults,
-      );
+      await addCardData("Card Number", imageDefaults, "cardNumber", imageDefaults);
       const oldCard = allCards[imageDefaults.cardNumber];
       if (oldCard) {
         const addImages = await ask("Add Images to existing card?", false);

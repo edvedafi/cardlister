@@ -9,6 +9,7 @@ const saveData = {
   metadata: {},
   setData: {},
   allCardData: {},
+  bulk: [],
 };
 export const initializeAnswers = async (inputDirectory, readExact = false) => {
   answerFile = `${inputDirectory}input.json`;
@@ -19,9 +20,7 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
       // console.log('answerInput', answerInput);
 
       saveData.metadata = answerInput.metadata;
-      saveData.metadata.reprocessImages = readExact
-        ? false
-        : await ask("Reprocess existing images", false);
+      saveData.metadata.reprocessImages = readExact ? false : await ask("Reprocess existing images", false);
 
       saveData.allCardData = readExact
         ? answerInput.allCardData
@@ -38,6 +37,7 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
               return acc;
             }, {});
       saveData.setData = answerInput.setData;
+      saveData.bulk = answerInput.bulk;
       console.log("saveData", saveData);
     }
   } catch (e) {
@@ -58,12 +58,17 @@ const saveAnswers = (cardData) => {
     console.log("Error saving answers", e);
   });
 };
+const saveBulkAnswers = (cardData) => {
+  if (cardData) {
+    saveData.bulk = cardData;
+  }
+  fs.writeJSON(answerFile, saveData).catch((e) => {
+    console.log("Error saving answers", e);
+  });
+};
 
 export const getSetData = async () => {
-  const isSet = await ask(
-    "Is this a complete set?",
-    isYes(saveData.setData?.isSet),
-  );
+  const isSet = await ask("Is this a complete set?", isYes(saveData.setData?.isSet));
 
   if (isSet) {
     saveData.setData.isSet = true;
@@ -77,44 +82,20 @@ export const getSetData = async () => {
     saveData.setData.team = await ask("Team", saveData.setData.team, {
       selectOptions: getTeamSelections(saveData.setData.sport),
     });
-    saveData.setData.manufacture = await ask(
-      "Manufacturer",
-      saveData.setData.manufacture,
-    );
+    saveData.setData.manufacture = await ask("Manufacturer", saveData.setData.manufacture);
     saveData.setData.setName = await ask("Set Name", saveData.setData.setName);
     saveData.setData.insert = await ask("Insert", saveData.setData.insert);
-    saveData.setData.parallel = await ask(
-      "Parallel",
-      saveData.setData.parallel,
-    );
-    saveData.setData.features = await ask(
-      "Features",
-      saveData.setData.features,
-    );
-    saveData.setData.printRun = await ask(
-      "Print Run",
-      saveData.setData.printRun,
-    );
-    saveData.setData.autographed = await ask(
-      "Autograph",
-      saveData.setData.autographed,
-    );
+    saveData.setData.parallel = await ask("Parallel", saveData.setData.parallel);
+    saveData.setData.features = await ask("Features", saveData.setData.features);
+    saveData.setData.printRun = await ask("Print Run", saveData.setData.printRun);
+    saveData.setData.autographed = await ask("Autograph", saveData.setData.autographed);
 
     saveData.setData.graded = await ask("Graded", saveData.setData.graded);
 
-    saveData.setData.card_number_prefix = await ask(
-      "Enter Card Number Prefix",
-      saveData.setData.card_number_prefix,
-    );
+    saveData.setData.card_number_prefix = await ask("Enter Card Number Prefix", saveData.setData.card_number_prefix);
     saveData.setData.price = await ask("Default Price", saveData.setData.price);
-    saveData.setData.bscPrice = await ask(
-      "BSC Price",
-      saveData.setData.bscPrice,
-    );
-    saveData.setData.autoOffer = await ask(
-      "Default Auto Accept Offer",
-      saveData.setData.autoOffer,
-    );
+    saveData.setData.bscPrice = await ask("BSC Price", saveData.setData.bscPrice);
+    saveData.setData.autoOffer = await ask("Default Auto Accept Offer", saveData.setData.autoOffer);
   } else {
     saveData.setData = {};
   }
@@ -170,16 +151,11 @@ async function getCardTitle(output) {
       : `${output.manufacture} ${output.setName}`
     : "";
   let teamDisplay = output.teamDisplay;
-  let graded = isYes(output.graded)
-    ? ` ${output.grader} ${output.grade} ${psaGrades[output.grade]}`
-    : "";
+  let graded = isYes(output.graded) ? ` ${output.grader} ${output.grade} ${psaGrades[output.grade]}` : "";
 
   output.longTitle = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   let title = output.longTitle;
-  if (
-    title.length > maxTitleLength &&
-    ["Panini", "Leaf"].includes(output.manufacture)
-  ) {
+  if (title.length > maxTitleLength && ["Panini", "Leaf"].includes(output.manufacture)) {
     setName = output.setName;
     title = `${output.year} ${setName}${insert}${parallel} #${output.cardNumber} ${output.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
@@ -225,10 +201,7 @@ async function getLotTitle(output) {
   let teamDisplay = output.teamDisplay;
 
   const updateTitle = () =>
-    `25 Card ${output.lotType} Lot: ${output.player} ${teamDisplay}${lotCount}`.replace(
-      / {2}/g,
-      " ",
-    );
+    `25 Card ${output.lotType} Lot: ${output.player} ${teamDisplay}${lotCount}`.replace(/ {2}/g, " ");
 
   output.longTitle = updateTitle();
   let title = output.longTitle;
@@ -286,30 +259,16 @@ async function getCardName(output) {
 }
 
 const findStoreCategory = (sport) => {
-  return (
-    { baseball: "10796384017", football: "10796385017" }[sport] || "10796387017"
-  );
+  return { baseball: "10796384017", football: "10796385017" }[sport] || "10796387017";
 };
 
-export async function addCardData(
-  text,
-  output,
-  propName,
-  defaultValues,
-  options,
-) {
-  if (
-    saveData?.setData &&
-    saveData?.setData[propName] &&
-    !options?.allowUpdates
-  ) {
+export async function addCardData(text, output, propName, defaultValues, options) {
+  if (saveData?.setData && saveData?.setData[propName] && !options?.allowUpdates) {
     if (!isNo(saveData?.setData[propName])) {
       output[propName] = saveData?.setData[propName];
     }
   } else {
-    const defaultValue = defaultValues[propName]
-      ? defaultValues[propName].display || defaultValues[propName]
-      : "";
+    const defaultValue = defaultValues[propName] ? defaultValues[propName].display || defaultValues[propName] : "";
     output[propName] = await ask(text, defaultValue, options);
   }
 }
@@ -327,16 +286,14 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   let output = {
     ...defaultValues,
     cardNumber:
-      saveData.setData.card_number_prefix &&
-      !cardNumber.startsWith(saveData.setData.card_number_prefix)
+      saveData.setData.card_number_prefix && !cardNumber.startsWith(saveData.setData.card_number_prefix)
         ? `${saveData.setData.card_number_prefix}${cardNumber}`
         : cardNumber,
     count: 1,
     pics: [],
   };
 
-  const askFor = async (text, propName, options) =>
-    await addCardData(text, output, propName, defaultValues, options);
+  const askFor = async (text, propName, options) => await addCardData(text, output, propName, defaultValues, options);
 
   await askFor("Sport", "sport", {
     selectOptions: sports,
@@ -426,9 +383,9 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   }
   await askFor("BSC Price", "bscPrice", { allowUpdates: true });
 
-  output.directory = `${output.year}/${output.setName}${
-    output.insert ? `/${output.insert}` : ""
-  }${output.parallel ? `/${output.parallel}` : ""}/`.replace(/\s/g, "_");
+  output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ""}${
+    output.parallel ? `/${output.parallel}` : ""
+  }/`.replace(/\s/g, "_");
   return output;
 }
 
@@ -476,13 +433,49 @@ export const getCardData = async (allCards, imageDefaults) => {
   }
 
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
-  output.pics =
-    output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
+  output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
   allCards[output.key] = output;
   saveAnswers(allCards);
 
   return output;
+};
+
+export const getBulkCardData = async (bulkCards, setData) => {
+  const defaultValues = {
+    ...setData,
+    quantity: 1,
+    bscPrice: 0.25,
+    slPrice: 0.18,
+  };
+
+  if (bulkCards.length > 0) {
+    try {
+      cardNumber = Number.parseInt(bulkCards[bulkCards.length - 1].cardNumber) + 1;
+    } catch (e) {}
+  }
+  cardNumber = await ask("Card Number", cardNumber);
+  let bulkOutput;
+
+  if (cardNumber) {
+    const output = {
+      ...setData,
+      cardNumber: cardNumber,
+    };
+
+    const askFor = async (text, propName) =>
+      await addCardData(text, output, propName, defaultValues, { allowUpdates: true });
+
+    await askFor("Quantity", "quantity");
+    await askFor("BSC Price", "bscPrice");
+    // await askFor("SL NUmber", "slPrice");
+
+    bulkCards.push(output);
+
+    saveBulkAnswers(bulkCards);
+  }
+
+  return cardNumber;
 };
 
 export const getTeam = async (defaults) => {
@@ -494,11 +487,7 @@ export const getTeam = async (defaults) => {
       defaultTeam = defaults.team;
     } else if (defaults.team.searchExact) {
       defaultTeam = defaults.team.searchExact;
-    } else if (
-      defaults.team.length === 1 &&
-      defaults.team[0] &&
-      defaults.team[0].searchExact
-    ) {
+    } else if (defaults.team.length === 1 && defaults.team[0] && defaults.team[0].searchExact) {
       defaultTeam = defaults.team[0].searchExact;
     }
   }
@@ -516,17 +505,11 @@ export const getTeam = async (defaults) => {
 };
 
 export const getTeamDisplay = (teams) =>
-  teams?.reduce(
-    (display, team) =>
-      display?.length > 0 ? `${display} | ${team.display}` : team.display,
-    undefined,
-  );
+  teams?.reduce((display, team) => (display?.length > 0 ? `${display} | ${team.display}` : team.display), undefined);
 
 export const cardDataExistsForRawImage = (rawImage, allCards) => {
   if (rawImage && !saveData.setData.reprocessImages) {
-    const saved = Object.values(allCards).find((card) =>
-      card.raw?.includes(rawImage),
-    );
+    const saved = Object.values(allCards).find((card) => card.raw?.includes(rawImage));
     if (saved) {
       return saved;
     }
@@ -569,10 +552,7 @@ export const getLotData = async (imageDefaults, allCards) => {
   output.teamDisplay = getTeamDisplay(output.team);
   await askFor("Quantity", "quantity");
 
-  const skipShipping = await ask(
-    "Use Standard Lot Size,Shipping, Price?",
-    true,
-  );
+  const skipShipping = await ask("Use Standard Lot Size,Shipping, Price?", true);
 
   if (!skipShipping) {
     await askFor("Oldest Card", "year");
@@ -596,9 +576,7 @@ export const getLotData = async (imageDefaults, allCards) => {
 
   output.lotCount = 1;
   output.key = `${playerKey}_${output.lotCount}`;
-  const keyExists = async () =>
-    allCards[output.key] ||
-    (await fs.pathExists(`${output.directory}/${output.key}`));
+  const keyExists = async () => allCards[output.key] || (await fs.pathExists(`${output.directory}/${output.key}`));
   while ((await keyExists()) && output.lotCount < 99) {
     output.key = `${playerKey}_${++output.lotCount}`;
   }
@@ -606,8 +584,7 @@ export const getLotData = async (imageDefaults, allCards) => {
   output.title = await getLotTitle(output);
 
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
-  output.pics =
-    output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
+  output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
   output.description = `${output.longTitle}<br><br>Typically these lots contain base cards, lower end RCs, and lower end inserts. You are not necessarily getting the exact cards pictured as I have multiple lots for every player and just list with quantities. If you are interested in the player and want to ensure you get specifically one or more of the cards pictured please message me so that I can ensure you get those cards.<br><br>Please note I try to make these lots are all unique cards, but sometimes I am not perfect at that.`;
 

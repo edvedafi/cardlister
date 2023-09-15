@@ -13,13 +13,17 @@ const uploadQueue = new Queue({
   concurrency: 5,
 });
 
-async function writeBuySportsCardsOutput(allCards) {
+async function writeBuySportsCardsOutput(allCards, bulk) {
   const years = {};
 
-  //queue up all of the cards for writing in real time
-  Object.values(allCards).forEach((card) => {
-    uploadQueue.push(async () => writeToAPI(card));
-  });
+  //queue up all the cards for writing in real time
+  console.log(bulk.length);
+  const queueCards = (arrayOfCards) =>
+    arrayOfCards.forEach((card) => {
+      uploadQueue.push(async () => writeToAPI(card));
+    });
+  // queueCards(Object.values(allCards));
+  queueCards(bulk);
 
   // uploadQueue.push(async () => writeToAPI(allCards["165"]));
 
@@ -45,9 +49,7 @@ async function writeBuySportsCardsOutput(allCards) {
   //sort all cards in year by cardNumber
   Object.keys(years).forEach((year) => {
     Object.keys(years[year]).forEach((setName) => {
-      years[year][setName].sort(
-        (a, b) => parseInt(a.cardNumber) - parseInt(b.cardNumber),
-      );
+      years[year][setName].sort((a, b) => parseInt(a.cardNumber) - parseInt(b.cardNumber));
     });
   });
 
@@ -89,46 +91,38 @@ const baseHeaders = () => ({
 });
 
 async function post(path, body) {
-  const responseObject = await fetch(
-    `https://api-prod.buysportscards.com/${path}`,
-    {
-      headers: baseHeaders(),
-      body: JSON.stringify(body),
-      method: "POST",
-    },
-  );
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+    headers: baseHeaders(),
+    body: JSON.stringify(body),
+    method: "POST",
+  });
 
   return responseObject.json();
 }
+
 async function postImage(path, imagePath) {
   const formData = new FormData();
 
   formData.append("attachment", fs.createReadStream(imagePath));
 
-  const responseObject = await fetch(
-    `https://api-prod.buysportscards.com/${path}`,
-    {
-      headers: {
-        ...baseHeaders(),
-        ...formData.getHeaders(),
-      },
-      body: formData,
-      method: "POST",
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+    headers: {
+      ...baseHeaders(),
+      ...formData.getHeaders(),
     },
-  );
+    body: formData,
+    method: "POST",
+  });
 
   return responseObject.json();
 }
 
 async function put(path, body) {
-  const responseObject = await fetch(
-    `https://api-prod.buysportscards.com/${path}`,
-    {
-      headers: baseHeaders(),
-      body: JSON.stringify(body),
-      method: "PUT",
-    },
-  );
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+    headers: baseHeaders(),
+    body: JSON.stringify(body),
+    method: "PUT",
+  });
 
   return responseObject.json();
 }
@@ -142,10 +136,8 @@ const get = async (path) =>
   ).json();
 
 async function writeToAPI(card) {
-  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`
-    .replaceAll("& ", "")
-    .replaceAll(" ", "+");
-  // console.log(`Searching for: ${searchPath}`);
+  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`.replaceAll("& ", "").replaceAll(" ", "+");
+  console.log(`Searching for: ${searchPath}`);
   const filters = {
     cardNo: [card.cardNumber],
     sport: [card.sport],
@@ -186,42 +178,41 @@ async function writeToAPI(card) {
 
     // console.log("First Result = " + listingId);
 
-    const settingsResponse = await get(
-      `seller/card-listing/${listingId}/settings`,
-    );
+    const settingsResponse = await get(`seller/card-listing/${listingId}/settings`);
 
-    const frontResponse = await postImage(
-      `common/card/${listingId}/product/e484609d38/attachment`,
-      `output/${card.directory}${card.frontImage}`,
-    );
+    const listing = {
+      productType: "raw",
+      condition: "near_mint",
+      grade: "",
+      price: card.bscPrice,
+      quantity: card.quantity,
+      gradingCompany: "",
+      productId: settingsResponse.productId,
+      sportId: card.sport,
+      availableQuantity: card.quantity,
+    };
 
-    const backResponse = await postImage(
-      `common/card/${listingId}/product/e484609d38/attachment`,
-      `output/${card.directory}${card.backImage}`,
-    );
+    if (card.frontImage) {
+      const frontResponse = await postImage(
+        `common/card/${listingId}/product/e484609d38/attachment`,
+        `output/${card.directory}${card.frontImage}`,
+      );
+      listing.sellerImgFront = frontResponse.objectKey;
+    }
 
-    const saveResponse = await put(`seller/card-listing/${listingId}/product`, {
-      action: "add",
-      listing: {
-        productType: "raw",
-        condition: "near_mint",
-        grade: "",
-        price: card.bscPrice,
-        quantity: card.quantity,
-        gradingCompany: "",
-        productId: settingsResponse.productId,
-        sportId: card.sport,
-        availableQuantity: card.quantity,
-        sellerImgFront: frontResponse.objectKey,
-        sellerImgBack: backResponse.objectKey,
-      },
-    });
+    if (card.backImage) {
+      const backResponse = await postImage(
+        `common/card/${listingId}/product/e484609d38/attachment`,
+        `output/${card.directory}${card.backImage}`,
+      );
+      listing.sellerImgBack = backResponse.objectKey;
+    }
 
-    // console.log(
-    //   "saveResponse Result = " + JSON.stringify(saveResponse, null, 2),
-    // );
+    const saveResponse = await put(`seller/card-listing/${listingId}/product`, { action: "add", listing });
+
+    // console.log("saveResponse Result = " + JSON.stringify(saveResponse, null, 2));
     if (saveResponse.listings?.length > 0) {
-      console.log(`Successfully uploaded ${card.longTitle} to BSC`);
+      console.log(`Successfully uploaded ${card.longTitle || card.cardNumber} to BSC`);
     } else {
       await open(
         `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
@@ -230,9 +221,7 @@ async function writeToAPI(card) {
       );
     }
   } else {
-    console.log(
-      `Found ${listResponse.totalResults} results for ${card.cardName}`,
-    );
+    console.log(`Found ${listResponse.totalResults} results for ${card.cardName}`);
     console.log("  " + searchPath);
     console.log("  " + JSON.stringify(filters));
     console.log("  " + "Opening BSC now");

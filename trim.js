@@ -8,6 +8,7 @@ import "zx/globals";
 import { getFiles, getInputs } from "./src/utils/inputs.js";
 import processSingles from "./src/singles.js";
 import initializeFirebase from "./src/utils/firebase.js";
+import processBulk from "./src/bulk.js";
 
 $.verbose = false;
 

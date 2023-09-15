@@ -4,11 +4,11 @@ import writeEbayFile from "./listing-sites/ebay.js";
 import writeShopifyFile from "./listing-sites/shopify.js";
 import uploadToShopify from "./listing-sites/shopifyUpload.js";
 
-async function writeOutputFiles(allCards) {
+async function writeOutputFiles(allCards, bulk) {
   await Promise.all([
     uploadToShopify(allCards),
     writeSportLotsOutput(allCards),
-    writeBuySportsCardsOutput(allCards),
+    writeBuySportsCardsOutput(allCards, bulk),
     writeEbayFile(allCards),
     writeShopifyFile(allCards),
   ]);
