@@ -7,7 +7,7 @@ import uploadToShopify from "./listing-sites/shopifyUpload.js";
 async function writeOutputFiles(allCards, bulk) {
   await Promise.all([
     uploadToShopify(allCards),
-    writeSportLotsOutput(allCards),
+    writeSportLotsOutput(allCards, bulk),
     writeBuySportsCardsOutput(allCards, bulk),
     writeEbayFile(allCards),
     writeShopifyFile(allCards),

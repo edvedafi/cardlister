@@ -103,8 +103,7 @@ async function writeEbayFile(data) {
     header: [
       {
         id: "action",
-        title:
-          "*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)",
+        title: "*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)",
       },
       { id: "customLabel", title: "CustomLabel" },
       { id: "category", title: "*Category" },
@@ -240,13 +239,9 @@ async function writeEbayFile(data) {
         }[card.league?.toLowerCase()] || card.league
       : "N/A";
 
-    card.sport = card.sport
-      ? card.sport.slice(0, 1).toUpperCase() + card.sport.slice(1).toLowerCase()
-      : "N/A";
+    card.sport = card.sport ? card.sport.slice(0, 1).toUpperCase() + card.sport.slice(1).toLowerCase() : "N/A";
 
-    card.description =
-      card.description ||
-      `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
+    card.description = card.description || `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
 
     card.setName = `${card.year} ${card.setName}`;
 
@@ -267,7 +262,7 @@ async function writeEbayFile(data) {
   });
 
   // merge defaults
-  console.log("csv data size: ", csvData.length);
+  console.log("ebay data size: ", csvData.length);
   csvData = csvData.map((card) => ({ ...defaultValues, ...card }));
 
   try {
@@ -278,7 +273,9 @@ async function writeEbayFile(data) {
     throw e;
   }
 
-  await uploadEbayFile();
+  if (csvData.length > 0) {
+    await uploadEbayFile();
+  }
 }
 
 import { Builder, Browser, By, until } from "selenium-webdriver";
@@ -292,9 +289,7 @@ export const uploadEbayFile = async () => {
     let signInButton = await Promise.race([
       waitForElement(By.id("userid")),
       waitForElement(
-        By.xpath(
-          "//iframe[starts-with(@name, 'a-') and starts-with(@src, 'https://www.google.com/recaptcha')]",
-        ),
+        By.xpath("//iframe[starts-with(@name, 'a-') and starts-with(@src, 'https://www.google.com/recaptcha')]"),
       ),
     ]);
 
@@ -302,9 +297,7 @@ export const uploadEbayFile = async () => {
     if (id === "userid") {
       //do nothing because we found the right button
     } else {
-      const checkbox = await driver.wait(
-        until.elementLocated(By.css("div.recaptcha-checkbox-checkmark")),
-      );
+      const checkbox = await driver.wait(until.elementLocated(By.css("div.recaptcha-checkbox-checkmark")));
       await checkbox.click();
       signInButton = waitForElement(By.id("userid"));
     }
@@ -334,14 +327,10 @@ export const uploadEbayFile = async () => {
     // await signIn(waitForElement);
 
     await driver.get("https://www.ebay.com/sh/lst/active");
-    const uploadButton = await waitForElement(
-      By.xpath('//button[text()="Upload"]'),
-    );
+    const uploadButton = await waitForElement(By.xpath('//button[text()="Upload"]'));
     await uploadButton.click();
 
-    await driver
-      .findElement(By.xpath("//input[@type='file']"))
-      .sendKeys(`${process.cwd()}/${filePath}`);
+    await driver.findElement(By.xpath("//input[@type='file']")).sendKeys(`${process.cwd()}/${filePath}`);
 
     const resultTitle = await waitForElement(By.id("Listing-popup-title"));
     const result = await resultTitle.getText();

@@ -23,6 +23,10 @@ const savedAnswers = await initializeAnswers(input_directory);
 const setData = await getSetData();
 
 //gather the list of files that we will process
-const files = await getFiles(input_directory);
+let files = [];
+console.log(input_directory);
+if (input_directory !== "input/bulk/") {
+  files = await getFiles(input_directory);
+}
 
 await processSingles(savedAnswers, setData, files);

@@ -93,9 +93,10 @@ export const getSetData = async () => {
     saveData.setData.graded = await ask("Graded", saveData.setData.graded);
 
     saveData.setData.card_number_prefix = await ask("Enter Card Number Prefix", saveData.setData.card_number_prefix);
-    saveData.setData.price = await ask("Default Price", saveData.setData.price);
-    saveData.setData.bscPrice = await ask("BSC Price", saveData.setData.bscPrice);
-    saveData.setData.autoOffer = await ask("Default Auto Accept Offer", saveData.setData.autoOffer);
+    saveData.setData.price = await ask("Default Price", saveData.setData.price || 0.99);
+    saveData.setData.autoOffer = await ask("Default Auto Accept Offer", saveData.setData.autoOffer || 0.01);
+    saveData.setData.bscPrice = await ask("BSC Price", saveData.setData.bscPrice || 0.25);
+    saveData.setData.slPrice = await ask("SportLots Price", saveData.setData.slPrice || 0.18);
   } else {
     saveData.setData = {};
   }
@@ -468,7 +469,7 @@ export const getBulkCardData = async (bulkCards, setData) => {
 
     await askFor("Quantity", "quantity");
     await askFor("BSC Price", "bscPrice");
-    // await askFor("SL NUmber", "slPrice");
+    await askFor("SL NUmber", "slPrice");
 
     bulkCards.push(output);
 

@@ -17,12 +17,11 @@ async function writeBuySportsCardsOutput(allCards, bulk) {
   const years = {};
 
   //queue up all the cards for writing in real time
-  console.log(bulk.length);
   const queueCards = (arrayOfCards) =>
     arrayOfCards.forEach((card) => {
       uploadQueue.push(async () => writeToAPI(card));
     });
-  // queueCards(Object.values(allCards));
+  queueCards(Object.values(allCards));
   queueCards(bulk);
 
   // uploadQueue.push(async () => writeToAPI(allCards["165"]));
@@ -137,7 +136,7 @@ const get = async (path) =>
 
 async function writeToAPI(card) {
   const searchPath = `search/seller/results?q=${card.setName}+${card.player}`.replaceAll("& ", "").replaceAll(" ", "+");
-  console.log(`Searching for: ${searchPath}`);
+  // console.log(`Searching for: ${searchPath}`);
   const filters = {
     cardNo: [card.cardNumber],
     sport: [card.sport],
@@ -146,17 +145,17 @@ async function writeToAPI(card) {
     year: [card.year],
   };
 
-  if (card.parallel) {
-    filters.variant.push("parallel");
-    filters.variantName.push(card.parallel.toLowerCase().replaceAll(" ", "-"));
-  }
-
   if (card.insert) {
     filters.variant.push("insert");
-    filters.variantName.push(card.insert.toLowerCase().replaceAll(" ", "-"));
-  }
-
-  if (filters.variant.length === 0) {
+    if (card.parallel) {
+      filters.variantName.push(`${card.insert}-${card.parallel}`.toLowerCase().replaceAll(" ", "-"));
+    } else {
+      filters.variantName.push(card.insert.toLowerCase().replaceAll(" ", "-"));
+    }
+  } else if (card.parallel) {
+    filters.variant.push("parallel");
+    filters.variantName.push(card.parallel.toLowerCase().replaceAll(" ", "-"));
+  } else {
     filters.variant.push("base");
   }
 

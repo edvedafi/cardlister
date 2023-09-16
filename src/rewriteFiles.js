@@ -1,7 +1,7 @@
 import { initializeAnswers } from "./card-data/cardData.js";
 import "zx/globals";
 import dotenv from "dotenv";
-import { getInputDirectory } from "./utils/inputs.js";
+import { getInputDirectory, getInputs } from "./utils/inputs.js";
 import uploadToShopify from "./listing-sites/shopifyUpload.js";
 import writeSportLotsOutput from "./listing-sites/sportlots.js";
 import writeBuySportsCardsOutput from "./listing-sites/bsc.js";
@@ -10,11 +10,11 @@ import writeShopifyFile from "./listing-sites/shopify.js";
 
 dotenv.config();
 
-const inputDirectory = await getInputDirectory();
+const inputDirectory = await getInputs();
 const savedAnswers = await initializeAnswers(inputDirectory, true);
 await Promise.all([
   uploadToShopify(savedAnswers.allCardData),
-  writeSportLotsOutput(savedAnswers.allCardData),
+  writeSportLotsOutput(savedAnswers.allCardData, savedAnswers.bulk),
   writeBuySportsCardsOutput(savedAnswers.allCardData, savedAnswers.bulk),
   writeEbayFile(savedAnswers.allCardData),
   writeShopifyFile(savedAnswers.allCardData),
