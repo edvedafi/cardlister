@@ -111,7 +111,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     const setSelectValue = async (name, value) => {
       const brandSelector = await waitForElement(By.name(name));
       let brandSelectorSelect = new Select(brandSelector);
-      await brandSelectorSelect.selectByValue(value);
+      await brandSelectorSelect.selectByValue("" + value);
     };
 
     // await setTimeout(10000);

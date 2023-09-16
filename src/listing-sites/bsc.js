@@ -148,13 +148,15 @@ async function writeToAPI(card) {
   if (card.insert) {
     filters.variant.push("insert");
     if (card.parallel) {
-      filters.variantName.push(`${card.insert}-${card.parallel}`.toLowerCase().replaceAll(" ", "-"));
+      filters.variantName.push(
+        `${card.insert}-${card.parallel}`.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"),
+      );
     } else {
-      filters.variantName.push(card.insert.toLowerCase().replaceAll(" ", "-"));
+      filters.variantName.push(card.insert.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
     }
   } else if (card.parallel) {
     filters.variant.push("parallel");
-    filters.variantName.push(card.parallel.toLowerCase().replaceAll(" ", "-"));
+    filters.variantName.push(card.parallel.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
   } else {
     filters.variant.push("base");
   }

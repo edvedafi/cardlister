@@ -379,10 +379,13 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   //inserts, parallels or cards worth more than $1 default to 10% of the Ebay price otherwise drop it to a quarter
   if (output.insert || output.parallel || output.price > 1) {
     output.bscPrice = Math.round(output.price * 10) / 100;
+    output.slPrice = Math.round(output.price * 10) / 100;
   } else {
     output.bscPrice = 0.25;
+    output.slPrice = 0.18;
   }
   await askFor("BSC Price", "bscPrice", { allowUpdates: true });
+  await askFor("SportLots Price", "slPrice", { allowUpdates: true });
 
   output.directory = `${output.year}/${output.setName}${output.insert ? `/${output.insert}` : ""}${
     output.parallel ? `/${output.parallel}` : ""
@@ -442,12 +445,12 @@ export const getCardData = async (allCards, imageDefaults) => {
   return output;
 };
 
-export const getBulkCardData = async (bulkCards, setData) => {
+export const getBulkCardData = async (bulkCards, setData, enterValues) => {
   const defaultValues = {
-    ...setData,
     quantity: 1,
     bscPrice: 0.25,
     slPrice: 0.18,
+    ...setData,
   };
 
   if (bulkCards.length > 0) {
@@ -465,7 +468,7 @@ export const getBulkCardData = async (bulkCards, setData) => {
     };
 
     const askFor = async (text, propName) =>
-      await addCardData(text, output, propName, defaultValues, { allowUpdates: true });
+      await addCardData(text, output, propName, defaultValues, { allowUpdates: enterValues });
 
     await askFor("Quantity", "quantity");
     await askFor("BSC Price", "bscPrice");
@@ -483,7 +486,6 @@ export const getTeam = async (defaults) => {
   const teams = [];
   let defaultTeam;
   if (defaults.team) {
-    console.log("team = ", defaults.team);
     if (typeof defaults.team === "string") {
       defaultTeam = defaults.team;
     } else if (defaults.team.searchExact) {
