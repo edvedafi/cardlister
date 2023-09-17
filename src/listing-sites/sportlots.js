@@ -141,19 +141,27 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       const setInfo = JSON.parse(key);
       await driver.get("https://sportlots.com/inven/dealbin/newinven.tpl");
 
-      await setSelectValue("yr", setInfo.year);
-      await setSelectValue("sprt", { baseball: "BB", football: "FB", basketball: "BK" }[setInfo.sport]);
-      await setSelectValue("brd", setInfo.brand);
+      try {
+        await setSelectValue("yr", setInfo.year);
+        await setSelectValue("sprt", { baseball: "BB", football: "FB", basketball: "BK" }[setInfo.sport.toLowerCase()]);
+        await setSelectValue("brd", setInfo.brand);
+      } catch (e) {
+        await ask(`Please select the proper filters and then Press any key to continue...`);
+      }
 
       await clickSubmit();
 
-      const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setInfo.setName}')]`));
+      try {
+        const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setInfo.setName}')]`));
+        const fullSetText = await tableRowWithSetName.getText();
+        const fullSetNumbers = fullSetText.split(" ")[0];
+        //find the radio button where the value is fullSetNumbers
+        const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+        await radioButton.click();
+      } catch (e) {
+        await ask(`Please select the ${setInfo.setName} and then Press any key to continue...`);
+      }
 
-      const fullSetText = await tableRowWithSetName.getText();
-      const fullSetNumbers = fullSetText.split(" ")[0];
-      //find the radio button where the value is fullSetNumbers
-      const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-      await radioButton.click();
       await clickSubmit();
 
       let rows = await driver.findElements({

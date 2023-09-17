@@ -139,7 +139,7 @@ async function writeToAPI(card) {
   // console.log(`Searching for: ${searchPath}`);
   const filters = {
     cardNo: [card.cardNumber],
-    sport: [card.sport],
+    sport: [card.sport.toLowerCase()],
     variant: [],
     variantName: [],
     year: [card.year],
