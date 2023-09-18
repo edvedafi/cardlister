@@ -5,13 +5,11 @@ import writeShopifyFile from "./listing-sites/shopify.js";
 import uploadToShopify from "./listing-sites/shopifyUpload.js";
 
 async function writeOutputFiles(allCards, bulk) {
-  await Promise.all([
-    uploadToShopify(allCards),
-    writeSportLotsOutput(allCards, bulk),
-    writeBuySportsCardsOutput(allCards, bulk),
-    writeEbayFile(allCards),
-    writeShopifyFile(allCards),
-  ]);
+  await uploadToShopify(allCards);
+  await writeSportLotsOutput(allCards, bulk);
+  await writeBuySportsCardsOutput(allCards, bulk);
+  await writeEbayFile(allCards);
+  await writeShopifyFile(allCards);
 }
 
 export default writeOutputFiles;

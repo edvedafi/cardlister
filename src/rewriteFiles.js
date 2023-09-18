@@ -12,11 +12,11 @@ dotenv.config();
 
 const inputDirectory = await getInputs();
 const savedAnswers = await initializeAnswers(inputDirectory, true);
-await Promise.all([
-  uploadToShopify(savedAnswers.allCardData),
-  writeSportLotsOutput(savedAnswers.allCardData, savedAnswers.bulk),
-  writeBuySportsCardsOutput(savedAnswers.allCardData, savedAnswers.bulk),
-  writeEbayFile(savedAnswers.allCardData),
-  writeShopifyFile(savedAnswers.allCardData),
-]);
+
+await uploadToShopify(savedAnswers.allCardData);
+await writeSportLotsOutput(savedAnswers.allCardData, savedAnswers.bulk);
+await writeBuySportsCardsOutput(savedAnswers.allCardData, savedAnswers.bulk);
+await writeEbayFile(savedAnswers.allCardData);
+await writeShopifyFile(writeShopifyFilesavedAnswers.allCardData);
+
 Object.values(savedAnswers.allCardData).forEach((t) => console.log(t.title));

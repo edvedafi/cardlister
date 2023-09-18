@@ -94,9 +94,15 @@ async function writeSportLotsOutput(allCards, bulk) {
       cardsToUpload[key] = {};
     }
     cardsToUpload[key][card.cardNumber] = card;
+    //also add to cardsToUpLoad removing all non numeric characters from cardNumber
+    const cardNumber = card.cardNumber.replace(/\D/g, "");
+    console.log(`adding ${card.cardNumber} and ${cardNumber}`);
+    if (cardNumber) {
+      cardsToUpload[key][cardNumber] = card;
+    }
   };
   Object.values(allCards).forEach(addCardsToUpload);
-  Object.values(bulk).forEach(addCardsToUpload);
+  bulk?.forEach(addCardsToUpload);
 
   await enterIntoSportLotsWebsite(cardsToUpload);
 }
@@ -108,6 +114,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     driver = await new Builder().forBrowser(Browser.CHROME).build();
     await driver.get("https://sportlots.com/cust/custbin/login.tpl?urlval=/index.tpl&qs=");
 
+    // console.log("writing: ", cardsToUpload);
     const setSelectValue = async (name, value) => {
       const brandSelector = await waitForElement(By.name(name));
       let brandSelectorSelect = new Select(brandSelector);
@@ -154,10 +161,14 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       try {
         const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setInfo.setName}')]`));
         const fullSetText = await tableRowWithSetName.getText();
-        const fullSetNumbers = fullSetText.split(" ")[0];
-        //find the radio button where the value is fullSetNumbers
-        const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-        await radioButton.click();
+        if (fullSetText.endsWith(setInfo.setName)) {
+          const fullSetNumbers = fullSetText.split(" ")[0];
+          //find the radio button where the value is fullSetNumbers
+          const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+          await radioButton.click();
+        } else {
+          await ask(`Please select the ${setInfo.setName} and then Press any key to continue...`);
+        }
       } catch (e) {
         await ask(`Please select the ${setInfo.setName} and then Press any key to continue...`);
       }
@@ -167,6 +178,8 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       let rows = await driver.findElements({
         css: "table > tbody > tr:first-child > td:first-child > form > table > tbody > tr",
       });
+
+      console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
 
       for (let row of rows) {
         // Find the columns of the current row.
@@ -178,6 +191,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           const card = cardsToUpload[key][tableCardNumber];
 
           if (card) {
+            console.log("uploading: ", card);
             let cardNumberTextBox = await columns[0].findElement({ css: "input" });
             await cardNumberTextBox.sendKeys(card.quantity);
 
@@ -186,6 +200,8 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               priceTextBox.clear();
               await priceTextBox.sendKeys(card.price);
             }
+          } else {
+            console.log("not found: ", tableCardNumber);
           }
         }
       }
