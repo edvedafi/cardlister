@@ -14,17 +14,7 @@ const hf = new HfInference(process.env.HF_TOKEN);
 // console.log(spacy)
 // const nlp = spacy.load('en_core_web_sm');
 
-const manufactures = [
-  "topps",
-  "panini",
-  "sage",
-  "upper deck",
-  "donruss",
-  "fleer",
-  "score",
-  "pinnacle",
-  "playoff",
-];
+const manufactures = ["topps", "panini", "sage", "upper deck", "donruss", "fleer", "score", "pinnacle", "playoff"];
 
 const sets = [
   "prizm",
@@ -190,23 +180,15 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
   const addSearch = async (textResult, isFront) => {
     if (textResult) {
       const textBlocks =
-        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter(
-          (block) => block.blockType === "TEXT",
-        ) || [];
+        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter((block) => block.blockType === "TEXT") || [];
 
       const blocks = await Promise.all(
         textBlocks.map(async (block) => {
           return await Promise.all(
             block.paragraphs?.map(async (paragraph) => {
               const searchValue = {
-                word: paragraph.words
-                  .map((word) =>
-                    word.symbols.map((symbol) => symbol.text).join(""),
-                  )
-                  .join(" "),
-                words: paragraph.words.map((word) =>
-                  word.symbols.map((symbol) => symbol.text).join(""),
-                ),
+                word: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join("")).join(" "),
+                words: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join("")),
                 wordCount: paragraph.words.length,
                 confidence: (isFront ? 302 : 301) + block.confidence,
                 isFront,
@@ -219,16 +201,11 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
         }),
       );
       // console.log('blocks:', blocks)
-      searchParagraphs = searchParagraphs.concat(
-        blocks.reduce((acc, val) => acc.concat(val), []),
-      );
+      searchParagraphs = searchParagraphs.concat(blocks.reduce((acc, val) => acc.concat(val), []));
     }
   };
   // console.log(frontResult.fullTextAnnotation)
-  await Promise.all([
-    addSearch(frontResult, true),
-    addSearch(backResult, false),
-  ]);
+  await Promise.all([addSearch(frontResult, true), addSearch(backResult, false)]);
 
   defaults = await extractData(searchParagraphs, defaults, setData);
 
@@ -242,9 +219,7 @@ export const extractData = async (searchParagraphs, defaults, setData) => {
   // console.log('extractData', searchParagraphs);
   let result = { ...defaults };
   // Sort the search paragraphs by confidence
-  searchParagraphs = searchParagraphs.sort(
-    (a, b) => b.confidence - a.confidence,
-  );
+  searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence);
 
   //let's see if the card has the standard panini info
   result = {
@@ -272,8 +247,7 @@ export const extractData = async (searchParagraphs, defaults, setData) => {
 
 const getCropHints = async (client, image) => {
   const [cropHintResults] = await client.cropHints(image);
-  const hint =
-    cropHintResults.cropHintsAnnotation.cropHints[0].boundingPoly.vertices;
+  const hint = cropHintResults.cropHintsAnnotation.cropHints[0].boundingPoly.vertices;
   const left = hint.map((h) => h.x).sort((a, b) => a - b)[0];
   const top = hint.map((h) => h.y).sort((a, b) => a - b)[0];
   const right = hint.map((h) => h.x).sort((a, b) => b - a)[0];
@@ -300,10 +274,7 @@ export const runNLP = async (text, setData) => {
     const countWords = (word) => {
       if (word) {
         const search = word.toLowerCase();
-        return text.reduce(
-          (count, paragraph) => count + paragraph.lowerCase.includes(search),
-          0,
-        );
+        return text.reduce((count, paragraph) => count + paragraph.lowerCase.includes(search), 0);
       } else {
         return 0;
       }
@@ -314,9 +285,7 @@ export const runNLP = async (text, setData) => {
     // console.log('nlp input: ', textBlock);
     const segments = await callNLP(textBlock);
     // console.log('segments', segments);
-    const persons = segments.filter(
-      (segment) => segment.entity_group === "PER",
-    );
+    const persons = segments.filter((segment) => segment.entity_group === "PER");
     // console.log('persons', persons)
     // await ask('Continue?');
 
@@ -329,17 +298,10 @@ export const runNLP = async (text, setData) => {
           let finalWord;
           try {
             if (person.word.includes("#") && !person.word.includes("/")) {
-              let rawWord = text.find((word) =>
-                word?.lowerCase?.match(
-                  person?.word?.replace(/#/g, "[A-Za-z.']+"),
-                ),
-              );
+              let rawWord = text.find((word) => word?.lowerCase?.match(person?.word?.replace(/#/g, "[A-Za-z.']+")));
               if (rawWord) {
                 const end = person.word.replace(/#/g, "");
-                finalWord = rawWord.word.slice(
-                  0,
-                  rawWord.lowerCase.indexOf(end) + end.length,
-                );
+                finalWord = rawWord.word.slice(0, rawWord.lowerCase.indexOf(end) + end.length);
               }
             }
           } catch (e) {
@@ -352,32 +314,18 @@ export const runNLP = async (text, setData) => {
         //names cannot start with a number or a symbol
         .filter((person) => !person.word.match(/^[^A-Za-z]/))
         //remove duplicates
-        .filter(
-          (person, index, self) =>
-            index === self.findIndex((p) => p.word === person.word),
-        )
+        .filter((person, index, self) => index === self.findIndex((p) => p.word === person.word))
         //remove any names that are in the ignore list
         .filter(
           (person) =>
-            !manufactures.includes(person.word) &&
-            !inserts.includes(person.word) &&
-            !sets.includes(person.word),
+            !manufactures.includes(person.word) && !inserts.includes(person.word) && !sets.includes(person.word),
         )
         //remove any names that are substrings of other names
-        .filter(
-          (person) =>
-            !persons.find(
-              (search) =>
-                search.word !== person.word &&
-                search.word.includes(person.word),
-            ),
-        )
+        .filter((person) => !persons.find((search) => search.word !== person.word && search.word.includes(person.word)))
         //count the number of times that a name appears in the text
         .map((name) => ({
           ...name,
-          count: name.word
-            .split(/\s/)
-            .reduce((count, word) => count + countWords(word), 0),
+          count: name.word.split(/\s/).reduce((count, word) => count + countWords(word), 0),
           wordCount: wordCount(name.word),
         }))
         //sort first by count and then by score
@@ -402,41 +350,23 @@ export const runNLP = async (text, setData) => {
         results.player = titleCase(names[0]);
       } else if (names.length === 3) {
         const firstInitial = names.find((name) => name.length === 1);
-        const secondInitial = names.find(
-          (name) => name.length === 1 && name !== firstInitial,
-        );
+        const secondInitial = names.find((name) => name.length === 1 && name !== firstInitial);
         const lastName = names.find((name) => name.length > 1);
 
         if (countWords(`${firstInitial}${secondInitial} ${lastName}`) > 0) {
-          results.player = titleCase(
-            `${firstInitial}${secondInitial} ${lastName}`,
-          );
-        } else if (
-          countWords(`${firstInitial}.${secondInitial}. ${lastName}`) > 0
-        ) {
-          results.player = titleCase(
-            `${firstInitial}.${secondInitial}. ${lastName}`,
-          );
-        } else if (
-          countWords(`${firstInitial}. ${secondInitial}. ${lastName}`) > 0
-        ) {
-          results.player = titleCase(
-            `${firstInitial}. ${secondInitial}. ${lastName}`,
-          );
+          results.player = titleCase(`${firstInitial}${secondInitial} ${lastName}`);
+        } else if (countWords(`${firstInitial}.${secondInitial}. ${lastName}`) > 0) {
+          results.player = titleCase(`${firstInitial}.${secondInitial}. ${lastName}`);
+        } else if (countWords(`${firstInitial}. ${secondInitial}. ${lastName}`) > 0) {
+          results.player = titleCase(`${firstInitial}. ${secondInitial}. ${lastName}`);
         } else {
-          results.player = titleCase(
-            `${firstInitial} ${secondInitial} ${lastName}`,
-          );
+          results.player = titleCase(`${firstInitial} ${secondInitial} ${lastName}`);
         }
       } else {
         //check to see if any of our options are exact 2 words that both have letters in them
         const twoWords = names.filter((name) => {
           const split = name.split(" ");
-          return (
-            split.length === 2 &&
-            split[0].match(/[A-Za-z]/) &&
-            split[1].match(/[A-Za-z]/)
-          );
+          return split.length === 2 && split[0].match(/[A-Za-z]/) && split[1].match(/[A-Za-z]/);
         });
 
         if (twoWords.length === 1) {
@@ -454,8 +384,7 @@ export const runNLP = async (text, setData) => {
 const runFirstPass = async (searchParagraphs, defaults, setData) => {
   const results = { ...defaults };
   searchParagraphs.forEach((block) => {
-    const wordCountBetween = (min, max) =>
-      block.wordCount >= min && block.wordCount <= max;
+    const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
 
     // console.log('First Pass: ', block)
 
@@ -510,34 +439,20 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
       if (!results.cardNumber) {
         const firstWord = block.words[0].toLowerCase();
         if (wordCountBetween(2, 4) && ["no", "no."].includes(firstWord)) {
-          results.cardNumber = block.words
-            .slice(block.words.findIndex((word) => word.indexOf(".") >= 0) + 1)
-            .join("");
+          results.cardNumber = block.words.slice(block.words.findIndex((word) => word.indexOf(".") >= 0) + 1).join("");
           block.set = true;
         }
       }
 
-      if (
-        !results.setName &&
-        wordCountBetween(1, 2) &&
-        sets.includes(block.lowerCase)
-      ) {
+      if (!results.setName && wordCountBetween(1, 2) && sets.includes(block.lowerCase)) {
         results.setName = titleCase(block.word);
         block.set = true;
-      } else if (
-        !results.manufacture &&
-        wordCountBetween(1, 2) &&
-        manufactures.includes(block.lowerCase)
-      ) {
+      } else if (!results.manufacture && wordCountBetween(1, 2) && manufactures.includes(block.lowerCase)) {
         results.manufacture = titleCase(block.word);
         block.set = true;
       }
 
-      if (
-        !results.insert &&
-        wordCountBetween(1, 2) &&
-        inserts.includes(block.lowerCase)
-      ) {
+      if (!results.insert && wordCountBetween(1, 2) && inserts.includes(block.lowerCase)) {
         results.insert = titleCase(block.word);
         block.set = true;
       }
@@ -574,8 +489,7 @@ const runSecondPass = async (searchParagraphs, defaults, setData) => {
   searchParagraphs
     .filter((block) => !block.set)
     .forEach((block) => {
-      const wordCountBetween = (min, max) =>
-        block.wordCount >= min && block.wordCount <= max;
+      const wordCountBetween = (min, max) => block.wordCount >= min && block.wordCount <= max;
 
       // console.log('second pass: ', block)
 
@@ -583,11 +497,7 @@ const runSecondPass = async (searchParagraphs, defaults, setData) => {
         if (!results.year && block.word > 1900 && block.word < 2100) {
           //convert block.word to a number and add 1
           results.year = `${Number(block.word) + 1}`;
-        } else if (
-          !results.cardNumber &&
-          !setData.card_number_prefix &&
-          !block.isFront
-        ) {
+        } else if (!results.cardNumber && !setData.card_number_prefix && !block.isFront) {
           results.cardNumber = block.word;
         }
       }
@@ -599,12 +509,7 @@ const runSecondPass = async (searchParagraphs, defaults, setData) => {
         }
       }
 
-      if (
-        !results.player &&
-        !block.set &&
-        block.isProperName &&
-        wordCountBetween(2, 3)
-      ) {
+      if (!results.player && !block.set && block.isProperName && wordCountBetween(2, 3)) {
         results.player = titleCase(block.word);
       }
     });
@@ -650,26 +555,18 @@ const addFeature = (features, feature) => {
 
 export const paniniMatch = (searchParagraphs) => {
   const results = {};
-  const match = searchParagraphs.find((block) =>
-    block.lowerCase.match(/^\d\d\d\d panini - /),
-  );
+  const match = searchParagraphs.find((block) => block.lowerCase.match(/^\d\d\d\d panini - /));
   if (match) {
     results.manufacture = "Panini";
-    results.year = match.words[0];
-    results.setName = titleCase(match.words[3]);
+    results.year = results.year || match.words[0];
+    results.setName = results.setName || titleCase(match.words[3]);
+    const updateInsert = !results.insert;
     let i = 4;
-    while (
-      match.words[i] &&
-      !match.words[i].startsWith("Ⓒ") &&
-      !sports.includes(match.words[i].toLowerCase())
-    ) {
-      if (
-        match.words[i].toLowerCase() === "draft" &&
-        match.words[i + 1]?.toLowerCase() === "picks"
-      ) {
+    while (match.words[i] && !match.words[i].startsWith("Ⓒ") && !sports.includes(match.words[i].toLowerCase())) {
+      if (match.words[i].toLowerCase() === "draft" && match.words[i + 1]?.toLowerCase() === "picks") {
         results.setName = `${results.setName} Draft Picks`;
         i++;
-      } else {
+      } else if (updateInsert) {
         const nextWord = titleCase(match.words[i]);
         if (results.insert) {
           results.insert += ` ${nextWord}`;
@@ -679,7 +576,7 @@ export const paniniMatch = (searchParagraphs) => {
       }
       i++;
     }
-    if (sports.includes(match.words[i]?.toLowerCase())) {
+    if (!results.sport && sports.includes(match.words[i]?.toLowerCase())) {
       results.sport = match.words[i]?.toLowerCase();
     }
   }

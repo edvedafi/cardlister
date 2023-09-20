@@ -1,28 +1,58 @@
 import { byCardNumber } from "../utils/data.js";
 import open from "open";
-import url from "url";
 import FormData from "form-data";
 import Queue from "queue";
 // set up the queues
 
 $.verbose = false;
 
+const results = [];
 const uploadQueue = new Queue({
-  results: [],
+  results: results,
   autostart: true,
   concurrency: 5,
 });
 
-async function writeBuySportsCardsOutput(allCards, bulk) {
+async function writeBuySportsCardsOutput(allCards, bulk = []) {
   const years = {};
+  let hasQueueError = false;
+  uploadQueue.addEventListener("error", (error, job) => {
+    hasQueueError = true;
+    console.log(`Queue error: `, error, job);
+    uploadQueue.stop();
+  });
 
   //queue up all the cards for writing in real time
-  const queueCards = (arrayOfCards) =>
-    arrayOfCards.forEach((card) => {
-      uploadQueue.push(async () => writeToAPI(card));
-    });
-  queueCards(Object.values(allCards));
-  queueCards(bulk);
+  // Object.values(allCards).forEach((card) => {
+  //   uploadQueue.push(async () => await writeToAPI(card));
+  // });
+
+  //now group up the bulk uploads
+  Object.entries(
+    bulk.reduce((cardsToUpload, card) => {
+      const key = JSON.stringify({
+        year: card.year,
+        sport: card.sport.toLowerCase(),
+        brand: card.manufacture.toLowerCase(),
+        setName: card.setName.toLowerCase(),
+        parallel: card.parallel.toLowerCase(),
+        insert: card.insert.toLowerCase(),
+      });
+      if (!cardsToUpload[key]) {
+        cardsToUpload[key] = {};
+      }
+      cardsToUpload[key][card.cardNumber] = card;
+      //also add to cardsToUpLoad removing all non-numeric characters from cardNumber
+      const cardNumber = card.cardNumber.toString().replace(/\D/g, "");
+      if (cardNumber) {
+        cardsToUpload[key][cardNumber] = card;
+      }
+      return cardsToUpload;
+    }, {}),
+  ).forEach(([key, cards]) => {
+    // console.log(`Adding cards to bulk upload for ${JSON.stringify(key)}`);
+    uploadQueue.push(async () => await writeBulkToAPI(key, cards));
+  });
 
   // uploadQueue.push(async () => writeToAPI(allCards["165"]));
 
@@ -78,7 +108,22 @@ async function writeBuySportsCardsOutput(allCards, bulk) {
     throw err;
   }
 
-  await new Promise((resolve) => uploadQueue.addEventListener("end", resolve));
+  if (!hasQueueError) {
+    console.log("wait for the queues!");
+    await new Promise((resolve) =>
+      uploadQueue.addEventListener("end", () => {
+        resolve();
+      }),
+    );
+    // console.log("results", results);
+    console.log(
+      "Finished uploading to BSC. ",
+      results.reduce((sum, currentValue) => sum + currentValue, 0),
+      " cards uploaded.",
+    );
+  } else {
+    console.log("Queue error. ", results.length, " cards uploaded.");
+  }
 }
 
 const baseHeaders = () => ({
@@ -96,24 +141,57 @@ async function post(path, body) {
     method: "POST",
   });
 
-  return responseObject.json();
+  // console.log(JSON.stringify(body, null, 2));
+  // console.log(JSON.stringify(responseObject, null, 2));
+  // console.log(responseObject.status);
+  // console.log(responseObject.statusText);
+
+  if (responseObject.status === 401) {
+    console.log("BSC Token Expired");
+    process.exit(1);
+  }
+  // process.exit(1);
+
+  const text = await responseObject.text();
+
+  if (text === "" || text.trim().length === 0) {
+    console.log("Empty response from BSC");
+    console.log("path: ", `https://api-prod.buysportscards.com/${path}`);
+    console.log(JSON.stringify(body, null, 2));
+    return undefined;
+  }
+
+  return JSON.parse(text);
 }
 
 async function postImage(path, imagePath) {
-  const formData = new FormData();
+  let responseObject;
 
-  formData.append("attachment", fs.createReadStream(imagePath));
+  try {
+    const formData = new FormData();
 
-  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
-    headers: {
-      ...baseHeaders(),
-      ...formData.getHeaders(),
-    },
-    body: formData,
-    method: "POST",
-  });
+    formData.append("attachment", fs.createReadStream(imagePath));
 
-  return responseObject.json();
+    responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+      headers: {
+        ...baseHeaders(),
+        ...formData.getHeaders(),
+      },
+      body: formData,
+      method: "POST",
+    });
+
+    // console.log(responseObject);
+
+    if (responseObject.status === 401) {
+      console.log("BSC Token Expired");
+      process.exit(1);
+    }
+  } catch (err) {
+    console.log("Error uploading image: ", err);
+  }
+
+  return responseObject?.json();
 }
 
 async function put(path, body) {
@@ -123,7 +201,31 @@ async function put(path, body) {
     method: "PUT",
   });
 
-  return responseObject.json();
+  if (responseObject.status === 401) {
+    console.log("BSC Token Expired");
+    process.exit(1);
+  } else if (responseObject.status < 200 || responseObject.status >= 300) {
+    throw new Error(
+      `Error from PUT https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
+    );
+  }
+
+  const text = await responseObject.text();
+
+  if (text === "" || text.trim().length === 0) {
+    console.log("Empty response from BSC");
+    console.log("path: ", `https://api-prod.buysportscards.com/${path}`);
+    console.log(JSON.stringify(body, null, 2));
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.log(`Error parsing JSON response from PUT ${path}`, text);
+    console.log(e);
+    throw e;
+  }
 }
 
 const get = async (path) =>
@@ -134,32 +236,39 @@ const get = async (path) =>
     })
   ).json();
 
+const getVariantsForFilters = (info) => {
+  const filters = {
+    variant: [],
+    variantName: [],
+  };
+  if (info.insert) {
+    filters.variant.push("insert");
+    if (info.parallel) {
+      filters.variantName.push(
+        `${info.insert}-${info.parallel}`.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"),
+      );
+    } else {
+      filters.variantName.push(info.insert.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
+    }
+  } else if (info.parallel) {
+    filters.variant.push("parallel");
+    filters.variantName.push(info.parallel.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
+  } else {
+    filters.variant.push("base");
+  }
+  return filters;
+};
+
 async function writeToAPI(card) {
+  // console.log(`Processing ${card.longTitle || card.cardNumber}`);
   const searchPath = `search/seller/results?q=${card.setName}+${card.player}`.replaceAll("& ", "").replaceAll(" ", "+");
   // console.log(`Searching for: ${searchPath}`);
   const filters = {
     cardNo: [card.cardNumber],
     sport: [card.sport.toLowerCase()],
-    variant: [],
-    variantName: [],
     year: [card.year],
+    ...getVariantsForFilters(card),
   };
-
-  if (card.insert) {
-    filters.variant.push("insert");
-    if (card.parallel) {
-      filters.variantName.push(
-        `${card.insert}-${card.parallel}`.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"),
-      );
-    } else {
-      filters.variantName.push(card.insert.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
-    }
-  } else if (card.parallel) {
-    filters.variant.push("parallel");
-    filters.variantName.push(card.parallel.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
-  } else {
-    filters.variant.push("base");
-  }
 
   const listResponse = await post(searchPath, {
     condition: "all",
@@ -181,6 +290,8 @@ async function writeToAPI(card) {
 
     const settingsResponse = await get(`seller/card-listing/${listingId}/settings`);
 
+    // console.log("settingsResponse Result = " + JSON.stringify(settingsResponse, null, 2));
+
     const listing = {
       productType: "raw",
       condition: "near_mint",
@@ -198,7 +309,7 @@ async function writeToAPI(card) {
         `common/card/${listingId}/product/e484609d38/attachment`,
         `output/${card.directory}${card.frontImage}`,
       );
-      listing.sellerImgFront = frontResponse.objectKey;
+      listing.sellerImgFront = frontResponse?.objectKey;
     }
 
     if (card.backImage) {
@@ -206,20 +317,23 @@ async function writeToAPI(card) {
         `common/card/${listingId}/product/e484609d38/attachment`,
         `output/${card.directory}${card.backImage}`,
       );
-      listing.sellerImgBack = backResponse.objectKey;
+      listing.sellerImgBack = backResponse?.objectKey;
     }
 
     const saveResponse = await put(`seller/card-listing/${listingId}/product`, { action: "add", listing });
 
     // console.log("saveResponse Result = " + JSON.stringify(saveResponse, null, 2));
     if (saveResponse.listings?.length > 0) {
-      console.log(`Successfully uploaded ${card.longTitle || card.cardNumber} to BSC`);
+      // console.log(`Successfully uploaded ${card.longTitle || card.cardNumber} to BSC`);
+      return 1;
     } else {
+      // console.log(`Failed to upload ${card.longTitle || card.cardNumber} to BSC`);
       await open(
         `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
           card.cardName.replaceAll("&", ""),
         )}`,
       );
+      return 0;
     }
   } else {
     console.log(`Found ${listResponse.totalResults} results for ${card.cardName}`);
@@ -231,6 +345,65 @@ async function writeToAPI(card) {
         card.cardName.replaceAll("&", ""),
       )}`,
     );
+  }
+}
+
+async function writeBulkToAPI(keyString, cards) {
+  try {
+    const key = JSON.parse(keyString);
+    const searchBody = {
+      filters: {
+        sport: [key.sport],
+        year: [key.year],
+        setName: [key.setName.replaceAll(" ", "-")],
+        ...getVariantsForFilters(key),
+      },
+      condition: "near_mint",
+      productType: "raw",
+      currentListings: true,
+    };
+
+    let listResponse = await post("seller/bulk-upload/results", searchBody);
+    if (!listResponse || listResponse.totalResults < 1) {
+      searchBody.filters.setName = [`${key.brand}-${key.setName}`.replaceAll(" ", "-")];
+      listResponse = await post("seller/bulk-upload/results", searchBody);
+      if (!listResponse || listResponse.totalResults < 1) {
+        console.log("Failed to find bulk upload for: ", key);
+        throw new Error("Failed to find bulk upload for: ", key);
+      }
+    }
+
+    const updates = [];
+    listResponse.results.forEach((listing) => {
+      const card = cards[listing.card.cardNo];
+      if (card) {
+        updates.push({
+          ...listing,
+          price: card.bscPrice,
+          availableQuantity: Number.parseInt(card.quantity),
+          leastPriceForType: `${listing.leastPriceForType}`,
+        });
+      } else if (listing.availableQuantity > 0) {
+        updates.push(listing);
+      }
+    });
+
+    const updateResponse = await put("seller/bulk-upload", {
+      sellerId: "cf987f7871",
+      listings: updates,
+    });
+
+    if (updateResponse.result === "Saved!") {
+      return updateResponse.listings?.length;
+    } else {
+      console.log(updates);
+      console.log("Failed to update bulk upload for: ", keyString);
+      console.log(updateResponse);
+      throw new Error("Failed to update bulk upload for: ", keyString);
+    }
+  } catch (err) {
+    console.log("Error in bulk upload: ", err);
+    throw err;
   }
 }
 

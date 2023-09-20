@@ -61,7 +61,7 @@ async function writeSportLotsOutput(allCards, bulk) {
         .forEach((setName) => {
           output.push(`  ${setName}`);
           sortedCards[year][setName].sort(byCardNumber).forEach((card) => {
-            output.push(`    ${card.cardNumber} ${card.player} ${card.price} (${card.quantity})`);
+            output.push(`    ${card.cardNumber} ${card.player} ${card.slPrice} (${card.quantity})`);
           });
         });
     });
@@ -94,9 +94,8 @@ async function writeSportLotsOutput(allCards, bulk) {
       cardsToUpload[key] = {};
     }
     cardsToUpload[key][card.cardNumber] = card;
-    //also add to cardsToUpLoad removing all non numeric characters from cardNumber
-    const cardNumber = card.cardNumber.replace(/\D/g, "");
-    console.log(`adding ${card.cardNumber} and ${cardNumber}`);
+    //also add to cardsToUpLoad removing all non-numeric characters from cardNumber
+    const cardNumber = card.cardNumber.toString().replace(/\D/g, "");
     if (cardNumber) {
       cardsToUpload[key][cardNumber] = card;
     }
@@ -195,10 +194,10 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
             let cardNumberTextBox = await columns[0].findElement({ css: "input" });
             await cardNumberTextBox.sendKeys(card.quantity);
 
-            if (card.price > 0.18) {
+            if (card.slPrice > 0.18) {
               const priceTextBox = await columns[3].findElement({ css: "input" });
               priceTextBox.clear();
-              await priceTextBox.sendKeys(card.price);
+              await priceTextBox.sendKeys(card.slPrice);
             }
           } else {
             console.log("not found: ", tableCardNumber);
