@@ -22,10 +22,10 @@ async function writeBuySportsCardsOutput(allCards, bulk = []) {
     uploadQueue.stop();
   });
 
-  //queue up all the cards for writing in real time
-  // Object.values(allCards).forEach((card) => {
-  //   uploadQueue.push(async () => await writeToAPI(card));
-  // });
+  // queue up all the cards for writing in real time
+  Object.values(allCards).forEach((card) => {
+    uploadQueue.push(async () => await writeToAPI(card));
+  });
 
   //now group up the bulk uploads
   Object.entries(

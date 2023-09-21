@@ -178,7 +178,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         css: "table > tbody > tr:first-child > td:first-child > form > table > tbody > tr",
       });
 
-      console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
+      // console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
 
       for (let row of rows) {
         // Find the columns of the current row.
@@ -190,7 +190,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           const card = cardsToUpload[key][tableCardNumber];
 
           if (card) {
-            console.log("uploading: ", card);
+            // console.log("uploading: ", card);
             let cardNumberTextBox = await columns[0].findElement({ css: "input" });
             await cardNumberTextBox.sendKeys(card.quantity);
 
@@ -200,7 +200,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               await priceTextBox.sendKeys(card.slPrice);
             }
           } else {
-            console.log("not found: ", tableCardNumber);
+            // console.log("not found: ", tableCardNumber);
           }
         }
       }
@@ -210,7 +210,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       const resultHeader = await driver.wait(until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)));
       const resultText = await resultHeader.getText();
 
-      console.log(resultText + " to Sportlots");
+      console.log(`${resultText} to Sportlots at ${key}`);
     }
   } catch (e) {
     console.log("Failed to upload to SportLots");
