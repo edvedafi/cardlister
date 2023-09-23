@@ -4,13 +4,14 @@ import dotenv from "dotenv";
 import { getInputDirectory, getInputs } from "./utils/inputs.js";
 import uploadToShopify from "./listing-sites/shopifyUpload.js";
 import writeSportLotsOutput from "./listing-sites/sportlots.js";
-import writeBuySportsCardsOutput from "./listing-sites/bsc.js";
+import writeBuySportsCardsOutput, { loginTest } from "./listing-sites/bsc.js";
 import writeEbayFile from "./listing-sites/ebay.js";
 import writeShopifyFile from "./listing-sites/shopify.js";
 import { ask } from "./utils/ask.js";
 
 dotenv.config();
 
+// await loginTest();
 const inputDirectory = await getInputs();
 const savedAnswers = await initializeAnswers(inputDirectory, true);
 

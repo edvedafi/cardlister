@@ -34,9 +34,13 @@ export const getInputDirectory = async () => {
 };
 
 export const getFiles = async (inputDirectory) => {
-  const lsOutput = await $`ls ${inputDirectory}PXL*.jpg`;
-  return lsOutput
-    .toString()
-    .split("\n")
-    .filter((image) => image !== "");
+  try {
+    const lsOutput = await $`ls ${inputDirectory}PXL*.jpg`;
+    return lsOutput
+      .toString()
+      .split("\n")
+      .filter((image) => image !== "");
+  } catch (e) {
+    return [];
+  }
 };

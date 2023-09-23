@@ -455,7 +455,15 @@ export const getBulkCardData = async (bulkCards, setData, enterValues) => {
 
   if (bulkCards.length > 0) {
     try {
-      cardNumber = Number.parseInt(bulkCards[bulkCards.length - 1].cardNumber) + 1;
+      const lastCard = bulkCards[bulkCards.length - 1];
+      if (lastCard) {
+        const rawNumber = lastCard.cardNumber;
+        if (lastCard.card_number_prefix && rawNumber.startsWith(lastCard.card_number_prefix)) {
+          cardNumber = Number.parseInt(rawNumber.replace(lastCard.card_number_prefix, "")) + 1;
+        } else if (rawNumber.match(/\d+/)) {
+          cardNumber = Number.parseInt(rawNumber) + 1;
+        }
+      }
     } catch (e) {}
   }
   cardNumber = await ask("Card Number", cardNumber);

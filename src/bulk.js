@@ -22,6 +22,28 @@ async function collectBulkListings(savedAnswers, setData) {
     lastCardNumber = await getBulkCardData(allCards, setData);
   }
 
+  let hasParallels = await ask("Are there more parallels to enter?", false);
+  while (hasParallels) {
+    const parallelSetDaata = {
+      ...setData,
+      parallel: await ask("What is the parallel?"),
+    };
+
+    console.log("First enter cards that have greater than common value");
+    lastCardNumber = "start";
+    while (lastCardNumber && lastCardNumber !== "") {
+      lastCardNumber = await getBulkCardData(allCards, setData, true);
+    }
+
+    console.log("Now enter cards that have common value");
+    lastCardNumber = "start";
+    while (lastCardNumber && lastCardNumber !== "") {
+      lastCardNumber = await getBulkCardData(allCards, parallelSetDaata);
+    }
+
+    hasParallels = await ask("Are there more parallels to enter?", false);
+  }
+
   return allCards;
 }
 

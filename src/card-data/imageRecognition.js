@@ -344,7 +344,7 @@ export const runNLP = async (text, setData) => {
         .filter((name) => !isTeam(name));
 
       // console.log('selecting persons from: ', names)
-      if (names[0].includes(" ")) {
+      if (names[0]?.includes(" ")) {
         results.player = titleCase(names[0]);
       } else if (names[1]?.includes(" ")) {
         results.player = titleCase(names[0]);
