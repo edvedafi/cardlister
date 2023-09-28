@@ -2,7 +2,11 @@ import { byCardNumber } from "../utils/data.js";
 import open from "open";
 import FormData from "form-data";
 import Queue from "queue";
-// set up the queues
+import { ask } from "../utils/ask.js";
+import dotenv from "dotenv";
+import { setEnvValue } from "../utils/inputs.js";
+
+dotenv.config();
 
 $.verbose = false;
 
@@ -128,37 +132,41 @@ async function writeBuySportsCardsOutput(allCards, bulk = []) {
     console.log("Queue error. ", results.length, " cards uploaded.");
   }
 }
-
+let token = process.env.BSC_TOKEN;
 const baseHeaders = () => ({
   accept: "application/json, text/plain, */*",
   "accept-language": "en-US,en;q=0.9",
   assumedrole: "sellers",
-  authorization: "Bearer " + process.env.BSC_TOKEN,
+  authorization: "Bearer " + token,
   "content-type": "application/json",
 });
 
-const fetchJson = async (path, method = "GET", body) => {
+const fetchJson = async (path, method = "GET", body, headers = {}) => {
+  const fullPath = path.indexOf("https") === 0 ? path : `https://api-prod.buysportscards.com/${path}`;
   const fetchOptions = {
-    headers: baseHeaders(),
+    headers: {
+      ...baseHeaders(),
+      ...headers,
+    },
     method: method,
   };
 
   if (body) {
     fetchOptions.body = JSON.stringify(body);
   }
-  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, fetchOptions);
+  const responseObject = await fetch(`${fullPath}`, fetchOptions);
 
   if (responseObject.status === 401) {
     console.log("BSC Token Expired");
-    process.exit(1);
+    await login();
   } else if (responseObject.status < 200 || responseObject.status >= 300) {
     console.group(`Error from BSC ${method} ${path}`);
     if (body) console.log("Body: ", JSON.stringify(body, null, 2));
-    if (responseObject) console.log("Response: ", JSON.stringify(responseObject, null, 2));
+    // if (responseObject) console.log("Response: ", JSON.stringify(responseObject, null, 2));
+    console.log(`Returned: ${responseObject.status} ${responseObject.statusText}`);
+    console.log(`End Error: ${method} ${path}`);
     console.groupEnd();
-    throw new Error(
-      `Error from PUT https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
-    );
+    throw new Error(`Error from ${method} ${fullPath}: ${responseObject.status} ${responseObject.statusText}`);
   }
 
   const text = await responseObject.text();
@@ -168,7 +176,7 @@ const fetchJson = async (path, method = "GET", body) => {
     if (body) {
       console.log(JSON.stringify(body, null, 2));
     }
-    console.log("path: ", `https://api-prod.buysportscards.com/${path}`);
+    console.log("path: ", fullPath);
     console.groupEnd();
     return undefined;
   }
@@ -176,22 +184,22 @@ const fetchJson = async (path, method = "GET", body) => {
   try {
     return JSON.parse(text);
   } catch (e) {
-    console.log(`Error parsing JSON response from PUT ${path}`, text);
+    console.log(`Error parsing JSON response from ${method} ${fullPath}`, text);
     console.log(e);
     throw e;
   }
 };
 
 const get = fetchJson;
-const put = async (path, body) => fetchJson(path, "PUT", body);
-const post = async (path, body) => fetchJson(path, "POST", body);
+const put = async (path, body, headers) => fetchJson(path, "PUT", body, headers);
+const post = async (path, body, headers) => fetchJson(path, "POST", body, headers);
 
 async function postImage(path, imagePath) {
   const formData = new FormData();
 
   formData.append("attachment", fs.createReadStream(imagePath));
 
-  return post(path, formData);
+  return post(path, formData, formData.getHeaders());
 }
 
 const getVariantsForFilters = (info) => {
@@ -218,14 +226,36 @@ const getVariantsForFilters = (info) => {
 };
 
 export async function loginTest() {
-  const loginResponse = await get("seller/dashboard/information");
-  if (loginResponse && loginResponse.profile.sellerStoreName === "edvedafi") {
-    console.log("Successfully logged into BSC");
-  } else {
-    console.log("Failed to log into BSC");
-    console.log(loginResponse);
-    throw new Error("Failed to log into BSC");
+  let loggedIn = false;
+  try {
+    const loginResponse = await get("marketplace/user/profile");
+    // console.log(loginResponse);
+    if (loginResponse && loginResponse.sellerProfile.sellerStoreName === "edvedafi") {
+      // console.log("Successfully logged into BSC");
+      // console.log(loginResponse);
+      loggedIn = true;
+    }
+  } catch (err) {
+    loggedIn = false;
   }
+
+  if (!loggedIn) {
+    console.log("Login to BSC failed.");
+    await login();
+  }
+}
+
+async function login() {
+  await open("https://www.buysportscards.com");
+  const newKey = await ask("New Key");
+
+  if (newKey) {
+    setEnvValue("BSC_TOKEN", newKey);
+    dotenv.config();
+    token = newKey;
+  }
+
+  await loginTest();
 }
 
 async function writeToAPI(card) {
@@ -274,19 +304,27 @@ async function writeToAPI(card) {
     };
 
     if (card.frontImage) {
-      const frontResponse = await postImage(
-        `common/card/${listingId}/product/e484609d38/attachment`,
-        `output/${card.directory}${card.frontImage}`,
-      );
-      listing.sellerImgFront = frontResponse?.objectKey;
+      try {
+        const frontResponse = await postImage(
+          `common/card/${listingId}/product/e484609d38/attachment`,
+          `output/${card.directory}${card.frontImage}`,
+        );
+        listing.sellerImgFront = frontResponse?.objectKey;
+      } catch (e) {
+        console.log(`Error uploading front image for ${card.directory}${card.frontImage}`);
+      }
     }
 
     if (card.backImage) {
-      const backResponse = await postImage(
-        `common/card/${listingId}/product/e484609d38/attachment`,
-        `output/${card.directory}${card.backImage}`,
-      );
-      listing.sellerImgBack = backResponse?.objectKey;
+      try {
+        const backResponse = await postImage(
+          `common/card/${listingId}/product/e484609d38/attachment`,
+          `output/${card.directory}${card.backImage}`,
+        );
+        listing.sellerImgBack = backResponse?.objectKey;
+      } catch (e) {
+        console.log(`Error uploading back image for ${card.directory}${card.frontImage}`);
+      }
     }
 
     const saveResponse = await put(`seller/card-listing/${listingId}/product`, { action: "add", listing });

@@ -11,7 +11,6 @@ import { ask } from "./utils/ask.js";
 
 dotenv.config();
 
-// await loginTest();
 const inputDirectory = await getInputs();
 const savedAnswers = await initializeAnswers(inputDirectory, true);
 

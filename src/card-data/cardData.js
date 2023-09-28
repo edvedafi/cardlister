@@ -38,7 +38,7 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
             }, {});
       saveData.setData = answerInput.setData;
       saveData.bulk = answerInput.bulk;
-      console.log("saveData", saveData);
+      // console.log("saveData", saveData);
     }
   } catch (e) {
     console.log(e);

@@ -1,10 +1,8 @@
 export const isYes = (str) =>
   (typeof str === "boolean" && str) ||
-  (typeof str === "string" &&
-    ["yes", "YES", "y", "Y", "Yes", "YEs", "YeS", "yES"].includes(str));
+  (typeof str === "string" && ["yes", "YES", "y", "Y", "Yes", "YEs", "YeS", "yES"].includes(str));
 export const isNo = (str) =>
-  (typeof str === "boolean" && !str) ||
-  (typeof str === "string" && ["no", "NO", "n", "N", "No"].includes(str));
+  (typeof str === "boolean" && !str) || (typeof str === "string" && ["no", "NO", "n", "N", "No"].includes(str));
 
 export const titleCase = (str) => {
   if (!str) {
@@ -12,6 +10,7 @@ export const titleCase = (str) => {
   }
   try {
     return str
+      .trim()
       .split(" ")
       .map((word) => {
         if (word.length > 3 && word.toLowerCase().startsWith("mc")) {
@@ -35,12 +34,7 @@ export const titleCase = (str) => {
 
 export const byCardNumber = (a, b) => {
   //extract card number from cardNumber string
-  if (
-    a.cardNumber &&
-    parseInt(a.cardNumber) &&
-    b.cardNumber &&
-    parseInt(b.cardNumber)
-  ) {
+  if (a.cardNumber && parseInt(a.cardNumber) && b.cardNumber && parseInt(b.cardNumber)) {
     return parseInt(a.cardNumber) - parseInt(b.cardNumber);
   }
   const aMatcher = a.cardNumber?.match(/\d+/) || [];
