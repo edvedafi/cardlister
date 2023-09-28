@@ -174,43 +174,50 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
 
       await clickSubmit();
 
-      let rows = await driver.findElements({
-        css: "table > tbody > tr:first-child > td:first-child > form > table > tbody > tr",
-      });
+      let cardsAdded = 0;
 
-      // console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
+      while ((await driver.getCurrentUrl()).includes("listcards.tpl")) {
+        let rows = await driver.findElements({
+          css: "table > tbody > tr:first-child > td:first-child > form > table > tbody > tr",
+        });
 
-      for (let row of rows) {
-        // Find the columns of the current row.
-        let columns = await row.findElements({ css: "td" });
+        // console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
 
-        if (columns && columns.length > 1) {
-          // Extract the text from the second column.
-          let tableCardNumber = await columns[1].getText();
-          const card = cardsToUpload[key][tableCardNumber];
+        for (let row of rows) {
+          // Find the columns of the current row.
+          let columns = await row.findElements({ css: "td" });
 
-          if (card) {
-            // console.log("uploading: ", card);
-            let cardNumberTextBox = await columns[0].findElement({ css: "input" });
-            await cardNumberTextBox.sendKeys(card.quantity);
+          if (columns && columns.length > 1) {
+            // Extract the text from the second column.
+            let tableCardNumber = await columns[1].getText();
+            const card = cardsToUpload[key][tableCardNumber];
 
-            if (card.slPrice > 0.18) {
-              const priceTextBox = await columns[3].findElement({ css: "input" });
-              priceTextBox.clear();
-              await priceTextBox.sendKeys(card.slPrice);
+            if (card) {
+              // console.log("uploading: ", card);
+              let cardNumberTextBox = await columns[0].findElement({ css: "input" });
+              await cardNumberTextBox.sendKeys(card.quantity);
+
+              if (card.slPrice > 0.18) {
+                const priceTextBox = await columns[3].findElement({ css: "input" });
+                priceTextBox.clear();
+                await priceTextBox.sendKeys(card.slPrice);
+              }
+            } else {
+              // console.log("not found: ", tableCardNumber);
             }
-          } else {
-            // console.log("not found: ", tableCardNumber);
           }
+        }
+
+        await clickSubmit();
+        const resultHeader = await driver.wait(until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)));
+        const resultText = await resultHeader.getText();
+        const cardsAddedText = resultText.match(/(\d+) cards added/);
+        if (cardsAddedText) {
+          cardsAdded += parseInt(cardsAddedText[0]);
         }
       }
 
-      await clickSubmit();
-
-      const resultHeader = await driver.wait(until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)));
-      const resultText = await resultHeader.getText();
-
-      console.log(`${resultText} to Sportlots at ${key}`);
+      console.log(`${cardsAdded} to Sportlots at ${key}`);
     }
   } catch (e) {
     console.log("Failed to upload to SportLots");

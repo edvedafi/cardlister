@@ -162,7 +162,8 @@ const fetchJson = async (path, method = "GET", body, headers = {}) => {
   } else if (responseObject.status < 200 || responseObject.status >= 300) {
     console.group(`Error from BSC ${method} ${path}`);
     if (body) console.log("Body: ", JSON.stringify(body, null, 2));
-    // if (responseObject) console.log("Response: ", JSON.stringify(responseObject, null, 2));
+    if (responseObject) console.log("Response: ", JSON.stringify(responseObject, null, 2));
+    console.log("headers: ", JSON.stringify(fetchOptions.headers, null, 2));
     console.log(`Returned: ${responseObject.status} ${responseObject.statusText}`);
     console.log(`End Error: ${method} ${path}`);
     console.groupEnd();
