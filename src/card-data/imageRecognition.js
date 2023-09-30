@@ -224,7 +224,7 @@ export const extractData = async (searchParagraphs, defaults, setData) => {
   //let's see if the card has the standard panini info
   result = {
     ...result,
-    ...paniniMatch(searchParagraphs),
+    ...paniniMatch(searchParagraphs, setData),
   };
 
   //Run NLP on the entire document
@@ -553,25 +553,32 @@ const addFeature = (features, feature) => {
   }
 };
 
-export const paniniMatch = (searchParagraphs) => {
+export const paniniMatch = (searchParagraphs, defaults) => {
+  if (defaults.manufacture && defaults.year && defaults.setName && defaults.insert) {
+    return {};
+  }
+
   const results = {};
   const match = searchParagraphs.find((block) => block.lowerCase.match(/^\d\d\d\d panini - /));
   if (match) {
-    results.manufacture = "Panini";
-    results.year = results.year || match.words[0];
-    results.setName = results.setName || titleCase(match.words[3]);
-    const updateInsert = !results.insert;
+    results.manufacture = defaults.manufacture || "Panini";
+    results.year = defaults.year || match.words[0];
+    results.setName = defaults.setName || titleCase(match.words[3]);
+    const updateInsert = !defaults.insert;
     let i = 4;
     while (match.words[i] && !match.words[i].startsWith("Ⓒ") && !sports.includes(match.words[i].toLowerCase())) {
       if (match.words[i].toLowerCase() === "draft" && match.words[i + 1]?.toLowerCase() === "picks") {
         results.setName = `${results.setName} Draft Picks`;
         i++;
-      } else if (updateInsert) {
+      } else if (updateInsert && results.setName.toLowerCase() !== match.words[i].toLowerCase()) {
         const nextWord = titleCase(match.words[i]);
         if (results.insert) {
           results.insert += ` ${nextWord}`;
         } else {
           results.insert = nextWord;
+          console.log(`setting insert to ${nextWord}`);
+          console.log(`${results.setName.toLowerCase()} !== ${match.words[i].toLowerCase()}`);
+          console.log(results.setName.toLowerCase() !== match.words[i].toLowerCase());
         }
       }
       i++;
