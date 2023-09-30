@@ -160,7 +160,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       try {
         const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setInfo.setName}')]`));
         const fullSetText = await tableRowWithSetName.getText();
-        if (fullSetText.endsWith(setInfo.setName)) {
+        if (fullSetText.endsWith(setInfo.setName) || fullSetText.endsWith(`${setInfo.setName} Base Set`)) {
           const fullSetNumbers = fullSetText.split(" ")[0];
           //find the radio button where the value is fullSetNumbers
           const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
