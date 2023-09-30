@@ -1,5 +1,5 @@
 import { byCardNumber, graders } from "./data.js";
-import { graderIds } from "../listing-sites/ebay.js";
+import { graderIds } from "../listing-sites/ebayConstants.js";
 
 describe("sortByCardNumber", () => {
   it("should sort an all numeric array correctly", () => {

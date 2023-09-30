@@ -505,13 +505,12 @@ export const getTeam = async (defaults) => {
   let newTeam = await ask("Teams", defaultTeam, {
     selectOptions: getTeamSelections(defaults.sport),
   });
-  teams.push(newTeam);
-  // while (newTeam) {
-  //   teams.push(newTeam);
-  //   newTeam = await ask("Teams", undefined, {
-  //     selectOptions: getTeamSelections(defaults.sport),
-  //   });
-  // }
+  while (newTeam) {
+    teams.push(newTeam);
+    newTeam = await ask("Teams", undefined, {
+      selectOptions: getTeamSelections(defaults.sport),
+    });
+  }
   return teams;
 };
 
