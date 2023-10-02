@@ -277,7 +277,13 @@ export const uploadEbayFile = async () => {
 
     await driver.get("https://www.ebay.com/sh/lst/active");
     const uploadButton = await waitForElement(By.xpath('//button[text()="Upload"]'));
-    await uploadButton.click();
+    try {
+      await uploadButton.click();
+    } catch (e) {
+      //scroll right and down 50px
+      await driver.executeScript("window.scrollBy(50,50)");
+      await uploadButton.click();
+    }
 
     await driver.findElement(By.xpath("//input[@type='file']")).sendKeys(`${process.cwd()}/${filePath}`);
 

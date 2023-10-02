@@ -9,6 +9,7 @@
     "@inquirer/prompts": "^1.0.0",
     "@shopify/shopify-api": "^7.2.0",
     "@u4/opencv4nodejs": "^6.5.1",
+    "chalk-table": "^1.0.2",
     "csv-writer": "^1.6.0",
     "decompress": "^4.2.1",
     "dotenv": "^16.0.3",

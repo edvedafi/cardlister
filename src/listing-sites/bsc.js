@@ -133,31 +133,20 @@ async function writeBuySportsCardsOutput(allCards, bulk = []) {
   }
 }
 let token = process.env.BSC_TOKEN;
-const baseHeaders = () => ({
-  accept: "application/json, text/plain, */*",
-  "accept-language": "en-US,en;q=0.9",
-  assumedrole: "sellers",
-  authorization: "Bearer " + token,
-  "content-type": "application/json",
-});
-
-const fetchJson = async (path, method = "GET", body, headers = {}) => {
-  const fullPath = path.indexOf("https") === 0 ? path : `https://api-prod.buysportscards.com/${path}`;
-  const fetchOptions = {
-    headers: {
-      ...baseHeaders(),
-      ...headers,
-    },
-    method: method,
+const baseHeaders = () => {
+  // console.log("token", token);
+  return {
+    accept: "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    assumedrole: "sellers",
+    authorization: "Bearer " + token,
+    "content-type": "application/json",
   };
+};
 
-  if (body) {
-    fetchOptions.body = JSON.stringify(body);
-  }
-  const responseObject = await fetch(`${fullPath}`, fetchOptions);
-
+const processResponse = async (responseObject, fetchOptions, body, method, path) => {
   if (responseObject.status === 401) {
-    console.log("BSC Token Expired");
+    console.log("BSC Token Expired calling ", path);
     await login();
   } else if (responseObject.status < 200 || responseObject.status >= 300) {
     console.group(`Error from BSC ${method} ${path}`);
@@ -177,7 +166,7 @@ const fetchJson = async (path, method = "GET", body, headers = {}) => {
     if (body) {
       console.log(JSON.stringify(body, null, 2));
     }
-    console.log("path: ", fullPath);
+    console.log("path: ", path);
     console.groupEnd();
     return undefined;
   }
@@ -185,10 +174,27 @@ const fetchJson = async (path, method = "GET", body, headers = {}) => {
   try {
     return JSON.parse(text);
   } catch (e) {
-    console.log(`Error parsing JSON response from ${method} ${fullPath}`, text);
+    console.log(`Error parsing JSON response from ${method} ${path}`, text);
     console.log(e);
     throw e;
   }
+};
+const fetchJson = async (path, method = "GET", body, headers = {}) => {
+  const fullPath = path.indexOf("https") === 0 ? path : `https://api-prod.buysportscards.com/${path}`;
+  const fetchOptions = {
+    headers: {
+      ...baseHeaders(),
+      ...headers,
+    },
+    method: method,
+  };
+
+  if (body) {
+    fetchOptions.body = JSON.stringify(body);
+  }
+  const responseObject = await fetch(`${fullPath}`, fetchOptions);
+
+  return await processResponse(responseObject, fetchOptions, body, method, path);
 };
 
 const get = fetchJson;
@@ -200,7 +206,16 @@ async function postImage(path, imagePath) {
 
   formData.append("attachment", fs.createReadStream(imagePath));
 
-  return post(path, formData, formData.getHeaders());
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+    headers: {
+      ...baseHeaders(),
+      ...formData.getHeaders(),
+    },
+    body: formData,
+    method: "POST",
+  });
+
+  return await processResponse(responseObject);
 }
 
 const getVariantsForFilters = (info) => {
@@ -227,6 +242,7 @@ const getVariantsForFilters = (info) => {
 };
 
 export async function loginTest() {
+  console.log('LoginTEST');
   let loggedIn = false;
   try {
     const loginResponse = await get("marketplace/user/profile");
@@ -243,10 +259,12 @@ export async function loginTest() {
   if (!loggedIn) {
     console.log("Login to BSC failed.");
     await login();
+    await loginTest();
   }
 }
 
 async function login() {
+  console.log('LOGIN');
   await open("https://www.buysportscards.com");
   const newKey = await ask("New Key");
 
@@ -255,8 +273,6 @@ async function login() {
     dotenv.config();
     token = newKey;
   }
-
-  await loginTest();
 }
 
 async function writeToAPI(card) {
@@ -307,7 +323,7 @@ async function writeToAPI(card) {
     if (card.frontImage) {
       try {
         const frontResponse = await postImage(
-          `common/card/${listingId}/product/e484609d38/attachment`,
+          `common/card/${listingId}/product/${listing.productId}/attachment`,
           `output/${card.directory}${card.frontImage}`,
         );
         listing.sellerImgFront = frontResponse?.objectKey;
@@ -319,7 +335,7 @@ async function writeToAPI(card) {
     if (card.backImage) {
       try {
         const backResponse = await postImage(
-          `common/card/${listingId}/product/e484609d38/attachment`,
+          `common/card/${listingId}/product/628a6e8cc9/attachment`,
           `output/${card.directory}${card.backImage}`,
         );
         listing.sellerImgBack = backResponse?.objectKey;

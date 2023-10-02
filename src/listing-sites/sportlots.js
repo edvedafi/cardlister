@@ -1,6 +1,7 @@
 import { byCardNumber } from "../utils/data.js";
 import { Browser, Builder, By, until, Select } from "selenium-webdriver";
-import { ask } from "../utils/ask.js";
+import { ask, validateAllUploaded } from "../utils/ask.js";
+import chalkTable from "chalk-table";
 
 const brands = {
   bowman: "Bowman",
@@ -97,7 +98,7 @@ async function writeSportLotsOutput(allCards, bulk) {
     //also add to cardsToUpLoad removing all non-numeric characters from cardNumber
     const cardNumber = card.cardNumber.toString().replace(/\D/g, "");
     if (cardNumber) {
-      cardsToUpload[key][cardNumber] = card;
+      cardsToUpload[key][cardNumber] = { ...card, noNumberDuplicate: true };
     }
   };
   Object.values(allCards).forEach(addCardsToUpload);
@@ -145,44 +146,56 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
 
     for (const key in cardsToUpload) {
       const setInfo = JSON.parse(key);
-      await driver.get("https://sportlots.com/inven/dealbin/newinven.tpl");
-
-      try {
-        await setSelectValue("yr", setInfo.year);
-        await setSelectValue("sprt", { baseball: "BB", football: "FB", basketball: "BK" }[setInfo.sport.toLowerCase()]);
-        await setSelectValue("brd", setInfo.brand);
-      } catch (e) {
-        await ask(`Please select the proper filters and then Press any key to continue...`);
-      }
-
-      await clickSubmit();
-
-      try {
-        const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setInfo.setName}')]`));
-        const fullSetText = await tableRowWithSetName.getText();
-        if (fullSetText.endsWith(setInfo.setName) || fullSetText.endsWith(`${setInfo.setName} Base Set`)) {
-          const fullSetNumbers = fullSetText.split(" ")[0];
-          //find the radio button where the value is fullSetNumbers
-          const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-          await radioButton.click();
-        } else {
-          await ask(`Please select the ${setInfo.setName} and then Press any key to continue...`);
-        }
-      } catch (e) {
-        await ask(`Please select the ${setInfo.setName} and then Press any key to continue...`);
-      }
-
-      await clickSubmit();
-
       let cardsAdded = 0;
 
+      const selectBrand = async (year, sport, brand) => {
+        await driver.get("https://sportlots.com/inven/dealbin/newinven.tpl");
+        try {
+          await setSelectValue("yr", year);
+          await setSelectValue("sprt", { baseball: "BB", football: "FB", basketball: "BK" }[sport.toLowerCase()]);
+          await setSelectValue("brd", brand);
+        } catch (e) {
+          await ask(`Please select the proper filters and then Press any key to continue...`);
+        }
+        await clickSubmit();
+      };
+
+      const selectSet = async (setName) => {
+        try {
+          const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setName}')]`));
+          const fullSetText = await tableRowWithSetName.getText();
+          if (fullSetText.endsWith(setName) || fullSetText.endsWith(`${setName} Base Set`)) {
+            const fullSetNumbers = fullSetText.split(" ")[0];
+            //find the radio button where the value is fullSetNumbers
+            const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+            await radioButton.click();
+          } else {
+            await ask(`Please select the ${setName} and then Press any key to continue...`);
+          }
+          await clickSubmit();
+        } catch (e) {
+          if (setName.startsWith("Donruss")) {
+            await selectBrand(setInfo.year, setInfo.sport, "Donruss");
+            await selectSet(setName.replace("Donruss", "").trim());
+          } else {
+            await ask(`Please select the ${setName} and then Press any key to continue...`);
+            await clickSubmit();
+          }
+        }
+      };
+
+      await selectBrand(setInfo.year, setInfo.sport, setInfo.brand);
+      await selectSet(setInfo.setName);
+
       while ((await driver.getCurrentUrl()).includes("listcards.tpl")) {
+        let pageAdds = 0;
         let rows = await driver.findElements({
           css: "table > tbody > tr:first-child > td:first-child > form > table > tbody > tr",
         });
 
         // console.log("cardsToUpload[key]", Object.keys(cardsToUpload[key]));
 
+        let firstCardNumber, lastCardNumber;
         for (let row of rows) {
           // Find the columns of the current row.
           let columns = await row.findElements({ css: "td" });
@@ -190,6 +203,11 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           if (columns && columns.length > 1) {
             // Extract the text from the second column.
             let tableCardNumber = await columns[1].getText();
+            if (!firstCardNumber) {
+              firstCardNumber = Number.parseInt(tableCardNumber);
+            }
+            lastCardNumber = Number.parseInt(tableCardNumber);
+
             const card = cardsToUpload[key][tableCardNumber];
 
             if (card) {
@@ -197,16 +215,29 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               let cardNumberTextBox = await columns[0].findElement({ css: "input" });
               await cardNumberTextBox.sendKeys(card.quantity);
 
-              if (card.slPrice > 0.18) {
-                const priceTextBox = await columns[3].findElement({ css: "input" });
-                priceTextBox.clear();
-                await priceTextBox.sendKeys(card.slPrice);
-              }
-            } else {
-              // console.log("not found: ", tableCardNumber);
+              const priceTextBox = await columns[3].findElement({ css: "input" });
+              priceTextBox.clear();
+              await priceTextBox.sendKeys(card.slPrice);
+              pageAdds++;
             }
           }
         }
+
+        //in the case where 'Skip to Page' exists we know that there are multiple pages so we should only be counting
+        //the cards that fit within the current range. Otherwise we should be counting all cards.
+        const skipToPage = await driver.findElements(By.xpath(`//*[contains(text(), 'Skip to Page')]`));
+        let expectedCards;
+        if (skipToPage.length > 0) {
+          expectedCards = Object.keys(cardsToUpload[key]).filter((cardNumber) => {
+            return cardNumber >= firstCardNumber && cardNumber <= lastCardNumber;
+          });
+        } else {
+          expectedCards = Object.keys(cardsToUpload[key]).filter(
+            (cardNumber) => !cardsToUpload[key][cardNumber]?.noNumberDuplicate,
+          );
+        }
+
+        await validateAllUploaded(expectedCards, pageAdds, cardsToUpload[key], "slPrice");
 
         await clickSubmit();
         const resultHeader = await driver.wait(until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)));
@@ -217,7 +248,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         }
       }
 
-      console.log(`${cardsAdded} to Sportlots at ${key}`);
+      console.log(`${cardsAdded} cards added to Sportlots at ${key}`);
     }
   } catch (e) {
     console.log("Failed to upload to SportLots");

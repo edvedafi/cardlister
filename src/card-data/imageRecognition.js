@@ -20,6 +20,7 @@ const sets = [
   "prizm",
   "bowman",
   "donruss",
+  "donruss optic",
   "sage",
   "score",
   "topps",
