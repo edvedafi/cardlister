@@ -242,7 +242,6 @@ const getVariantsForFilters = (info) => {
 };
 
 export async function loginTest() {
-  console.log('LoginTEST');
   let loggedIn = false;
   try {
     const loginResponse = await get("marketplace/user/profile");
@@ -264,7 +263,7 @@ export async function loginTest() {
 }
 
 async function login() {
-  console.log('LOGIN');
+  console.log("LOGIN");
   await open("https://www.buysportscards.com");
   const newKey = await ask("New Key");
 

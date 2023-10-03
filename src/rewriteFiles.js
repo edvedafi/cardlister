@@ -14,6 +14,7 @@ dotenv.config();
 const inputDirectory = await getInputs();
 const savedAnswers = await initializeAnswers(inputDirectory, true);
 
+await loginTest();
 if (await ask("Upload to Shopify?", true)) {
   await uploadToShopify(savedAnswers.allCardData);
 }

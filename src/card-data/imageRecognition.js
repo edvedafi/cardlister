@@ -21,6 +21,7 @@ const sets = [
   "bowman",
   "donruss",
   "donruss optic",
+  "optic",
   "sage",
   "score",
   "topps",
@@ -571,7 +572,11 @@ export const paniniMatch = (searchParagraphs, defaults) => {
       if (match.words[i].toLowerCase() === "draft" && match.words[i + 1]?.toLowerCase() === "picks") {
         results.setName = `${results.setName} Draft Picks`;
         i++;
-      } else if (updateInsert && results.setName.toLowerCase() !== match.words[i].toLowerCase()) {
+      } else if (
+        updateInsert &&
+        results.setName.toLowerCase() !== match.words[i].toLowerCase() &&
+        !sets.includes(match.words[i].toLowerCase())
+      ) {
         const nextWord = titleCase(match.words[i]);
         if (results.insert) {
           results.insert += ` ${nextWord}`;
