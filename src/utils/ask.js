@@ -68,7 +68,7 @@ export const confirm = async (questionText, defaultAnswer) => {
  * @param priceField - the name of the price field that was used to upload the cards
  */
 export const validateAllUploaded = async (expectedCards, uploadedCount, allCards, priceField) => {
-  const expectedCardCount = expectedCards.reduce((a) => a + 1, 0);
+  const expectedCardCount = expectedCards.length;
   if (uploadedCount !== expectedCardCount) {
     console.log(
       `Expected to add ${expectedCardCount} cards but only added ${uploadedCount} cards. Please manually add the following cards:`,
