@@ -162,23 +162,38 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
 
       const selectSet = async (setName) => {
         try {
-          const tableRowWithSetName = await driver.findElement(By.xpath(`//*[contains(text(), '${setName}')]`));
-          const fullSetText = await tableRowWithSetName.getText();
-          if (fullSetText.endsWith(setName) || fullSetText.endsWith(`${setName} Base Set`)) {
-            const fullSetNumbers = fullSetText.split(" ")[0];
-            //find the radio button where the value is fullSetNumbers
-            const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-            await radioButton.click();
-          } else {
-            await ask(`Please select the ${setName} and then Press any key to continue...`);
+          let found = false;
+          const rows = await driver.findElements(By.xpath(`//*[contains(text(), '${setName}')]`));
+          for (let row of rows) {
+            const fullSetText = await row.getText();
+            // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
+            // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
+            const regex = new RegExp(`^\\d+( ${setInfo.brand})? ${setName}( Base Set)?$`);
+            if (regex.test(fullSetText)) {
+              const fullSetNumbers = fullSetText.split(" ")[0];
+              //find the radio button where the value is fullSetNumbers
+              const radioButton = await driver.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+              await radioButton.click();
+              found = true;
+            }
           }
+
+          if (!found) {
+            if (setName.startsWith("Donruss")) {
+              await selectBrand(setInfo.year, setInfo.sport, "Donruss");
+              await selectSet(setName.replace("Donruss", "").trim());
+            } else {
+              await ask(`Please select [${setName}] and then Press any key to continue...`);
+            }
+          }
+
           await clickSubmit();
         } catch (e) {
           if (setName.startsWith("Donruss")) {
             await selectBrand(setInfo.year, setInfo.sport, "Donruss");
             await selectSet(setName.replace("Donruss", "").trim());
           } else {
-            await ask(`Please select the ${setName} and then Press any key to continue...`);
+            await ask(`Please select [${setName}] and then Press any key to continue...`);
             await clickSubmit();
           }
         }
