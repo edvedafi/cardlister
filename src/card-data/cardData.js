@@ -445,7 +445,7 @@ export const getCardData = async (allCards, imageDefaults) => {
   return output;
 };
 
-export const getBulkCardData = async (bulkCards, setData, enterValues) => {
+export const getBulkCardData = async (bulkCards, setData, enterValues, lastCardNumber) => {
   const defaultValues = {
     quantity: 1,
     bscPrice: 0.25,
@@ -455,16 +455,10 @@ export const getBulkCardData = async (bulkCards, setData, enterValues) => {
 
   if (bulkCards.length > 0) {
     try {
-      const lastCard = bulkCards[bulkCards.length - 1];
-      if (lastCard) {
-        const rawNumber = lastCard.cardNumber;
-        if (lastCard.card_number_prefix && rawNumber.startsWith(lastCard.card_number_prefix)) {
-          cardNumber = Number.parseInt(rawNumber.replace(lastCard.card_number_prefix, "")) + 1;
-        } else if (rawNumber.match(/\d+/)) {
-          cardNumber = Number.parseInt(rawNumber) + 1;
-        }
-      }
-    } catch (e) {}
+      cardNumber = Number.parseInt(lastCardNumber) + 1;
+    } catch (e) {
+      /*burying the exception because we don't care if it fails*/
+    }
   }
   cardNumber = await ask("Card Number", cardNumber);
   let bulkOutput;
@@ -480,7 +474,7 @@ export const getBulkCardData = async (bulkCards, setData, enterValues) => {
 
     await askFor("Quantity", "quantity");
     await askFor("BSC Price", "bscPrice");
-    await askFor("SL NUmber", "slPrice");
+    await askFor("SL Price", "slPrice");
 
     bulkCards.push(output);
 
