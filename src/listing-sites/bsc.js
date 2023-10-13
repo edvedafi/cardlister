@@ -14,7 +14,7 @@ const results = [];
 const uploadQueue = new Queue({
   results: results,
   autostart: true,
-  concurrency: 5,
+  concurrency: 1,
 });
 
 async function writeBuySportsCardsOutput(allCards, bulk = []) {
@@ -156,18 +156,18 @@ const processResponse = async (responseObject, fetchOptions, body, method, path)
     console.log(`Returned: ${responseObject.status} ${responseObject.statusText}`);
     console.log(`End Error: ${method} ${path}`);
     console.groupEnd();
-    throw new Error(`Error from ${method} ${fullPath}: ${responseObject.status} ${responseObject.statusText}`);
+    throw new Error(`Error from ${method} ${path}: ${responseObject.status} ${responseObject.statusText}`);
   }
 
   const text = await responseObject.text();
 
   if (text === "" || text.trim().length === 0) {
-    console.group("Empty response from BSC");
-    if (body) {
-      console.log(JSON.stringify(body, null, 2));
-    }
-    console.log("path: ", path);
-    console.groupEnd();
+    // console.group("Empty response from BSC");
+    // if (body) {
+    //   console.log(JSON.stringify(body, null, 2));
+    // }
+    // console.log("path: ", path);
+    // console.groupEnd();
     return undefined;
   }
 
@@ -410,10 +410,20 @@ async function writeBulkToAPI(keyString, cards) {
       }
     });
 
-    const updateResponse = await put("seller/bulk-upload", {
-      sellerId: "cf987f7871",
-      listings: updates,
-    });
+    let updateResponse;
+    try {
+      updateResponse = await put("seller/bulk-upload", {
+        sellerId: "cf987f7871",
+        listings: updates,
+      });
+    } catch (err) {
+      console.log("Waiting 2 seconds and trying again");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      updateResponse = await put("seller/bulk-upload", {
+        sellerId: "cf987f7871",
+        listings: updates,
+      });
+    }
 
     if (updateResponse.result === "Saved!") {
       return updateResponse.listings?.length;
