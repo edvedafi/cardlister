@@ -233,14 +233,17 @@ async function getLotTitle(output) {
 async function getCardName(output) {
   //generate a 60 character card name
   const maxCardNameLength = 60;
-  let cardName = output.title;
+  let cardName = output.title.replace(" | ", " ");
   let insert = add(output.insert);
   let parallel = add(output.parallel);
   if (cardName.length > maxCardNameLength) {
-    cardName = `${output.year} ${output.manufacture} ${output.setName}${insert}${parallel} ${output.player}`;
+    cardName = `${output.year} ${output.manufacture} ${output.setName}${insert}${parallel} ${output.player}`.replace(
+      " | ",
+      " ",
+    );
   }
   if (cardName.length > maxCardNameLength) {
-    cardName = `${output.year} ${output.setName}${insert}${parallel} ${output.player}`;
+    cardName = `${output.year} ${output.setName}${insert}${parallel} ${output.player}`.replace(" | ", " ");
   }
   if (cardName.length > maxCardNameLength) {
     cardName = `${output.year} ${output.setName}${insert}${parallel}`;
@@ -248,7 +251,7 @@ async function getCardName(output) {
   if (cardName.length > maxCardNameLength) {
     cardName = `${output.setName}${insert}${parallel}`;
   }
-  cardName = cardName.replace(/ {2}/g, " ");
+  cardName = cardName.replace(/ {2}/g, " ").replace(" | ", " ");
 
   if (cardName.length > maxCardNameLength) {
     cardName = await ask("Card Name", cardName, {
