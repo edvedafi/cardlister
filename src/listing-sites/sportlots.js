@@ -164,11 +164,13 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         try {
           let found = false;
           const rows = await driver.findElements(By.xpath(`//*[contains(text(), '${setName}')]`));
+          // console.log("rows", rows.length);
           for (let row of rows) {
             const fullSetText = await row.getText();
             // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
             // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
             const regex = new RegExp(`^\\d+( ${setInfo.brand})? ${setName}( Base Set)?$`);
+            // console.log("Testing: " + fullSetText + " against " + regex);
             if (regex.test(fullSetText)) {
               const fullSetNumbers = fullSetText.split(" ")[0];
               //find the radio button where the value is fullSetNumbers
@@ -183,7 +185,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               await selectBrand(setInfo.year, setInfo.sport, "Donruss");
               await selectSet(setName.replace("Donruss", "").trim());
             } else {
-              await ask(`Please select [${setName}] and then Press any key to continue...`);
+              await ask(`Please select [${setInfo.brand} ${setName}] and then Press any key to continue...`);
             }
           }
 
@@ -193,13 +195,14 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
             await selectBrand(setInfo.year, setInfo.sport, "Donruss");
             await selectSet(setName.replace("Donruss", "").trim());
           } else {
-            await ask(`Please select [${setName}] and then Press any key to continue...`);
+            await ask(`Please select [${setInfo.brand} ${setName}] and then Press any key to continue...`);
             await clickSubmit();
           }
         }
       };
 
       await selectBrand(setInfo.year, setInfo.sport, setInfo.brand);
+      await driver.wait(until.urlContains("dealsets.tpl"));
       await selectSet(setInfo.setName);
 
       while ((await driver.getCurrentUrl()).includes("listcards.tpl")) {
