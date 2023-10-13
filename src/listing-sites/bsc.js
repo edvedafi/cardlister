@@ -276,7 +276,10 @@ async function login() {
 
 async function writeToAPI(card) {
   // console.log(`Processing ${card.longTitle || card.cardNumber}`);
-  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`.replaceAll("& ", "").replaceAll(" ", "+");
+  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`
+    .replaceAll("| ", "")
+    .replaceAll("& ", "")
+    .replaceAll(" ", "+");
   // console.log(`Searching for: ${searchPath}`);
   const filters = {
     cardNo: [card.cardNumber],
