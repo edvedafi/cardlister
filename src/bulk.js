@@ -13,18 +13,18 @@ async function collectBulkListings(savedAnswers, setData) {
   let lastCardNumber = "start";
   const allCards = savedAnswers.bulk || [];
   while (lastCardNumber && lastCardNumber !== "") {
-    lastCardNumber = await getBulkCardData(allCards, setData, true);
+    lastCardNumber = await getBulkCardData(allCards, setData, true, lastCardNumber);
   }
 
   console.log("Now enter cards that have common value");
   lastCardNumber = "start";
   while (lastCardNumber && lastCardNumber !== "") {
-    lastCardNumber = await getBulkCardData(allCards, setData);
+    lastCardNumber = await getBulkCardData(allCards, setData, false, lastCardNumber);
   }
 
   let hasParallels = await ask("Are there more parallels to enter?", false);
   while (hasParallels) {
-    const parallelSetDaata = {
+    const parallelSetData = {
       ...setData,
       parallel: await ask("What is the parallel?"),
     };
@@ -32,13 +32,13 @@ async function collectBulkListings(savedAnswers, setData) {
     console.log("First enter cards that have greater than common value");
     lastCardNumber = "start";
     while (lastCardNumber && lastCardNumber !== "") {
-      lastCardNumber = await getBulkCardData(allCards, setData, true);
+      lastCardNumber = await getBulkCardData(allCards, setData, true, lastCardNumber);
     }
 
     console.log("Now enter cards that have common value");
     lastCardNumber = "start";
     while (lastCardNumber && lastCardNumber !== "") {
-      lastCardNumber = await getBulkCardData(allCards, parallelSetDaata);
+      lastCardNumber = await getBulkCardData(allCards, parallelSetData, lastCardNumber);
     }
 
     hasParallels = await ask("Are there more parallels to enter?", false);
