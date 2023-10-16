@@ -54,12 +54,12 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
       }
 
       const cropAttempts = [
-        () =>
-          $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`,
+        // () =>
+        //   $`swift src/image-processing/CardCropper.rotate.swift ${input} ${tempImage}`,
         () => sharp(input).extract(cardData.crop).toFile(tempImage),
         () => sharp(input).trim({ threshold: 50 }).toFile(tempImage),
-        () =>
-          $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`,
+        // () =>
+        //   $`swift src/image-processing/CardCropper.swift ${input} ${tempImage}`,
         async () => {
           await $`cp ${input} ${tempImage}`;
           const openCommand = $`open -Wn ${tempImage}`;

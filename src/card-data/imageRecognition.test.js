@@ -1,17 +1,9 @@
-import {
-  copyRightYearRegexMatch,
-  extractData,
-  paniniMatch,
-  runNLP,
-} from "./imageRecognition.js";
+import { copyRightYearRegexMatch, extractData, paniniMatch, runNLP } from "./imageRecognition.js";
 import * as ImageRecognition from "./imageRecognition.js";
 import * as Teams from "../utils/teams.js";
 import { ask } from "../utils/ask.js";
 import { Score_2022_Adian_Hutchinson } from "./testData/2022_Score_Aidan_Hutchinson.js";
-import {
-  BigLeague_2023_Willie_Mays,
-  BigLeague_2023_Willie_Mays_NLP,
-} from "./testData/BigLeague_2023_Willie_Mays.js";
+import { BigLeague_2023_Willie_Mays, BigLeague_2023_Willie_Mays_NLP } from "./testData/BigLeague_2023_Willie_Mays.js";
 import {
   Chronicles_2021_Crusade_McKenzie,
   Chronicles_2021_Crusade_McKenzie_NLP,
@@ -85,7 +77,7 @@ describe("Image Recognition", () => {
             "2021 panini america , inc. produced in the usa . officially licensed product of mlb players , inc.",
         },
       ];
-      expect(paniniMatch(input)).toEqual({});
+      expect(paniniMatch(input, {})).toEqual({});
     });
     it('should match Chronicles: "2021 PANINI - CHRONICLES CRUSADE BASEBALL"', () => {
       const input = [
@@ -99,7 +91,7 @@ describe("Image Recognition", () => {
           lowerCase: "2021 panini - chronicles crusade baseball",
         },
       ];
-      expect(paniniMatch(input)).toEqual({
+      expect(paniniMatch(input, {})).toEqual({
         year: "2021",
         manufacture: "Panini",
         setName: "Chronicles",
@@ -119,14 +111,14 @@ describe("Image Recognition", () => {
           lowerCase: "2021 panini - score football",
         },
       ];
-      expect(paniniMatch(input)).toEqual({
+      expect(paniniMatch(input, {})).toEqual({
         year: "2022",
         manufacture: "Panini",
         setName: "Score",
         sport: "football",
       });
     });
-    it('should match a set without a sport: "2021 PANINI - SCORE FOOTBALL"', () => {
+    it('should match a set without a sport: "2021 PANINI - Prizm Draft Picks"', () => {
       const input = [
         {
           word: "2021 PANINI - PRIZM DRAFT DRAFT Ⓒ2021 Panini America, Inc. Produced in the USA.",
@@ -152,10 +144,10 @@ describe("Image Recognition", () => {
           confidence: 301.9749516248703,
           isFront: false,
           isNumber: false,
-          lowerCase: "2021 panini - score football",
+          lowerCase: "2021 panini - prizm draft picks",
         },
       ];
-      expect(paniniMatch(input)).toEqual({
+      expect(paniniMatch(input, {})).toEqual({
         year: "2021",
         manufacture: "Panini",
         setName: "Prizm Draft Picks",
@@ -337,19 +329,7 @@ describe("Image Recognition", () => {
         },
         {
           word: "© 2022 Panini America , Inc. Produced in the USA .",
-          words: [
-            "©",
-            "2022",
-            "Panini",
-            "America",
-            ",",
-            "Inc.",
-            "Produced",
-            "in",
-            "the",
-            "USA",
-            ".",
-          ],
+          words: ["©", "2022", "Panini", "America", ",", "Inc.", "Produced", "in", "the", "USA", "."],
           wordCount: 11,
           confidence: 301.9584296941757,
           isFront: false,
@@ -621,9 +601,7 @@ describe("Image Recognition", () => {
     });
 
     it("should pick out the name that is most visible if there is more than one", async () => {
-      ImageRecognition.callNLP = jest
-        .fn()
-        .mockResolvedValue(BigLeague_2023_Willie_Mays_NLP);
+      ImageRecognition.callNLP = jest.fn().mockResolvedValue(BigLeague_2023_Willie_Mays_NLP);
       expect(await runNLP(BigLeague_2023_Willie_Mays, {})).toEqual({
         player: "Willie Mays",
       });
@@ -850,19 +828,7 @@ describe("Image Recognition", () => {
         },
         {
           word: "© 2022 Panini America , Inc. Produced in the USA .",
-          words: [
-            "©",
-            "2022",
-            "Panini",
-            "America",
-            ",",
-            "Inc.",
-            "Produced",
-            "in",
-            "the",
-            "USA",
-            ".",
-          ],
+          words: ["©", "2022", "Panini", "America", ",", "Inc.", "Produced", "in", "the", "USA", "."],
           wordCount: 11,
           confidence: 301.9451759457588,
           isFront: false,
@@ -1334,19 +1300,7 @@ describe("Image Recognition", () => {
         },
         {
           word: "BRO 2022 Panini America , Inc. Produced in the USA .",
-          words: [
-            "BRO",
-            "2022",
-            "Panini",
-            "America",
-            ",",
-            "Inc.",
-            "Produced",
-            "in",
-            "the",
-            "USA",
-            ".",
-          ],
+          words: ["BRO", "2022", "Panini", "America", ",", "Inc.", "Produced", "in", "the", "USA", "."],
           wordCount: 11,
           confidence: 301.93136817216873,
           isFront: false,
@@ -1872,18 +1826,7 @@ describe("Image Recognition", () => {
         },
         {
           word: "2022 Panini America , Inc. Produced in the USA .",
-          words: [
-            "2022",
-            "Panini",
-            "America",
-            ",",
-            "Inc.",
-            "Produced",
-            "in",
-            "the",
-            "USA",
-            ".",
-          ],
+          words: ["2022", "Panini", "America", ",", "Inc.", "Produced", "in", "the", "USA", "."],
           wordCount: 10,
           confidence: 301.9647750854492,
           isFront: false,
@@ -1901,18 +1844,7 @@ describe("Image Recognition", () => {
         },
         {
           word: "64.3 2428 361 232 NFL TOTALS 796 1268 62.8 8398",
-          words: [
-            "64.3",
-            "2428",
-            "361",
-            "232",
-            "NFL",
-            "TOTALS",
-            "796",
-            "1268",
-            "62.8",
-            "8398",
-          ],
+          words: ["64.3", "2428", "361", "232", "NFL", "TOTALS", "796", "1268", "62.8", "8398"],
           wordCount: 10,
           confidence: 301.95861607789993,
           isFront: false,
@@ -2357,9 +2289,7 @@ describe("Image Recognition", () => {
     });
 
     it("should use both first and last name to do the count", async () => {
-      ImageRecognition.callNLP = jest
-        .fn()
-        .mockResolvedValue(Chronicles_2021_Crusade_McKenzie_NLP);
+      ImageRecognition.callNLP = jest.fn().mockResolvedValue(Chronicles_2021_Crusade_McKenzie_NLP);
       expect(await runNLP(Chronicles_2021_Crusade_McKenzie, {})).toEqual({
         player: "Triston McKenzie",
       });
@@ -2692,19 +2622,7 @@ describe("Image Recognition", () => {
           },
           {
             word: "© 2022 Panini America , Inc. Produced in the USA .",
-            words: [
-              "©",
-              "2022",
-              "Panini",
-              "America",
-              ",",
-              "Inc.",
-              "Produced",
-              "in",
-              "the",
-              "USA",
-              ".",
-            ],
+            words: ["©", "2022", "Panini", "America", ",", "Inc.", "Produced", "in", "the", "USA", "."],
             wordCount: 11,
             confidence: 301.95279693603516,
             isFront: false,
@@ -2988,24 +2906,18 @@ describe("Image Recognition", () => {
       });
 
       it('should not inlcude the . if the text is read with a space ("NO . 6" should be 6)', async () => {
-        expect(
-          await extractData(Chronicles_2021_Pujols, {}, { isSet: false }),
-        ).toMatchObject({ cardNumber: "6" });
+        expect(await extractData(Chronicles_2021_Pujols, {}, { isSet: false })).toMatchObject({ cardNumber: "6" });
       });
     });
 
     describe("Year", () => {
       it("should be based on copyright if it is available", async () => {
-        expect(
-          await extractData(Score_2022_Adian_Hutchinson, {}, { isSet: false }),
-        ).toMatchObject({
+        expect(await extractData(Score_2022_Adian_Hutchinson, {}, { isSet: false })).toMatchObject({
           year: "2022",
         });
       });
       it("should do year + 1 if the value comes out of the body of the card", async () => {
-        expect(
-          await extractData(Vintage_Topps, {}, { isSet: false }),
-        ).toMatchObject({
+        expect(await extractData(Vintage_Topps, {}, { isSet: false })).toMatchObject({
           year: "1963",
         });
       });
@@ -3013,9 +2925,7 @@ describe("Image Recognition", () => {
 
     describe("Features", () => {
       it("should include RC if it is a Rookie Card", async () => {
-        expect(
-          await extractData(Score_2022_Adian_Hutchinson, {}, { isSet: false }),
-        ).toMatchObject({
+        expect(await extractData(Score_2022_Adian_Hutchinson, {}, { isSet: false })).toMatchObject({
           features: "RC",
         });
       });
@@ -3023,17 +2933,13 @@ describe("Image Recognition", () => {
 
     describe("Vintage Card makers", () => {
       it("should include Philadelphia as P. C. G.", async () => {
-        expect(
-          await extractData(Vintage_Philadelphia, {}, { isSet: false }),
-        ).toMatchObject({
+        expect(await extractData(Vintage_Philadelphia, {}, { isSet: false })).toMatchObject({
           manufacture: "Philadelphia Gum",
           setName: "Philadelphia",
         });
       });
       it("should include Topps as T. C. G.", async () => {
-        expect(
-          await extractData(Vintage_Topps, {}, { isSet: false }),
-        ).toMatchObject({
+        expect(await extractData(Vintage_Topps, {}, { isSet: false })).toMatchObject({
           manufacture: "Topps",
           setName: "Topps",
         });

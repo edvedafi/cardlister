@@ -243,10 +243,11 @@ const getVariantsForFilters = (info) => {
 
 export async function loginTest() {
   let loggedIn = false;
+  let loginResponse;
   try {
-    const loginResponse = await get("marketplace/user/profile");
+    loginResponse = await get("marketplace/user/profile");
     // console.log(loginResponse);
-    if (loginResponse && loginResponse.sellerProfile.sellerStoreName === "edvedafi") {
+    if (loginResponse && loginResponse?.sellerProfile?.sellerStoreName === "edvedafi") {
       // console.log("Successfully logged into BSC");
       // console.log(loginResponse);
       loggedIn = true;
@@ -257,6 +258,7 @@ export async function loginTest() {
 
   if (!loggedIn) {
     console.log("Login to BSC failed.");
+    console.log(loginResponse);
     await login();
     await loginTest();
   }

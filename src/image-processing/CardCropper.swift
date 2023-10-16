@@ -6,6 +6,7 @@
 //
 import Cocoa
 import CoreImage
+import NSImage
 
 print(CommandLine.arguments[1])
 print(CommandLine.arguments[2])

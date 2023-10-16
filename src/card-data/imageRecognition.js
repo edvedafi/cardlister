@@ -93,6 +93,11 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
       },
     },
     features: detectionFeatures,
+    imageContext: {
+      cropHintsParams: {
+        aspectRatios: [1.390625, 0.7191011236],
+      },
+    },
   });
 
   const [backResult] = back
