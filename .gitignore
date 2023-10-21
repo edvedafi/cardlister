@@ -21,3 +21,5 @@ run.log
 !.yarn/sdks
 !.yarn/versions
 
+CardCropper
+CardCropper.rotate

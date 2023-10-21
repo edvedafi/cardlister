@@ -4317,13 +4317,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buffers@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "buffers@npm:0.1.1"
-  checksum: ad6f8e483efab39cefd92bdc04edbff6805e4211b002f4d1cfb70c6c472a61cc89fb18c37bcdfdd4ee416ca096e9ff606286698a7d41a18b539bac12fd76d4d5
-  languageName: node
-  linkType: hard
-
 "bundle-name@npm:^3.0.0":
   version: 3.0.0
   resolution: "bundle-name@npm:3.0.0"
@@ -8365,15 +8358,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nan@npm:^2.14.0":
-  version: 2.18.0
-  resolution: "nan@npm:2.18.0"
-  dependencies:
-    node-gyp: latest
-  checksum: 4fe42f58456504eab3105c04a5cffb72066b5f22bd45decf33523cb17e7d6abc33cca2a19829407b9000539c5cb25f410312d4dc5b30220167a3594896ea6a0a
-  languageName: node
-  linkType: hard
-
 "nan@npm:^2.17.0":
   version: 2.17.0
   resolution: "nan@npm:2.17.0"
@@ -8749,17 +8733,6 @@ __metadata:
   bin:
     opencollective-postinstall: index.js
   checksum: 0a68c5cef135e46d11e665d5077398285d1ce5311c948e8327b435791c409744d4a6bb9c55bd6507fb5f2ef34b0ad920565adcdaf974cbdae701aead6f32b396
-  languageName: node
-  linkType: hard
-
-"opencv@npm:^7.0.0":
-  version: 7.0.0
-  resolution: "opencv@npm:7.0.0"
-  dependencies:
-    buffers: ^0.1.1
-    nan: ^2.14.0
-    node-gyp: latest
-  checksum: 5ac463faf4eb889c5550dd856198a39c9a8259d930fb93d81d13607438e0693f83679d873ca327fd7b822bb8ada5b3760ccf6aa1e091caaa47e58df61232fe46
   languageName: node
   linkType: hard
 
@@ -9702,7 +9675,6 @@ __metadata:
     multer: ^1.4.5-lts.1
     ngrok: ^5.0.0-beta.2
     open: ^9.1.0
-    opencv: ^7.0.0
     prettier: ^3.0.0
     queue: ^7.0.0
     selenium-webdriver: ^4.11.1

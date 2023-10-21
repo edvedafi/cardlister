@@ -6,7 +6,8 @@
 //
 import Cocoa
 import CoreImage
-import NSImage
+import AppKit
+import Foundation
 
 print(CommandLine.arguments[1])
 print(CommandLine.arguments[2])
