@@ -2,7 +2,7 @@ import { byCardNumber } from "../utils/data.js";
 import open from "open";
 import FormData from "form-data";
 import Queue from "queue";
-import { ask } from "../utils/ask.js";
+import { ask, validateAllUploaded } from "../utils/ask.js";
 import dotenv from "dotenv";
 import { setEnvValue } from "../utils/inputs.js";
 
@@ -431,7 +431,14 @@ async function writeBulkToAPI(keyString, cards) {
     }
 
     if (updateResponse.result === "Saved!") {
-      return updateResponse.listings?.length;
+      const uploadedCount = updateResponse.listings?.filter((card) => card.availableQuantity > 0).length || 0;
+      await validateAllUploaded(
+        cards.map((card) => card.cardNumber),
+        uploadedCount,
+        cards,
+        "bscPrice",
+      );
+      return uploadedCount;
     } else {
       console.log(updates);
       console.log("Failed to update bulk upload for: ", keyString);
