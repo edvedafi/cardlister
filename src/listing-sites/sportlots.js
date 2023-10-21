@@ -21,59 +21,7 @@ const brands = {
 };
 
 async function writeSportLotsOutput(allCards, bulk) {
-  const sortedCards = {};
-
-  //group cards
-  Object.values(allCards).forEach((card) => {
-    if (!sortedCards[card.year]) {
-      sortedCards[card.year] = {};
-    }
-    let setName = card.setName;
-    const addToSetName = (modifier) => {
-      if (modifier) {
-        setName = `${setName} ${modifier}`;
-      }
-    };
-    addToSetName(card.insert);
-    addToSetName(card.parallel);
-
-    if (!sortedCards[card.year][setName]) {
-      sortedCards[card.year][setName] = [];
-    }
-    sortedCards[card.year][setName].push(card);
-  });
-
-  //sort all cards in year by cardNumber
-  Object.keys(sortedCards).forEach((year) => {
-    Object.keys(sortedCards[year]).forEach((setName) => {
-      sortedCards[year][setName].sort((a, b) => parseInt(a.cardNumber) - parseInt(b.cardNumber));
-    });
-  });
-
-  //write output sorted by year and then setName
-  const output = [];
-  Object.keys(sortedCards)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .forEach((year) => {
-      output.push(""); //add blank line between years
-      output.push(year);
-      Object.keys(sortedCards[year])
-        .sort()
-        .forEach((setName) => {
-          output.push(`  ${setName}`);
-          sortedCards[year][setName].sort(byCardNumber).forEach((card) => {
-            output.push(`    ${card.cardNumber} ${card.player} ${card.slPrice} (${card.quantity})`);
-          });
-        });
-    });
-  output.push("");
-  try {
-    await fs.outputFile("output/sportlots.txt", output.join("\n"));
-  } catch (err) {
-    console.error("Failed to write sportlots.txt");
-    console.error(err);
-    throw err;
-  }
+  await writeSportLotsFile(allCards);
 
   const cardsToUpload = {};
   const addCardsToUpload = (card) => {
@@ -104,11 +52,20 @@ async function writeSportLotsOutput(allCards, bulk) {
   Object.values(allCards).forEach(addCardsToUpload);
   bulk?.forEach(addCardsToUpload);
 
-  await enterIntoSportLotsWebsite(cardsToUpload);
+  const addedCount = await enterIntoSportLotsWebsite(cardsToUpload);
+
+  const expected = Object.values(allCards).length + (bulk?.filter((card) => card.quantity > 0).length || 0);
+
+  if (addedCount !== expected) {
+    console.log(
+      `Expected to add ${expected} cards but only added ${addedCount} cards. Please manually add the following cards:`,
+    );
+  }
 }
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
   let driver;
+  let totalCardsAdded = 0;
 
   try {
     driver = await new Builder().forBrowser(Browser.CHROME).build();
@@ -267,6 +224,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       }
 
       console.log(`${cardsAdded} cards added to Sportlots at ${key}`);
+      totalCardsAdded += cardsAdded;
     }
   } catch (e) {
     console.log("Failed to upload to SportLots");
@@ -276,6 +234,63 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     if (driver) {
       await driver.quit();
     }
+  }
+  return totalCardsAdded;
+}
+
+async function writeSportLotsFile(allCards) {
+  const sortedCards = {};
+
+  //group cards
+  Object.values(allCards).forEach((card) => {
+    if (!sortedCards[card.year]) {
+      sortedCards[card.year] = {};
+    }
+    let setName = card.setName;
+    const addToSetName = (modifier) => {
+      if (modifier) {
+        setName = `${setName} ${modifier}`;
+      }
+    };
+    addToSetName(card.insert);
+    addToSetName(card.parallel);
+
+    if (!sortedCards[card.year][setName]) {
+      sortedCards[card.year][setName] = [];
+    }
+    sortedCards[card.year][setName].push(card);
+  });
+
+  //sort all cards in year by cardNumber
+  Object.keys(sortedCards).forEach((year) => {
+    Object.keys(sortedCards[year]).forEach((setName) => {
+      sortedCards[year][setName].sort((a, b) => parseInt(a.cardNumber) - parseInt(b.cardNumber));
+    });
+  });
+
+  //write output sorted by year and then setName
+  const output = [];
+  Object.keys(sortedCards)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .forEach((year) => {
+      output.push(""); //add blank line between years
+      output.push(year);
+      Object.keys(sortedCards[year])
+        .sort()
+        .forEach((setName) => {
+          output.push(`  ${setName}`);
+          sortedCards[year][setName].sort(byCardNumber).forEach((card) => {
+            output.push(`    ${card.cardNumber} ${card.player} ${card.slPrice} (${card.quantity})`);
+          });
+        });
+    });
+  output.push("");
+  try {
+    await fs.outputFile("output/sportlots.txt", output.join("\n"));
+  } catch (err) {
+    console.error("Failed to write sportlots.txt");
+    console.error(err);
+    throw err;
   }
 }
 
