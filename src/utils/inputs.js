@@ -24,6 +24,18 @@ export const getInputDirectory = async () => {
   let input_directory = await ask("Input Directory", "input");
   if (input_directory === "input") {
     input_directory = "input/";
+  } else if (input_directory === "bulk") {
+    //check to see if the bulk directory exists
+    if (fs.existsSync("input/bulk")) {
+      const shouldRest = await ask("Reset Bulk?", false);
+      if (shouldRest) {
+        //delete everything in the bulk directory
+        fs.rmSync("input/bulk", { recursive: true });
+        fs.mkdirSync("input/bulk");
+      }
+    } else {
+      fs.mkdirSync("input/bulk");
+    }
   } else if (input_directory.indexOf("/") !== input_directory.length - 1) {
     input_directory = `input/${input_directory}/`;
   } else {
