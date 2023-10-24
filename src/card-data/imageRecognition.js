@@ -587,9 +587,9 @@ export const paniniMatch = (searchParagraphs, defaults) => {
           results.insert += ` ${nextWord}`;
         } else {
           results.insert = nextWord;
-          console.log(`setting insert to ${nextWord}`);
-          console.log(`${results.setName.toLowerCase()} !== ${match.words[i].toLowerCase()}`);
-          console.log(results.setName.toLowerCase() !== match.words[i].toLowerCase());
+          // console.log(`setting insert to ${nextWord}`);
+          // console.log(`${results.setName.toLowerCase()} !== ${match.words[i].toLowerCase()}`);
+          // console.log(results.setName.toLowerCase() !== match.words[i].toLowerCase());
         }
       }
       i++;
