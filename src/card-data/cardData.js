@@ -283,6 +283,7 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     quantity: 1,
     price: 0.99,
     graded: false,
+    autographed: false,
     // grade: "Not Graded",
     // grader: "Not Graded",
     ...defaults,
@@ -321,14 +322,15 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     output.cardName = await getCardName(output);
     output.quantity = 1;
   } else {
-    await askFor("Parallel", "parallel", { allowUpdates: resetAll });
-    await askFor("Insert", "insert", { allowUpdates: resetAll });
-    await askFor("Features (RC, etc)", "features", { allowUpdates: resetAll });
-    await askFor("Print Run", "printRun", { allowUpdates: resetAll });
-    await askFor("Autographed", "autographed", { allowUpdates: resetAll });
+    await askFor("Parallel", "parallel", { allowUpdates: skipShipping || resetAll });
+    await askFor("Insert", "insert", { allowUpdates: skipShipping || resetAll });
+    await askFor("Features (RC, etc)", "features", { allowUpdates: skipShipping || resetAll });
+    await askFor("Print Run", "printRun", { allowUpdates: skipShipping || resetAll });
+    await askFor("Autographed", "autographed", { allowUpdates: skipShipping || resetAll });
     if (isYes(output.autographed)) {
       await askFor("Autograph Format", "autoFormat", {
-        allowUpdates: resetAll,
+        allowUpdates: skipShipping || resetAll,
+        selectOptions: ["Label or Sticker", "On Card", "Cut Signature"],
       });
     } else {
       output.autoFormat = output.autographed;
