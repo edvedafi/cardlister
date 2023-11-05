@@ -1,16 +1,16 @@
 //comment out the body of this to be prompted
-import { select, confirm as confirmPrompt, input } from "@inquirer/prompts";
-import { isNo, isYes } from "./data.js";
-import filterSelectPrompt from "./filterSelectPrompt.js";
-import chalkTable from "chalk-table";
+import { select, confirm as confirmPrompt, input } from '@inquirer/prompts';
+import { isNo, isYes } from './data.js';
+import filterSelectPrompt from './filterSelectPrompt.js';
+import chalkTable from 'chalk-table';
 
 export const ask = async (questionText, defaultAnswer = undefined, { maxLength, selectOptions, isYN } = {}) => {
-  if (typeof defaultAnswer === "boolean" || isYes(defaultAnswer) || isNo(defaultAnswer)) {
+  if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
     isYN = true;
   }
   let answer;
   if (selectOptions) {
-    let choices = selectOptions.map((option) => (typeof option === "string" ? { value: option } : option));
+    let choices = selectOptions.map((option) => (typeof option === 'string' ? { value: option } : option));
     // if (defaultAnswer) {
     //   choices = choices.sort((a, b) => {
     //     if (a.value === defaultAnswer) {
@@ -71,16 +71,18 @@ export const validateAllUploaded = async (expectedCards, uploadedCount, allCards
   const expectedCardCount = expectedCards.length;
   if (uploadedCount !== expectedCardCount) {
     console.log(
-      `Expected to add ${expectedCardCount} cards but only added ${uploadedCount} cards. Please manually add the following cards:`,
+      `Expected to add ${chalk.red(
+        expectedCardCount,
+      )} cards but only added ${uploadedCount} cards. Please manually add the following cards:`,
     );
     const options = {
       leftPad: 2,
       columns: [
-        { field: "key", name: chalk.cyan("Card #") },
-        { field: "quantity", name: chalk.cyan("Count") },
-        { field: "price", name: chalk.green(priceField) },
-        { field: "player", name: chalk.cyan("Player") },
-        { field: "title", name: chalk.yellow("Full Title") },
+        { field: 'key', name: chalk.cyan('Card #') },
+        { field: 'quantity', name: chalk.cyan('Count') },
+        { field: 'price', name: chalk.green(priceField) },
+        { field: 'player', name: chalk.cyan('Player') },
+        { field: 'title', name: chalk.yellow('Full Title') },
       ],
     };
     const table = chalkTable(
@@ -88,6 +90,6 @@ export const validateAllUploaded = async (expectedCards, uploadedCount, allCards
       expectedCards.map((cardNumber) => allCards[cardNumber]),
     );
     console.log(table);
-    await ask("Press any key to continue...");
+    await ask('Press any key to continue...');
   }
 };

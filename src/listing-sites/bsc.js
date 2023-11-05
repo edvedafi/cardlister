@@ -1,454 +1,220 @@
-import { byCardNumber } from "../utils/data.js";
-import open from "open";
-import FormData from "form-data";
-import Queue from "queue";
-import { ask, validateAllUploaded } from "../utils/ask.js";
-import dotenv from "dotenv";
-import { setEnvValue } from "../utils/inputs.js";
+import { ask } from '../utils/ask.js';
+import dotenv from 'dotenv';
+import { Browser, Builder, By, until } from 'selenium-webdriver';
+import { parseKey } from './uploads.js';
+import { validateUploaded } from './validate.js';
 
 dotenv.config();
 
-$.verbose = false;
+export const uploadToBuySportsCards = async (groupedCards) => {
+  console.log(chalk.magenta('BSC Starting Upload'));
+  let driver;
+  let totalCardsAdded = 0;
 
-const results = [];
-const uploadQueue = new Queue({
-  results: results,
-  autostart: true,
-  concurrency: 1,
-});
+  try {
+    driver = await new Builder().forBrowser(Browser.CHROME).build();
+    await driver.get('https://www.buysportscards.com');
 
-async function writeBuySportsCardsOutput(allCards, bulk = []) {
-  await loginTest();
-
-  const years = {};
-  let hasQueueError = false;
-  uploadQueue.addEventListener("error", (error, job) => {
-    hasQueueError = true;
-    console.log(`Queue error: `, error, job);
-    uploadQueue.stop();
-  });
-
-  // queue up all the cards for writing in real time
-
-  Object.values(allCards).forEach((card) => {
-    uploadQueue.push(async () => await writeToAPI(card));
-  });
-
-  //now group up the bulk uploads
-  Object.entries(
-    bulk.reduce((cardsToUpload, card) => {
-      const key = JSON.stringify({
-        year: card.year,
-        sport: card.sport.toLowerCase(),
-        brand: card.manufacture.toLowerCase(),
-        setName: card.setName.toLowerCase(),
-        parallel: card.parallel.toLowerCase(),
-        insert: card.insert.toLowerCase(),
-      });
-      if (!cardsToUpload[key]) {
-        cardsToUpload[key] = {};
-      }
-      cardsToUpload[key][card.cardNumber] = card;
-      //also add to cardsToUpLoad removing all non-numeric characters from cardNumber
-      const cardNumber = card.cardNumber.toString().replace(/\D/g, "");
-      if (cardNumber) {
-        cardsToUpload[key][cardNumber] = card;
-      }
-      return cardsToUpload;
-    }, {}),
-  ).forEach(([key, cards]) => {
-    // console.log(`Adding cards to bulk upload for ${JSON.stringify(key)}`);
-    uploadQueue.push(async () => await writeBulkToAPI(key, cards));
-  });
-
-  // uploadQueue.push(async () => writeToAPI(allCards["165"]));
-
-  //group cards
-  Object.values(allCards).forEach((card) => {
-    if (!years[card.year]) {
-      years[card.year] = {};
-    }
-    let setName = card.setName;
-    const addToSetName = (modifier) => {
-      if (modifier) {
-        setName = `${setName} ${modifier}`;
-      }
+    const waitForElement = async (locator, hidden) => {
+      await driver.wait(until.elementLocated(locator));
+      const element = driver.findElement(locator);
+      await waitForElementToBeReady(element, hidden);
+      return element;
     };
-    addToSetName(card.parallel);
-    if (card.insert !== "Base Set") addToSetName(card.insert);
-    if (!years[card.year][setName]) {
-      years[card.year][setName] = [];
+
+    const waitForElementToBeReady = async (element, hidden) => {
+      if (!hidden) {
+        await driver.wait(until.elementIsVisible(element));
+      }
+      await driver.wait(until.elementIsEnabled(element));
+    };
+
+    const caseInsensitive = (text) =>
+      `[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '${text}')]`;
+    const waitForButton = (text) =>
+      waitForElement(By.xpath(`//button[descendant::text()${caseInsensitive(text.toLowerCase())}]`));
+
+    const signInButton = await waitForButton('sign in');
+    await signInButton.click();
+
+    const emailInput = await waitForElement(By.id('email'));
+    await emailInput.sendKeys(process.env.BSC_EMAIL);
+    const passwordInput = await waitForElement(By.id('password'));
+    await passwordInput.sendKeys(process.env.BSC_PASSWORD);
+
+    //click the  button with id "next"
+    const nextButton = await waitForElement(By.id('next'));
+    await nextButton.click();
+    await waitForButton('welcome back,');
+
+    await driver.get('https://www.buysportscards.com/sellers/bulk-upload');
+
+    //for loop over entries in groupedCards
+    console.log('Uploading:', Object.keys(groupedCards));
+
+    for (const key in groupedCards) {
+      const setData = parseKey(key);
+      const setFilter = async (placeHolderField, checkboxValue) => {
+        const sportSearchField = await waitForElement(By.xpath(`//input[@placeholder='${placeHolderField}']`));
+        await sportSearchField.clear();
+        await sportSearchField.sendKeys(checkboxValue?.trim());
+        const parentElement = await sportSearchField.findElement(By.xpath('../../..'));
+        let found;
+        try {
+          const checkbox = await parentElement.findElement(
+            By.xpath(
+              `//input[@type='checkbox' and translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = '${checkboxValue
+                .toLowerCase()
+                .trim()
+                .replaceAll(' ', '-')}']`,
+            ),
+          );
+          if (checkbox) {
+            await checkbox.click();
+            found = true;
+          }
+        } catch (err) {
+          found = false;
+        }
+        return found;
+      };
+
+      await setFilter('Search Sport', setData.sport);
+      await setFilter('Search Year', setData.year);
+      let foundSet = await setFilter('Search Set', `${setData.manufacture} ${setData.setName}`);
+      if (!foundSet) {
+        foundSet = await setFilter('Search Set', `${setData.setName}`);
+      }
+      if (!foundSet) {
+        console.log(`Please select ${chalk.red(setData.manufacture)} ${chalk.red(setData.setName)} to continue.`);
+      }
+      if (setData.insert) {
+        await setFilter('Search Variant', 'Insert');
+        const foundVariant = await setFilter('Search Variant Name', `${setData.insert} ${setData.parallel || ''}`);
+        if (!foundVariant) {
+          console.log(
+            `Please select ${chalk.red(setData.insert)}${
+              setData.parallel ? chalk.red(' ' + setData.parallel) : ''
+            } to continue.`,
+          );
+        }
+      } else if (setData.parallel) {
+        await setFilter('Search Variant', 'Parallel');
+        const foundParallel = await setFilter('Search Variant Name', setData.parallel);
+        if (!foundParallel) {
+          console.log(`Please select ${chalk.red(setData.parallel)} to continue.`);
+        }
+      } else {
+        await setFilter('Search Variant', 'Base');
+      }
+
+      const conditionSelect = await waitForElement(By.css('.MuiSelect-select'));
+      await conditionSelect.click();
+      const conditionList = await waitForElement(By.xpath(`//*[@data-value='near_mint']`));
+      await conditionList.click();
+      const nextButton = await waitForButton('Generate');
+      await nextButton.click();
+
+      let pageAdds = 0;
+      let added = [];
+      await waitForElement(By.id('frontImageInput0'), true);
+      let tables = await driver.findElements(By.css(`.MuiTable-root`));
+      await waitForElementToBeReady(tables[0]);
+      const table = tables[0];
+      const body = await table.findElement(By.xpath(`./tbody`));
+      await waitForElementToBeReady(body);
+
+      const rows = await body.findElements(By.xpath(`./tr`));
+
+      const cardsToUpload = groupedCards[key];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const columns = await row.findElements(By.xpath(`./td`));
+
+        const cardNumberElement = await columns[1].findElement(By.xpath('./*'));
+        const tableCardNumber = await cardNumberElement.getText();
+
+        const card = cardsToUpload.find((card) => card.cardNumber === tableCardNumber);
+        if (card) {
+          // console.log('uploading: ', card);
+          let cardNumberTextBox = await columns[6].findElement({ css: 'input' });
+          const currentValue = await cardNumberTextBox.getAttribute('value');
+          let newQuantity = card.quantity;
+          if (currentValue) {
+            await cardNumberTextBox.sendKeys('\u0008\u0008');
+            newQuantity += Number.parseInt(currentValue);
+          }
+
+          const priceTextBox = await columns[5].findElement({ css: 'input' });
+          await priceTextBox.clear();
+          await driver.wait(until.elementTextIs(priceTextBox, ''), 5000);
+          await priceTextBox.sendKeys(card.bscPrice);
+
+          await driver.wait(until.elementTextIs(cardNumberTextBox, ''), 5000);
+          await cardNumberTextBox.sendKeys(newQuantity);
+
+          try {
+            if (card.frontImage || card.backImage) {
+              //find the buttons inside columns[3] that have "x" as the text
+              const buttons = await columns[3].findElements(By.xpath(`.//div[text()='X']`));
+              for (let button of buttons) {
+                try {
+                  // await driver.wait(until.elementToBeClickable(button), 5000); // Adjust the timeout as needed
+
+                  await button.click();
+                } catch (e) {
+                  //button wasn't click-able. just move on.
+                }
+              }
+
+              const imageInputs = await columns[3].findElements(By.xpath(`.//input[@type='file']`));
+              if (card.frontImage) {
+                const b = await columns[3].findElement(By.id(`addPhotoFront${i}`));
+                await driver.wait(until.elementIsEnabled(b), 1000);
+                await b.click();
+                await imageInputs[0].sendKeys(`${process.cwd()}/output/${card.directory}${card.frontImage}`);
+                // await new Promise((resolve) => setTimeout(resolve, 1000));
+                // await ask('Press any key to continue.');
+              }
+              if (card.backImage) {
+                await imageInputs[1].sendKeys(`${process.cwd()}/output/${card.directory}${card.backImage}`);
+                // await new Promise((resolve) => setTimeout(resolve, 1000));
+                // await ask('Press any key to continue.');
+              }
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+            console.log(`Added Card ${chalk.green(tableCardNumber)}${card.frontImage ? ' with images' : ''}`);
+          } catch (e) {
+            console.log(`Failed to add Image to card ${chalk.red(tableCardNumber)}`);
+          }
+
+          pageAdds++;
+          added.push(card);
+        } else {
+          // console.log(`Did not find card ${tableCardNumber}`);
+        }
+      }
+
+      await validateUploaded(cardsToUpload, added, 'bscPrice');
+
+      await driver.executeScript('window.scrollTo(0, 0);');
+      const saveButton = await waitForButton('Save');
+      await saveButton.click();
+
+      await waitForElement(By.className('MuiAlert-filledSuccess'));
+
+      console.log(`Added ${chalk.green(pageAdds)} cards for ${chalk.cyan(key)}`);
+
+      const reset = await waitForButton('Reset');
+      await reset.click();
     }
-    years[card.year][setName].push(card);
-  });
-
-  //sort all cards in year by cardNumber
-  Object.keys(years).forEach((year) => {
-    Object.keys(years[year]).forEach((setName) => {
-      years[year][setName].sort((a, b) => parseInt(a.cardNumber) - parseInt(b.cardNumber));
-    });
-  });
-
-  //write output sorted by year and then setName
-  const output = [];
-  Object.keys(years)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .forEach((year) => {
-      output.push(""); //add blank line between years
-      output.push(year);
-      Object.keys(years[year])
-        .sort()
-        .forEach((setName) => {
-          years[year][setName].sort(byCardNumber).forEach((card) => {
-            output.push(
-              `    ${card.year} ${setName} ${card.cardNumber} ${card.player} ${card.bscPrice} (${card.quantity})`,
-            );
-          });
-        });
-    });
-  output.push("");
-  try {
-    await fs.outputFile("output/bsc.txt", output.join("\n"));
-  } catch (err) {
-    console.error("Failed to write bsc.txt");
-    console.error(err);
-    throw err;
-  }
-
-  if (!hasQueueError) {
-    console.log("wait for the queues!");
-    await new Promise((resolve) =>
-      uploadQueue.addEventListener("end", () => {
-        resolve();
-      }),
-    );
-    // console.log("results", results);
-    console.log(
-      "Finished uploading to BSC. ",
-      results.reduce((sum, currentValue) => sum + Number.parseInt(currentValue), 0),
-      " cards uploaded.",
-    );
-  } else {
-    console.log("Queue error. ", results.length, " cards uploaded.");
-  }
-}
-let token = process.env.BSC_TOKEN;
-const baseHeaders = () => {
-  // console.log("token", token);
-  return {
-    accept: "application/json, text/plain, */*",
-    "accept-language": "en-US,en;q=0.9",
-    assumedrole: "sellers",
-    authorization: "Bearer " + token,
-    "content-type": "application/json",
-  };
-};
-
-const processResponse = async (responseObject, fetchOptions, body, method, path) => {
-  if (responseObject.status === 401) {
-    console.log("BSC Token Expired calling ", path);
-    await login();
-  } else if (responseObject.status < 200 || responseObject.status >= 300) {
-    console.group(`Error from BSC ${method} ${path}`);
-    if (body) console.log("Body: ", JSON.stringify(body, null, 2));
-    if (responseObject) console.log("Response: ", JSON.stringify(responseObject, null, 2));
-    console.log("headers: ", JSON.stringify(fetchOptions.headers, null, 2));
-    console.log(`Returned: ${responseObject.status} ${responseObject.statusText}`);
-    console.log(`End Error: ${method} ${path}`);
-    console.groupEnd();
-    throw new Error(`Error from ${method} ${path}: ${responseObject.status} ${responseObject.statusText}`);
-  }
-
-  const text = await responseObject.text();
-
-  if (text === "" || text.trim().length === 0) {
-    // console.group("Empty response from BSC");
-    // if (body) {
-    //   console.log(JSON.stringify(body, null, 2));
-    // }
-    // console.log("path: ", path);
-    // console.groupEnd();
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(text);
   } catch (e) {
-    console.log(`Error parsing JSON response from ${method} ${path}`, text);
-    console.log(e);
-    throw e;
+    console.log('Error in BSC upload: ', e);
+  } finally {
+    console.log(chalk.magenta('BSC Upload COMPLETE!'));
+    if (driver) {
+      await driver.quit();
+    }
   }
 };
-const fetchJson = async (path, method = "GET", body, headers = {}) => {
-  const fullPath = path.indexOf("https") === 0 ? path : `https://api-prod.buysportscards.com/${path}`;
-  const fetchOptions = {
-    headers: {
-      ...baseHeaders(),
-      ...headers,
-    },
-    method: method,
-  };
-
-  if (body) {
-    fetchOptions.body = JSON.stringify(body);
-  }
-  const responseObject = await fetch(`${fullPath}`, fetchOptions);
-
-  return await processResponse(responseObject, fetchOptions, body, method, path);
-};
-
-const get = fetchJson;
-const put = async (path, body, headers) => fetchJson(path, "PUT", body, headers);
-const post = async (path, body, headers) => fetchJson(path, "POST", body, headers);
-
-async function postImage(path, imagePath) {
-  const formData = new FormData();
-
-  formData.append("attachment", fs.createReadStream(imagePath));
-
-  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
-    headers: {
-      ...baseHeaders(),
-      ...formData.getHeaders(),
-    },
-    body: formData,
-    method: "POST",
-  });
-
-  return await processResponse(responseObject);
-}
-
-const getVariantsForFilters = (info) => {
-  const filters = {
-    variant: [],
-    variantName: [],
-  };
-  if (info.insert) {
-    filters.variant.push("insert");
-    if (info.parallel) {
-      filters.variantName.push(
-        `${info.insert}-${info.parallel}`.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"),
-      );
-    } else {
-      filters.variantName.push(info.insert.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
-    }
-  } else if (info.parallel) {
-    filters.variant.push("parallel");
-    filters.variantName.push(info.parallel.toLowerCase().replaceAll("&", "and").replaceAll(" ", "-"));
-  } else {
-    filters.variant.push("base");
-  }
-  return filters;
-};
-
-export async function loginTest() {
-  let loggedIn = false;
-  let loginResponse;
-  try {
-    loginResponse = await get("marketplace/user/profile");
-    // console.log(loginResponse);
-    if (loginResponse && loginResponse?.sellerProfile?.sellerStoreName === "edvedafi") {
-      // console.log("Successfully logged into BSC");
-      // console.log(loginResponse);
-      loggedIn = true;
-    }
-  } catch (err) {
-    loggedIn = false;
-  }
-
-  if (!loggedIn) {
-    console.log("Login to BSC failed.");
-    console.log(loginResponse);
-    await login();
-    await loginTest();
-  }
-}
-
-async function login() {
-  console.log("LOGIN");
-  await open("https://www.buysportscards.com");
-  const newKey = await ask("New Key");
-
-  if (newKey) {
-    setEnvValue("BSC_TOKEN", newKey);
-    dotenv.config();
-    token = newKey;
-  }
-}
-
-async function writeToAPI(card) {
-  // console.log(`Processing ${card.longTitle || card.cardNumber}`);
-  const searchPath = `search/seller/results?q=${card.setName}+${card.player}`
-    .replaceAll("| ", "")
-    .replaceAll("& ", "")
-    .replaceAll(" ", "+");
-  // console.log(`Searching for: ${searchPath}`);
-  const filters = {
-    cardNo: [card.cardNumber],
-    sport: [card.sport.toLowerCase()],
-    year: [card.year],
-    ...getVariantsForFilters(card),
-  };
-
-  const listResponse = await post(searchPath, {
-    condition: "all",
-    filters: filters,
-    myInventory: "false",
-    page: 0,
-    sellerId: "cf987f7871",
-    size: 2,
-    sort: "default",
-  });
-
-  // console.log(JSON.stringify(listResponse, null, 2));
-
-  if (listResponse.totalResults === 1) {
-    //should probably only proceed if there is a single listing returned rather than assuming the first is correct
-    const listingId = listResponse.results[0].id;
-
-    // console.log("First Result = " + listingId);
-
-    const settingsResponse = await get(`seller/card-listing/${listingId}/settings`);
-
-    // console.log("settingsResponse Result = " + JSON.stringify(settingsResponse, null, 2));
-
-    const listing = {
-      productType: "raw",
-      condition: "near_mint",
-      grade: "",
-      price: card.bscPrice,
-      quantity: card.quantity,
-      gradingCompany: "",
-      productId: settingsResponse.productId,
-      sportId: card.sport,
-      availableQuantity: card.quantity,
-    };
-
-    if (card.frontImage) {
-      try {
-        const frontResponse = await postImage(
-          `common/card/${listingId}/product/${listing.productId}/attachment`,
-          `output/${card.directory}${card.frontImage}`,
-        );
-        listing.sellerImgFront = frontResponse?.objectKey;
-      } catch (e) {
-        console.log(`Error uploading front image for ${card.directory}${card.frontImage}`);
-      }
-    }
-
-    if (card.backImage) {
-      try {
-        const backResponse = await postImage(
-          `common/card/${listingId}/product/628a6e8cc9/attachment`,
-          `output/${card.directory}${card.backImage}`,
-        );
-        listing.sellerImgBack = backResponse?.objectKey;
-      } catch (e) {
-        console.log(`Error uploading back image for ${card.directory}${card.frontImage}`);
-      }
-    }
-
-    const saveResponse = await put(`seller/card-listing/${listingId}/product`, { action: "add", listing });
-
-    // console.log("saveResponse Result = " + JSON.stringify(saveResponse, null, 2));
-    if (saveResponse.listings?.length > 0) {
-      // console.log(`Successfully uploaded ${card.longTitle || card.cardNumber} to BSC`);
-      return 1;
-    } else {
-      // console.log(`Failed to upload ${card.longTitle || card.cardNumber} to BSC`);
-      await open(
-        `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
-          card.cardName.replaceAll("&", ""),
-        )}`,
-      );
-      return 0;
-    }
-  } else {
-    console.log(`Found ${listResponse.totalResults} results for ${card.cardName}`);
-    console.log("  " + searchPath);
-    console.log("  " + JSON.stringify(filters));
-    console.log("  " + "Opening BSC now");
-    await open(
-      `https://www.buysportscards.com/sellers/inventory?myInventory=false&p=0&q=${encodeURI(
-        card.cardName.replaceAll("&", ""),
-      )}`,
-    );
-  }
-}
-
-async function writeBulkToAPI(keyString, cards) {
-  try {
-    const key = JSON.parse(keyString);
-    const searchBody = {
-      filters: {
-        sport: [key.sport],
-        year: [key.year],
-        setName: [key.setName.replaceAll(" ", "-")],
-        ...getVariantsForFilters(key),
-      },
-      condition: "near_mint",
-      productType: "raw",
-      currentListings: true,
-    };
-
-    let listResponse = await post("seller/bulk-upload/results", searchBody);
-    if (!listResponse || listResponse.totalResults < 1) {
-      searchBody.filters.setName = [`${key.brand}-${key.setName}`.replaceAll(" ", "-")];
-      listResponse = await post("seller/bulk-upload/results", searchBody);
-      if (!listResponse || listResponse.totalResults < 1) {
-        console.log("Failed to find bulk upload for: ", key);
-        throw new Error("Failed to find bulk upload for: ", key);
-      }
-    }
-
-    const updates = [];
-    listResponse.results.forEach((listing) => {
-      const card = cards[listing.card.cardNo];
-      if (card) {
-        updates.push({
-          ...listing,
-          price: `${card.bscPrice}`,
-          availableQuantity: `${card.quantity}`,
-        });
-      } else if (listing.availableQuantity > 0) {
-        updates.push(listing);
-      }
-    });
-
-    let updateResponse;
-    try {
-      updateResponse = await put("seller/bulk-upload", {
-        sellerId: "cf987f7871",
-        listings: updates,
-      });
-    } catch (err) {
-      console.log("Waiting 2 seconds and trying again");
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      updateResponse = await put("seller/bulk-upload", {
-        sellerId: "cf987f7871",
-        listings: updates,
-      });
-    }
-
-    if (updateResponse.result === "Saved!") {
-      const uploadedCount = updateResponse.listings?.filter((card) => card.availableQuantity > 0).length || 0;
-      await validateAllUploaded(
-        cards.map((card) => card.cardNumber),
-        uploadedCount,
-        cards,
-        "bscPrice",
-      );
-      return uploadedCount;
-    } else {
-      console.log(updates);
-      console.log("Failed to update bulk upload for: ", keyString);
-      console.log(updateResponse);
-      throw new Error("Failed to update bulk upload for: ", keyString);
-    }
-  } catch (err) {
-    console.log("Error in bulk upload: ", err);
-    throw err;
-  }
-}
-
-export default writeBuySportsCardsOutput;
