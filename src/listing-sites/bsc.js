@@ -49,6 +49,9 @@ export const uploadToBuySportsCards = async (groupedCards) => {
 
     await driver.get('https://www.buysportscards.com/sellers/bulk-upload');
 
+    // groupedCards = {
+    //   'football|2020|Panini|Chronicles|Panini|': groupedCards['football|2020|Panini|Chronicles|Panini|'],
+    // };
     //for loop over entries in groupedCards
     console.log('Uploading:', Object.keys(groupedCards));
 
@@ -135,7 +138,7 @@ export const uploadToBuySportsCards = async (groupedCards) => {
         const cardNumberElement = await columns[1].findElement(By.xpath('./*'));
         const tableCardNumber = await cardNumberElement.getText();
 
-        const card = cardsToUpload.find((card) => card.cardNumber === tableCardNumber);
+        const card = cardsToUpload.find((card) => card.cardNumber.toString() === tableCardNumber);
         if (card) {
           // console.log('uploading: ', card);
           let cardNumberTextBox = await columns[6].findElement({ css: 'input' });

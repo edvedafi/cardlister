@@ -22,7 +22,7 @@ if (await ask('Upload to Shopify?', true)) {
   await uploadToShopify(savedAnswers.allCardData);
 }
 if (await ask('Write to Sportlots?', true)) {
-  await writeSportLotsOutput(savedAnswers.allCardData, savedAnswers.bulk);
+  await writeSportLotsOutput(bulkGrouped);
 }
 if (await ask('Write to BuySportsCards?', true)) {
   await uploadToBuySportsCards(bulkGrouped);

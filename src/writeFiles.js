@@ -8,7 +8,7 @@ import { createGroups } from './listing-sites/uploads.js';
 async function writeOutputFiles(allCards, bulk) {
   const bulkGrouped = createGroups(allCards, bulk);
   await uploadToShopify(allCards);
-  await writeSportLotsOutput(allCards, bulk);
+  await writeSportLotsOutput(bulkGrouped);
   await uploadToBuySportsCards(bulkGrouped);
   await writeEbayFile(allCards);
   await writeShopifyFile(allCards);
