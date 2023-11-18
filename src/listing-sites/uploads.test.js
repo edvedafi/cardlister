@@ -430,5 +430,24 @@ describe('uploads', () => {
         examples.base.another,
       ]);
     });
+
+    it('should trim a multi year to a single year (1981-82 should be 1981)', () => {
+      const allCards = {
+        3: {
+          ...examples.base.card,
+          year: '1980-81',
+        },
+      };
+      const bulk = [
+        {
+          ...examples.base.another,
+          year: '1980-81',
+        },
+      ];
+
+      const result = createGroups(allCards, bulk);
+
+      expect(result).toContainAllKeys(['football|1980|panini|base set||']);
+    });
   });
 });

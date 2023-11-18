@@ -1,5 +1,7 @@
 const createKey = (card) =>
-  `${card.sport}|${card.year}|${card.manufacture}|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
+  `${card.sport}|${card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year}|${
+    card.manufacture
+  }|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
 export const parseKey = (key) => {
   const [sport, year, manufacture, setName, insert, parallel] = key.split('|');
   return {
