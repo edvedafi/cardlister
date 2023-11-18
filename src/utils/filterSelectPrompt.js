@@ -10,18 +10,18 @@ import {
   isNumberKey,
   isBackspaceKey,
   Paginator,
-} from "@inquirer/core";
-import chalk from "chalk";
-import figures from "figures";
-import ansiEscapes from "ansi-escapes";
-import Fuse from "fuse.js";
+} from '@inquirer/core';
+import chalk from 'chalk';
+import figures from 'figures';
+import ansiEscapes from 'ansi-escapes';
+import Fuse from 'fuse.js';
 
 function isSelectableChoice(choice) {
   return choice != null && !choice.disabled;
 }
 
 function isEsacpeKey(key) {
-  return key.name === "escape";
+  return key.name === 'escape';
 }
 
 export default createPrompt((config, done) => {
@@ -29,25 +29,21 @@ export default createPrompt((config, done) => {
   const firstRender = useRef(true);
 
   const prefix = usePrefix();
-  const [status, setStatus] = useState("pending");
-  const [searchTerm, setSearchTerm] = useState(
-    config.default?.display || config.default || "",
-  );
+  const [status, setStatus] = useState('pending');
+  const [searchTerm, setSearchTerm] = useState(config.default?.display || config.default || '');
 
   const keys =
     config.choices &&
     config.choices.length > 0 &&
-    config.choices[0].name &&
-    config.choices[0].description
-      ? ["name", "description"]
-      : ["value"];
+    config.choices[config.choices.length - 1].name &&
+    config.choices[config.choices.length - 1].description
+      ? ['name', 'description']
+      : ['value'];
 
   const defaultFuse = useRef(new Fuse(config.choices, { keys })).current;
   const [choices, setChoices] = useState(
     config.default
-      ? defaultFuse
-          .search(config?.default?.display || config.default)
-          .map((result) => result.item)
+      ? defaultFuse.search(config?.default?.display || config.default).map((result) => result.item)
       : config.choices,
   );
 
@@ -60,16 +56,16 @@ export default createPrompt((config, done) => {
     // console.log(key);
     if (isEnterKey(key)) {
       const typedValue = searchTerm;
-      setSearchTerm("");
-      setStatus("done");
+      setSearchTerm('');
+      setStatus('done');
       done(choice?.value || typedValue);
     } else if (isEsacpeKey(key)) {
-      if (config.cancelable && searchTerm === "") {
+      if (config.cancelable && searchTerm === '') {
         setChoices([]);
-        setStatus("aborted");
+        setStatus('aborted');
         done(undefined);
       } else {
-        setSearchTerm("");
+        setSearchTerm('');
         setChoices(config.choices);
         setCursorPos(0);
       }
@@ -79,13 +75,12 @@ export default createPrompt((config, done) => {
       let selectedOption;
 
       while (!isSelectableChoice(selectedOption)) {
-        newCursorPosition =
-          (newCursorPosition + offset + choices.length) % choices.length;
+        newCursorPosition = (newCursorPosition + offset + choices.length) % choices.length;
         selectedOption = choices[newCursorPosition];
       }
 
       setCursorPos(newCursorPosition);
-      setSearchTerm("");
+      setSearchTerm('');
     } else if (isNumberKey(key)) {
       // Adjust index to start at 1
       const newCursorPosition = Number(key.name) - 1;
@@ -100,10 +95,8 @@ export default createPrompt((config, done) => {
       //search choices for the closest matches
 
       // Change the pattern
-      const pattern = isBackspaceKey(key)
-        ? searchTerm.slice(0, -1)
-        : searchTerm + key.sequence;
-      if (pattern === "") {
+      const pattern = isBackspaceKey(key) ? searchTerm.slice(0, -1) : searchTerm + key.sequence;
+      if (pattern === '') {
         setChoices(config.choices);
         setCursorPos(0);
       } else {
@@ -116,25 +109,22 @@ export default createPrompt((config, done) => {
 
   let message = chalk.bold(config.message);
   if (searchTerm) {
-    message += chalk.dim(" " + searchTerm);
+    message += chalk.dim(' ' + searchTerm);
   }
   if (firstRender.current) {
-    message += chalk.dim(" (Use arrow keys or type to search)");
+    message += chalk.dim(' (Use arrow keys or type to search)');
     firstRender.current = false;
   }
 
-  if (status === "done") {
-    return `${prefix} ${message} ${chalk.cyan(
-      choice?.name || choice?.value || searchTerm,
-    )}`;
+  if (status === 'done') {
+    return `${prefix} ${message} ${chalk.cyan(choice?.name || choice?.value || searchTerm)}`;
   }
 
   const allChoices = choices
     .map((choice, index) => {
       const line = choice.name || choice.value;
       if (choice.disabled) {
-        const disabledLabel =
-          typeof choice.disabled === "string" ? choice.disabled : "(disabled)";
+        const disabledLabel = typeof choice.disabled === 'string' ? choice.disabled : '(disabled)';
         return chalk.dim(`- ${line} ${disabledLabel}`);
       }
 
@@ -144,21 +134,13 @@ export default createPrompt((config, done) => {
 
       return `  ${line}`;
     })
-    .join("\n");
+    .join('\n');
 
-  const windowedChoices = paginator.paginate(
-    allChoices,
-    cursorPosition,
-    config.pageSize,
-  );
+  const windowedChoices = paginator.paginate(allChoices, cursorPosition, config.pageSize);
   // console.log(allChoices);
-  const choiceDescription = choice
-    ? choice.description
-      ? `\n${choice.description}`
-      : ``
-    : "No Matches";
+  const choiceDescription = choice ? (choice.description ? `\n${choice.description}` : ``) : 'No Matches';
 
-  return status === "aborted"
+  return status === 'aborted'
     ? `${prefix} ${message}`
     : `${prefix} ${message}\n${windowedChoices}${choiceDescription}${ansiEscapes.cursorHide}`;
 });

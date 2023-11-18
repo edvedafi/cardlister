@@ -524,10 +524,14 @@ export const getTeam = async (defaults) => {
     selectOptions: getTeamSelections(defaults.sport),
   });
   while (newTeam) {
-    teams.push(newTeam);
-    newTeam = await ask('Teams', undefined, {
-      selectOptions: getTeamSelections(defaults.sport),
-    });
+    if (newTeam?.value?.trim().length > 0) {
+      teams.push(newTeam);
+      newTeam = await ask('Teams', undefined, {
+        selectOptions: getTeamSelections(defaults.sport),
+      });
+    } else {
+      newTeam = undefined;
+    }
   }
   return teams;
 };
