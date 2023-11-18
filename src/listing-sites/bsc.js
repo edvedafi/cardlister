@@ -16,9 +16,14 @@ export const uploadToBuySportsCards = async (groupedCards) => {
     await driver.get('https://www.buysportscards.com');
 
     const waitForElement = async (locator, hidden) => {
+      console.log('looking for element: ', locator);
       await driver.wait(until.elementLocated(locator));
+      console.log('located element: ', locator);
       const element = driver.findElement(locator);
+
+      console.log('found element: ', locator);
       await waitForElementToBeReady(element, hidden);
+      console.log('ready element: ', locator);
       return element;
     };
 
@@ -108,7 +113,11 @@ export const uploadToBuySportsCards = async (groupedCards) => {
           console.log(`Please select ${chalk.red(setData.parallel)} to continue.`);
         }
       } else {
-        await setFilter('Search Variant', 'Base');
+        // await setFilter('Search Variant', 'Base');
+
+        const checkbox = await waitForElement(By.xpath(`//input[@type='checkbox' and @value='base']`), true);
+        console.log('checkbox', checkbox);
+        await checkbox.click();
       }
 
       const conditionSelect = await waitForElement(By.css('.MuiSelect-select'));

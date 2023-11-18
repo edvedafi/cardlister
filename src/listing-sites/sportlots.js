@@ -162,6 +162,8 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               pageAdds++;
               addedCards.push(card);
               console.log(`Added Card ${chalk.green(tableCardNumber)}`);
+            } else {
+              console.log(`Card ${chalk.red(tableCardNumber)} not found`);
             }
           }
         }

@@ -83,7 +83,7 @@ async function writeEbayFile(data) {
       { id: 'cardType', title: '*C:Type' },
       { id: 'signedBy', title: 'C:Signed By' },
       { id: 'autoAuth', title: 'C:Autograph Authentication' },
-      { id: 'year', title: 'C:Year Manufactured' },
+      { id: 'yearManufactured', title: 'C:Year Manufactured' },
       { id: 'size', title: 'C:Card Size' },
       { id: 'country', title: 'C:Country/Region of Manufacture' },
       { id: 'material', title: 'C:Material' },
@@ -141,7 +141,8 @@ async function writeEbayFile(data) {
       card.autographed = 'No';
     }
 
-    if (parseInt(card.year) < 1987) {
+    card.yearManufactured = card.year.indexOf('-') > -1 ? card.year.split('-')[0] : card.year;
+    if (parseInt(card.yearManufactured) < 1986) {
       card.vintage = 'Yes';
     } else {
       card.vintage = 'No';
