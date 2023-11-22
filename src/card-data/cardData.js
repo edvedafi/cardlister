@@ -511,12 +511,13 @@ export const getBulkCardData = async (bulkCards, setData, enterValues, lastCardN
 export const getTeam = async (defaults) => {
   const teams = [];
   let defaultTeam;
+  let defaultCounter = 0;
   if (defaults.team) {
     if (typeof defaults.team === 'string') {
       defaultTeam = defaults.team;
     } else if (defaults.team.searchExact) {
       defaultTeam = defaults.team.searchExact;
-    } else if (defaults.team.length === 1 && defaults.team[0] && defaults.team[0].searchExact) {
+    } else if (defaults.team.length > 0 && defaults.team[defaultCounter] && defaults.team[defaultCounter].searchExact) {
       defaultTeam = defaults.team[0].searchExact;
     }
   }
@@ -524,11 +525,16 @@ export const getTeam = async (defaults) => {
     selectOptions: getTeamSelections(defaults.sport),
   });
   while (newTeam) {
-    if (newTeam?.value?.trim().length > 0) {
+    if (newTeam?.display?.trim().length > 0) {
       teams.push(newTeam);
-      newTeam = await ask('Teams', undefined, {
-        selectOptions: getTeamSelections(defaults.sport),
-      });
+      defaultCounter++;
+      newTeam = await ask(
+        'Teams',
+        defaults.team[defaultCounter] ? defaults.team[defaultCounter].searchExact : undefined,
+        {
+          selectOptions: getTeamSelections(defaults.sport),
+        },
+      );
     } else {
       newTeam = undefined;
     }
