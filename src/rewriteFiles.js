@@ -8,6 +8,7 @@ import { uploadToBuySportsCards } from './listing-sites/bsc.js';
 import writeEbayFile from './listing-sites/ebay.js';
 import { ask } from './utils/ask.js';
 import { createGroups } from './listing-sites/uploads.js';
+import { uploadToMyCardPost } from './listing-sites/mycardpost.js';
 
 dotenv.config();
 
@@ -27,8 +28,9 @@ if (await ask('Write to Sportlots?', true)) {
 if (await ask('Write to BuySportsCards?', true)) {
   await uploadToBuySportsCards(bulkGrouped);
 }
+if (await ask('Write to My Card Post?', true)) {
+  await uploadToMyCardPost(savedAnswers.allCardData);
+}
 if (await ask('Write to eBay?', true)) {
   await writeEbayFile(savedAnswers.allCardData);
 }
-
-// Object.values(savedAnswers.allCardData).forEach((t) => console.log(t.title));

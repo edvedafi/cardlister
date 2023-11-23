@@ -1,7 +1,7 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
-import { parseKey } from './uploads.js';
+import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady } from './uploads.js';
 import { validateUploaded } from './validate.js';
 
 dotenv.config();
@@ -15,27 +15,10 @@ export const uploadToBuySportsCards = async (groupedCards) => {
     driver = await new Builder().forBrowser(Browser.CHROME).build();
     await driver.get('https://www.buysportscards.com');
 
-    const waitForElement = async (locator, hidden) => {
-      console.log('looking for element: ', locator);
-      await driver.wait(until.elementLocated(locator));
-      console.log('located element: ', locator);
-      const element = driver.findElement(locator);
+    const waitForElement = useWaitForElement(driver);
 
-      console.log('found element: ', locator);
-      await waitForElementToBeReady(element, hidden);
-      console.log('ready element: ', locator);
-      return element;
-    };
+    const waitForElementToBeReady = useWaitForElementToBeReady(driver);
 
-    const waitForElementToBeReady = async (element, hidden) => {
-      if (!hidden) {
-        await driver.wait(until.elementIsVisible(element));
-      }
-      await driver.wait(until.elementIsEnabled(element));
-    };
-
-    const caseInsensitive = (text) =>
-      `[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '${text}')]`;
     const waitForButton = (text) =>
       waitForElement(By.xpath(`//button[descendant::text()${caseInsensitive(text.toLowerCase())}]`));
 

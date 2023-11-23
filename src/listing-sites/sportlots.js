@@ -74,6 +74,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           await setSelectValue('sprt', { baseball: 'BB', football: 'FB', basketball: 'BK' }[sport.toLowerCase()]);
           await setSelectValue('brd', brand);
         } catch (e) {
+          await setSelectValue('brd', 'All Brands');
           await ask(`Please select the proper filters and then Press any key to continue...`);
         }
         await clickSubmit();
@@ -120,7 +121,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         }
       };
 
-      await selectBrand(setInfo.year, setInfo.sport, setInfo.manufacture);
+      await selectBrand(setInfo.year, setInfo.sport, brands[setInfo.setName?.toLowerCase()] || setInfo.manufacture);
       await driver.wait(until.urlContains('dealsets.tpl'));
       await selectSet(`${setInfo.setName} ${setInfo.insert || ''} ${setInfo.parallel || ''}`.trim());
 
@@ -163,7 +164,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               addedCards.push(card);
               console.log(`Added Card ${chalk.green(tableCardNumber)}`);
             } else {
-              console.log(`Card ${chalk.red(tableCardNumber)} not found`);
+              // console.log(`Card ${chalk.red(tableCardNumber)} not found`);
             }
           }
         }
