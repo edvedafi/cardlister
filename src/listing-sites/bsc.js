@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady } from './uploads.js';
 import { validateUploaded } from './validate.js';
+import open from 'open';
 
 dotenv.config();
 
@@ -213,3 +214,7 @@ export const uploadToBuySportsCards = async (groupedCards) => {
     }
   }
 };
+
+export async function removeFromBuySportsCards(cardsToRemove) {
+  return open('https://www.buysportscards.com/sellers');
+}

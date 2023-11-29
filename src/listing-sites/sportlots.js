@@ -5,6 +5,7 @@ import chalkTable from 'chalk-table';
 import { parseKey } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
+import open from 'open';
 
 const brands = {
   bowman: 'Bowman',
@@ -22,6 +23,10 @@ const brands = {
   'upper deck': 'Upper Deck',
   ud: 'Upper Deck',
 };
+
+async function login() {
+  const driver = await new Builder().forBrowser(Browser.CHROME).build();
+}
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
   console.log(chalk.magenta('SportLots Starting Upload'));
@@ -205,6 +210,19 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       await driver.quit();
     }
   }
+}
+
+// export async function getSalesSportLots() {
+//   console.log(chalk.magenta('Gathering SportLots Sales'));
+//   const sales = [];
+//   const driver = await login();
+//
+//   // https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a
+//   return sales
+// }
+
+export async function removeFromSportLots(cardsToRemove) {
+  return open('https://sportlots.com/inven/dealbin/invenrpt.tpl');
 }
 
 export default enterIntoSportLotsWebsite;

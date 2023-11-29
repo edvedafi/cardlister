@@ -786,6 +786,9 @@ export const getEbaySales = async () => {
     });
   });
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on ebay'));
+  if (cards.length > 0) {
+    await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  }
   return cards;
 };
 

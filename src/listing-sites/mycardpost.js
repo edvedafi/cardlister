@@ -4,6 +4,7 @@ import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { backImage, buttonByText, frontImage, inputByPlaceholder, parseKey, useWaitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
+import open from 'open';
 
 dotenv.config();
 
@@ -149,4 +150,7 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
     }
   }
 };
-undefined;
+
+export async function removeFromMyCardPost(cardsToRemove) {
+  return open('https://mycardpost.com/edvedafi');
+}
