@@ -1,8 +1,8 @@
-import { byCardNumber } from '../utils/data.js';
+import { byCardNumber, manufactures, sets } from '../utils/data.js';
 import { Browser, Builder, By, until, Select } from 'selenium-webdriver';
 import { ask, validateAllUploaded } from '../utils/ask.js';
 import chalkTable from 'chalk-table';
-import { parseKey } from './uploads.js';
+import { parseKey, useWaitForElement, waitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import open from 'open';
@@ -24,8 +24,29 @@ const brands = {
   ud: 'Upper Deck',
 };
 
+const useClickSubmit = (waitForElement) => async () => {
+  const submitButton = await waitForElement(By.xpath("//input[@type = 'submit']"));
+  await submitButton.click();
+};
+const useSelectValue = (waitForElement) => async (name, value) => {
+  const brandSelector = await waitForElement(By.name(name));
+  let brandSelectorSelect = new Select(brandSelector);
+  await brandSelectorSelect.selectByValue('' + value);
+};
+
 async function login() {
   const driver = await new Builder().forBrowser(Browser.CHROME).build();
+  await driver.get('https://sportlots.com/cust/custbin/login.tpl?urlval=/index.tpl&qs=');
+  const waitForElement = useWaitForElement(driver);
+
+  const signInButton = await waitForElement(By.xpath("//input[@name = 'email_val']"));
+  await signInButton.sendKeys(process.env.SPORTLOTS_ID);
+
+  const passwordField = await waitForElement(By.xpath("//input[@name = 'psswd']"));
+  await passwordField.sendKeys(process.env.SPORTLOTS_PASS);
+
+  await useClickSubmit(waitForElement)();
+  return driver;
 }
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
@@ -36,37 +57,10 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
 
   try {
     driver = await new Builder().forBrowser(Browser.CHROME).build();
-    await driver.get('https://sportlots.com/cust/custbin/login.tpl?urlval=/index.tpl&qs=');
 
-    // console.log("writing: ", cardsToUpload);
-    const setSelectValue = async (name, value) => {
-      const brandSelector = await waitForElement(By.name(name));
-      let brandSelectorSelect = new Select(brandSelector);
-      await brandSelectorSelect.selectByValue('' + value);
-    };
-
-    // await setTimeout(10000);
-
-    const waitForElement = async (locator) => {
-      await driver.wait(until.elementLocated(locator));
-      const element = driver.findElement(locator);
-      await driver.wait(until.elementIsVisible(element));
-      await driver.wait(until.elementIsEnabled(element));
-      return element;
-    };
-
-    const clickSubmit = async () => {
-      const submitButton = await waitForElement(By.xpath("//input[@type = 'submit']"));
-      await submitButton.click();
-    };
-
-    const signInButton = await waitForElement(By.xpath("//input[@name = 'email_val']"));
-    await signInButton.sendKeys(process.env.SPORTLOTS_ID);
-
-    const passwordField = await waitForElement(By.xpath("//input[@name = 'psswd']"));
-    await passwordField.sendKeys(process.env.SPORTLOTS_PASS);
-
-    await clickSubmit();
+    const waitForElement = useWaitForElement(driver);
+    const clickSubmit = useClickSubmit(waitForElement);
+    const setSelectValue = useSelectValue(waitForElement);
 
     for (const key in cardsToUpload) {
       const setInfo = parseKey(key);
@@ -212,14 +206,104 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
   }
 }
 
-// export async function getSalesSportLots() {
-//   console.log(chalk.magenta('Gathering SportLots Sales'));
-//   const sales = [];
-//   const driver = await login();
-//
-//   // https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a
-//   return sales
-// }
+export const convertTitleToCard = (title) => {
+  const cardNumberIndex = title.indexOf('#');
+  const yearIdx = title.match(/\D*-?\D+/)?.index;
+  let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
+  let setInfoLower = setInfo.toLowerCase();
+  const card = {
+    cardNumber: title.match(/#(\S+)\s/)?.[1],
+    year: title.split(' ')[0],
+    parallel: '',
+    insert: '',
+    sport: { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)],
+  };
+
+  const manufacture = manufactures.find((m) => setInfoLower.indexOf(m) > -1);
+  if (manufacture) {
+    if (manufacture === 'score') {
+      card.manufacture = 'Panini';
+    } else {
+      card.manufacture = setInfo.slice(setInfoLower.indexOf(manufacture), manufacture.length);
+      setInfo = setInfo.replace(card.manufacture, '').trim();
+      setInfoLower = setInfo.toLowerCase();
+    }
+  }
+
+  const set = sets.find((s) => setInfo.toLowerCase().indexOf(s) > -1);
+  if (set) {
+    card.setName = setInfo.slice(setInfoLower.indexOf(set), set.length);
+    setInfo = setInfo.replace(card.setName, '').trim();
+    setInfoLower = setInfo.toLowerCase();
+  }
+
+  if (setInfoLower.indexOf('base set') === -1) {
+    const insertIndex = setInfoLower.indexOf('insert');
+    if (insertIndex > -1) {
+      card.insert = setInfo.slice(0, insertIndex).trim();
+      setInfo = setInfo.replace(card.insert, '').trim();
+      setInfoLower = setInfo.toLowerCase();
+    }
+
+    const parallelIndex = setInfoLower.indexOf('parallel');
+    if (parallelIndex > -1) {
+      card.parallel = setInfo.slice(0, parallelIndex).trim();
+      setInfo = setInfo.replace(card.parallel, '').trim();
+    }
+
+    if (setInfo.length > 0 && setInfo !== 'base') {
+      if (!card.setName) {
+        card.setName = setInfo;
+      } else if (!card.insert) {
+        card.insert = setInfo;
+      } else {
+        card.extraSetInfo = setInfo;
+      }
+    }
+  }
+
+  return card;
+};
+
+export async function getSalesSportLots() {
+  console.log(chalk.magenta('Gathering SportLots Sales'));
+  const cards = [];
+  let driver;
+  try {
+    driver = await login();
+    const waitForElement = useWaitForElement(driver);
+    await driver.sleep(500);
+    await driver.get('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
+    //find the div that contains text "Qty Filled"
+    const headerRow = await waitForElement(By.xpath(`//div[contains(text(), 'Qty Filled')]`));
+    //find the parent table of the table that contains text "Qty Filled"
+    const parentTable = await headerRow.findElement(By.xpath('..'));
+
+    //find all of the divs that contains a select element
+    const rows = await parentTable.findElements(By.xpath(`./div[descendant::select]`));
+    for (let row of rows) {
+      const select = await row.findElement(By.xpath(`.//select`));
+      const quantity = await select.getAttribute('value');
+      // the next div has the card's title in it
+      const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
+      const title = await titleDiv.getText();
+      cards.push({
+        platform: 'SportLots',
+        title,
+        quantity,
+        ...convertTitleToCard(title),
+      });
+    }
+  } finally {
+    if (driver) {
+      await driver.quit();
+    }
+  }
+  // await ask('Press any key to continue...');
+
+  console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
+  return cards;
+}
 
 export async function removeFromSportLots(cardsToRemove) {
   return open('https://sportlots.com/inven/dealbin/invenrpt.tpl');

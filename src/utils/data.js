@@ -92,6 +92,7 @@ export const manufactures = [
 export const sets = [
   'prizm',
   'bowman',
+  'chronicles',
   'donruss',
   'donruss optic',
   'optic',
@@ -139,6 +140,7 @@ export const sets = [
   'topps allen & ginter x',
   'topps heritage high number',
   'topps heritage minors',
+  'chronicles',
 ];
 
 export const inserts = ['invicta', 'next level', 'elite series', 'the rookies'];

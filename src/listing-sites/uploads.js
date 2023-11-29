@@ -39,14 +39,14 @@ export const createGroups = (allCards = {}, bulk = []) => {
 };
 
 export const waitForElement = async (driver, locator, hidden = false) => {
-  console.log('looking for element: ', locator);
+  // console.log('looking for element: ', locator);
   await driver.wait(until.elementLocated(locator));
-  console.log('located element: ', locator);
+  // console.log('located element: ', locator);
   const element = driver.findElement(locator);
 
-  console.log('found element: ', locator);
+  // console.log('found element: ', locator);
   await waitForElementToBeReady(driver, element, hidden);
-  console.log('ready element: ', locator);
+  // console.log('ready element: ', locator);
   return element;
 };
 
