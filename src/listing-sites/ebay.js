@@ -765,6 +765,7 @@ export const reverseTitle = (title) => {
 };
 
 export const getEbaySales = async () => {
+  console.log(chalk.magenta('Checking eBay for Sales'));
   const eBay = await loginEbayAPI();
 
   //don't need to do anything with location but do need to ensure it exists
@@ -784,11 +785,30 @@ export const getEbaySales = async () => {
       });
     });
   });
+  console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on ebay'));
   return cards;
 };
 
 export const removeFromEbay = async (cards) => {
   const toRemove = cards.filter((card) => card.platform !== 'ebay');
+  let removed = [];
+  // console.log('Would be removed from ebay:', toRemove);
+
+  if (removed.length === toRemove.length) {
+    console.log(
+      chalk.magenta('Successfully removed all'),
+      chalk.green(removed.length),
+      chalk.magenta('cards from ebay'),
+    );
+  } else {
+    console.log(
+      chalk.magenta('Only removed'),
+      chalk.red(removed.length),
+      chalk.magenta('of'),
+      chalk.red(toRemove.length),
+      chalk.magenta('cards from ebay'),
+    );
+  }
 };
 
 export default writeEbayFile;
