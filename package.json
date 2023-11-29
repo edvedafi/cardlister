@@ -51,6 +51,7 @@
     "start:singles": "ts-node trim.js",
     "process": "ts-node trim.js",
     "rewrite": "ts-node src/rewriteFiles.js",
+    "sales": "ts-node src/runSales.js",
     "test": "jest --watch",
     "tunnel": "ngrok http 3000",
     "testselect": "ts-node src/testselect.js"

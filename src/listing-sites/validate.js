@@ -58,7 +58,7 @@ export const validateUploaded = async (expectedCards, uploadedCards, priceField)
         columns: [
           { field: 'cardNumber', name: chalk.cyan('Card #') },
           { field: 'quantity', name: chalk.cyan('Count') },
-          { field: 'priceField', name: chalk.green('Price') },
+          { field: priceField, name: chalk.green('Price') },
           { field: 'player', name: chalk.cyan('Player') },
           { field: 'title', name: chalk.yellow('Full Title') },
         ],

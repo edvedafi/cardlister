@@ -4,6 +4,7 @@ import { isNo, isYes } from '../utils/data.js';
 import { gradeIds, graderIds } from './ebayConstants.js';
 import open from 'open';
 import eBayApi from 'ebay-api';
+import { inserts, manufactures, sets, titleCase } from '../utils/data.js';
 
 const defaultValues = {
   action: 'Add',
@@ -124,14 +125,6 @@ async function writeEbayFile(data) {
 
   //ebay mapping logic
   let csvData = Object.values(data).map((card) => {
-    const addFeature = (feature) => {
-      if (card.features && card.features.length > 0) {
-        card.features = `${card.features}|${feature}`;
-      } else {
-        card.features = feature;
-      }
-    };
-
     if (isYes(card.autographed)) {
       card.signedBy = card.player;
       card.autoAuth = card.manufacture;
@@ -141,74 +134,6 @@ async function writeEbayFile(data) {
       }
     } else {
       card.autographed = 'No';
-    }
-
-    card.yearManufactured = card.year.indexOf('-') > -1 ? card.year.split('-')[0] : card.year;
-    if (parseInt(card.yearManufactured) < 1986) {
-      card.vintage = 'Yes';
-    } else {
-      card.vintage = 'No';
-    }
-
-    if (card.thickness.indexOf('pt') < 0) {
-      card.thickness = `${card.thickness}pt`;
-    }
-
-    if (!card.parallel || isNo(card.parallel)) {
-      if (card.insert && !isNo(card.insert)) {
-        card.parallel = 'Base Insert';
-      } else {
-        card.parallel = 'Base Set';
-      }
-    } else {
-      addFeature('Parallel/Variety');
-      if (card.parallel.toLowerCase().indexOf('refractor') > -1) {
-        addFeature('Refractor');
-      }
-    }
-
-    if (!card.insert || isNo(card.insert)) {
-      card.insert = 'Base Set';
-    } else {
-      addFeature('Insert');
-    }
-
-    if (card.printRun && card.printRun > 0) {
-      addFeature('Serial Numbered');
-    }
-
-    if (!card.features || isNo(card.features)) {
-      card.features = 'Base';
-    }
-
-    card.features = card.features.replace('RC', 'Rookie');
-
-    card.league = card.league
-      ? {
-          mlb: 'Major League (MLB)',
-          nfl: 'National Football League (NFL)',
-          nba: 'National Basketball Association (NBA)',
-          nhl: 'National Hockey League (NHL)',
-        }[card.league?.toLowerCase()] || card.league
-      : 'N/A';
-
-    card.sport = card.sport ? card.sport.slice(0, 1).toUpperCase() + card.sport.slice(1).toLowerCase() : 'N/A';
-
-    card.description = card.description || `${card.longTitle}<br><br>${defaultValues.shippingInfo}`;
-
-    card.setName = `${card.year} ${card.setName}`;
-
-    if (!card.teamDisplay) {
-      card.teamDisplay = card.team?.display || 'N/A';
-    }
-
-    if (isYes(card.graded)) {
-      card.condition = '2750';
-      card.gradeID = gradeIds[card.grade];
-      card.graderID = graderIds[card.grader] || 2750123;
-      card.certNumber = `"${card.certNumber}"`;
-    } else {
-      card.conditionDetail = '400011'; //Excellent
     }
 
     return card;
@@ -234,12 +159,10 @@ async function writeEbayFile(data) {
 
 import { Builder, Browser, By, until } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
-import { setTimeout } from 'timers/promises';
 import chalk from 'chalk';
 import { useWaitForElement } from './uploads.js';
 import express from 'express';
 import fs from 'fs-extra';
-import axios from 'axios';
 
 export const uploadEbayFile = async () => {
   let driver;
@@ -310,7 +233,7 @@ const scopes = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
   // 'https://api.ebay.com/oauth/api_scope/sell.account',
-  'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+  'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   // 'https://api.ebay.com/oauth/api_scope/commerce.catalog.readonly',
   // 'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
   // 'https://api.ebay.com/oauth/api_scope/commerce.identity.email.readonly',
@@ -319,21 +242,15 @@ const scopes = [
   // 'https://api.ebay.com/oauth/api_scope/commerce.identity.name.readonly',
   // 'https://api.ebay.com/oauth/api_scope/commerce.identity.status.readonly',
   // 'https://api.ebay.com/oauth/api_scope/sell.finances',
-  'https://api.ebay.com/oauth/api_scope/sell.item.draft',
-  'https://api.ebay.com/oauth/api_scope/sell.item',
+  // 'https://api.ebay.com/oauth/api_scope/sell.item.draft',
+  ////////////'https://api.ebay.com/oauth/api_scope/sell.item',
   // 'https://api.ebay.com/oauth/api_scope/sell.reputation',
 ];
-const refreshFile = `ebay.auth.json`;
+const refreshFile = '.ebay';
 const getRefreshToken = async () => {
   try {
     if (fs.existsSync(refreshFile)) {
-      const refreshData = await fs.readJSON(refreshFile);
-      console.log('refreshData', refreshData);
-      if (refreshData.expires > Date.now()) {
-        return refreshData.refresh_token;
-      } else {
-        console.log('refresh token expired');
-      }
+      return fs.readJSON(refreshFile);
     }
   } catch (e) {
     console.error('Reading Refresh Token Failed');
@@ -351,78 +268,98 @@ const writeRefreshToken = async (refreshToken) => {
 };
 
 export const loginEbayAPI = async () => {
-  const refreshToken = await getRefreshToken();
-  let accessToken;
-  const ebayAuthToken = new EbayAuthToken({
-    filePath: 'ebay.json', // input file path.
-  });
-  if (refreshToken) {
-    console.log('refreshToken', refreshToken);
-    const response = await ebayAuthToken.getAccessToken('SANDBOX', refreshToken, scopes);
-    const responseJson = JSON.parse(response);
+  const eBay = eBayApi.fromEnv();
 
-    if (responseJson.access_token) {
-      accessToken = responseJson.access_token;
-    } else {
-      console.log('Failed to get access token from refresh token');
-      console.log(responseJson);
-    }
-  }
+  eBay.OAuth2.setScope(scopes);
 
-  if (!accessToken) {
+  let token = await getRefreshToken();
+  if (!token) {
     const app = express();
 
     let resolve;
-    const p = new Promise((_resolve) => {
+    const authCode = new Promise((_resolve) => {
       resolve = _resolve;
     });
     app.get('/oauth', function (req, res) {
       resolve(req.query.code);
       res.end('');
     });
-    const server = await app.listen(3000);
+    const server = app.listen(3000);
 
-    const authUrl = ebayAuthToken.generateUserAuthorizationUrl('SANDBOX', scopes);
-    await open(authUrl);
-
-    // // Wait for the first auth code
-    const code = await p;
-
+    console.log(eBay.OAuth2.generateAuthUrl());
+    await open(eBay.OAuth2.generateAuthUrl());
+    const code = await authCode;
     // console.log('code', code);
 
-    const accessTokenResponse = await ebayAuthToken.exchangeCodeForAccessToken('SANDBOX', code);
-    const accessTokenJson = JSON.parse(accessTokenResponse);
-
-    await writeRefreshToken({
-      refresh_token: accessTokenJson.refresh_token,
-      expires: accessTokenJson.refresh_token_expires_in + Date.now(),
-    });
-    server.close();
-    accessToken = accessTokenJson.access_token;
+    try {
+      token = await eBay.OAuth2.getToken(code);
+      await writeRefreshToken(token);
+    } catch (e) {
+      console.error(e);
+      throw e;
+    } finally {
+      server.close();
+    }
   }
 
-  console.log('Logged in successfully with token ', JSON.stringify(accessToken, null, 2));
-  return accessToken;
+  eBay.OAuth2.setCredentials(token);
+
+  // console.log('Logged in successfully!');
+  return eBay;
 };
 
 export const getOrders = async (api) => {
   const response = await api.get('/sell/fulfillment/v1/order?limit=10');
   console.log(response);
 };
+export const getFeatures = (card) => {
+  let features = card.features.split('|');
+  if ((features.length === 1 && isNo(features[0])) || features[0] === '') {
+    features = [];
+  }
 
+  if (card.parallel && !isNo(card.parallel)) {
+    features.push('Parallel/Variety');
+    if (card.parallel.toLowerCase().indexOf('refractor') > -1) {
+      features.push('Refractor');
+    }
+  }
+
+  if (card.insert && !isNo(card.insert)) {
+    features.push('Insert');
+  }
+
+  if (card.printRun && card.printRun > 0) {
+    features.push('Serial Numbered');
+  }
+
+  if (card.features.indexOf('RC') > -1) {
+    features.push('Rookie');
+  }
+
+  if (card.features.length) {
+    features.push('Base');
+  }
+
+  console.log('features', features);
+  return features;
+};
+
+const booleanText = (val) => [isYes(val) ? 'Yes' : 'No'];
+const displayOrNA = (testValue, displayValue) => [testValue && !isNo(testValue) ? displayValue || testValue : 'N/A'];
 export const convertCardToInventory = (card) => ({
   availability: {
-    pickupAtLocationAvailability: [
-      {
-        availabilityType: 'IN_STOCK',
-        fulfillmentTime: {
-          unit: 'BUSINESS_DAY',
-          value: '1',
-        },
-        merchantLocationKey: 'default',
-        quantity: card.quantity,
-      },
-    ],
+    // pickupAtLocationAvailability: [
+    //   {
+    //     availabilityType: 'IN_STOCK',
+    //     fulfillmentTime: {
+    //       unit: 'BUSINESS_DAY',
+    //       value: '1',
+    //     },
+    //     merchantLocationKey: 'CardLister',
+    //     quantity: card.quantity,
+    //   },
+    // ],
     shipToLocationAvailability: {
       availabilityDistributions: [
         {
@@ -442,12 +379,27 @@ export const convertCardToInventory = (card) => ({
   //'ConditionEnum : [NEW,LIKE_NEW,NEW_OTHER,NEW_WITH_DEFECTS,MANUFACTURER_REFURBISHED,CERTIFIED_REFURBISHED,EXCELLENT_REFURBISHED,VERY_GOOD_REFURBISHED,GOOD_REFURBISHED,SELLER_REFURBISHED,USED_EXCELLENT,USED_VERY_GOOD,USED_GOOD,USED_ACCEPTABLE,FOR_PARTS_OR_NOT_WORKING]',
   // conditionDescription: 'string',
   // need to support graded as well, this is only ungraded
-  conditionDescriptors: [
-    {
-      name: '40001',
-      values: ['400011'],
-    },
-  ],
+  conditionDescriptors: isYes(card.graded)
+    ? [
+        {
+          name: '27501',
+          values: [graderIds[card.grader] || 2750123],
+        },
+        {
+          name: '27502',
+          values: [gradeIds[card.grade]],
+        },
+        {
+          name: '27503',
+          values: [card.certNumber],
+        },
+      ]
+    : [
+        {
+          name: '40001',
+          values: ['400011'],
+        },
+      ],
   packageWeightAndSize: {
     dimensions: {
       height: card.height,
@@ -466,23 +418,62 @@ export const convertCardToInventory = (card) => ({
     aspects: {
       'Country/Region of Manufacture': ['United States'],
       country: ['United States'],
+      type: ['Sports Trading Card'],
+      sport: displayOrNA(card.sport, card.sport?.slice(0, 1).toUpperCase() + card.sport?.slice(1).toLowerCase()),
+      Franchise: displayOrNA(
+        card.team?.length > 0,
+        card.team?.map((team) => team.display),
+      ),
+      team: displayOrNA(
+        card.team?.length > 0,
+        card.team?.map((team) => team.display),
+      ),
+      league: displayOrNA(
+        {
+          mlb: 'Major League (MLB)',
+          nfl: 'National Football League (NFL)',
+          nba: 'National Basketball Association (NBA)',
+          nhl: 'National Hockey League (NHL)',
+        }[card.league?.toLowerCase()] || card.league,
+      ),
+      Set: [`${card.year} ${card.setName}`],
+      Manufacturer: [card.manufacture],
+      'Year Manufactured': [card.year.indexOf('-') > -1 ? card.year.split('-')[0] : card.year],
+      Season: [card.year.indexOf('-') > -1 ? card.year.split('-')[0] : card.year],
+      Character: [card.player],
+      'Player/Athlete': [card.player],
+      'Autograph Authentication': displayOrNA(card.autographed, card.manufacture),
+      Grade: displayOrNA(card.grade),
+      Graded: booleanText(card.graded),
+      'Autograph Format': displayOrNA(card.autoFormat),
+      'Professional Grader': displayOrNA(card.grader),
+      'Certification Number': displayOrNA(card.certNumber),
+      'Autograph Authentication Number': displayOrNA(card.certNumber),
+      Features: getFeatures(card),
+      'Parallel/Variety': [card.parallel || (card.insert && !isNo(card.insert) ? 'Base Insert' : 'Base Set')],
+      Autographed: booleanText(card.autographed),
+      'Card Name': [card.cardName],
+      'Card Number': [card.cardNumber],
+      'Signed By': displayOrNA(card.autographed, card.player),
+      Material: [card.material],
+      'Card Size': [card.size],
+      'Card Thickness': [card.thickness.indexOf('pt') < 0 ? `${card.thickness} Pt.` : card.thickness],
+      Language: [card.language || 'English'],
+      'Original/Licensed Reprint': [card.original || 'Original'],
+      Vintage: booleanText(parseInt(card.year) < 1986),
+      'Card Condition': [card.condition || 'Excellent'],
+      'Convention/Event': displayOrNA(card.convention),
+      'Insert Set': [card.insert || 'Base Set'],
+      'Print Run': displayOrNA(card.printRun),
     },
-    // "aspects": {
-    //   "Feature":[
-    //     "Water resistance", "GPS"
-    //   ],
-    //   "CPU":[
-    //     "Dual-Core Processor"
-    //   ]
-    // },
     country: 'United States',
     brand: card.manufacture,
-    description: card.description,
+    description: card.description || `${card.longTitle}<br><br>${defaultValues.shippingInfo}`,
     // ean: ['string'],
     // epid: 'string',
     imageUrls: card.pics.split('|'), //TODO: fix the input value to be an array
     // isbn: ['string'],
-    // mpn: 'string',
+    mpn: card.setName,
     // subtitle: 'string',
     title: card.title,
     // upc: ['string'],
@@ -526,7 +517,7 @@ const createOfferForCard = (card) => ({
     },
     // eBayPlusIfEligible: 'boolean',
     fulfillmentPolicyId: '122729485024',
-    paymentPolicyId: '73080971024',
+    paymentPolicyId: '173080971024',
     // productCompliancePolicyIds: ['string'],
     // regionalProductCompliancePolicies: {
     //   countryPolicies: [
@@ -546,7 +537,7 @@ const createOfferForCard = (card) => ({
     //     },
     //   ],
     // },
-    returnPolicyId: '143996946024',
+    returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
     // shippingCostOverrides: [
     //   {
     //     additionalShippingCost: {
@@ -571,7 +562,7 @@ const createOfferForCard = (card) => ({
   // lotSize: 'integer',
   marketplaceId: 'EBAY_US',
   //'MarketplaceEnum : [EBAY_US,EBAY_MOTORS,EBAY_CA,EBAY_GB,EBAY_AU,EBAY_AT,EBAY_BE,EBAY_FR,EBAY_DE,EBAY_IT,EBAY_NL,EBAY_ES,EBAY_CH,EBAY_TW,EBAY_CZ,EBAY_DK,EBAY_FI,EBAY_GR,EBAY_HK,EBAY_HU,EBAY_IN,EBAY_ID,EBAY_IE,EBAY_IL,EBAY_MY,EBAY_NZ,EBAY_NO,EBAY_PH,EBAY_PL,EBAY_PT,EBAY_PR,EBAY_RU,EBAY_SG,EBAY_ZA,EBAY_SE,EBAY_TH,EBAY_VN,EBAY_CN,EBAY_PE,EBAY_JP]',
-  merchantLocationKey: 'default',
+  merchantLocationKey: 'CardLister',
   pricingSummary: {
     // auctionReservePrice: {
     //   currency: 'string',
@@ -613,7 +604,7 @@ const createOfferForCard = (card) => ({
   // },
   // secondaryCategoryId: 'string',
   sku: card.key,
-  storeCategoryNames: ['Sports Cards', card.sport],
+  storeCategoryNames: [card.sport],
   // tax: {
   //   applyTax: 'boolean',
   //   thirdPartyTaxCategory: 'string',
@@ -621,71 +612,183 @@ const createOfferForCard = (card) => ({
   // },
 });
 
+let cachedLocation;
+export const getLocation = async (eBay) => {
+  if (cachedLocation) {
+    return cachedLocation;
+  } else {
+    let location;
+    try {
+      location = await eBay.sell.inventory.getInventoryLocation('CardLister');
+    } catch (e) {
+      //this is "location not found" error
+      if (e.meta?.errorId === 25804) {
+        let location = await eBay.sell.inventory.createInventoryLocation('CardLister', {
+          location: {
+            address: {
+              addressLine1: '3458 Edinburgh Rd',
+              // addressLine2: 'string',
+              city: 'Green Bay',
+              country: 'US',
+              // 'CountryCodeEnum : [AD,AE,AF,AG,AI,AL,AM,AN,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW]',
+              // county: 'string',
+              postalCode: '54311',
+              stateOrProvince: 'WI',
+            },
+            // geoCoordinates: {
+            //   latitude: 'number',
+            //   longitude: 'number',
+            // },
+          },
+          // locationAdditionalInformation: 'string',
+          // locationInstructions: 'string',
+          // locationTypes: ['StoreTypeEnum'],
+          locationWebUrl: 'www.edvedafi.com',
+          merchantLocationStatus: 'ENABLED', //'StatusEnum : [DISABLED,ENABLED]',
+          name: 'CardLister',
+          // operatingHours: [
+          //   {
+          //     dayOfWeekEnum: 'DayOfWeekEnum : [MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY]',
+          //     intervals: [
+          //       {
+          //         close: 'string',
+          //         open: 'string',
+          //       },
+          //     ],
+          //   },
+          // ],
+          // phone: 'string',
+          // specialHours: [
+          //   {
+          //     date: 'string',
+          //     intervals: [
+          //       {
+          //         close: 'string',
+          //         open: 'string',
+          //       },
+          //     ],
+          //   },
+          // ],
+        });
+      }
+      location = await eBay.sell.inventory.getInventoryLocation('CardLister');
+    }
+    cachedLocation = location;
+    return location;
+  }
+};
+
 export const ebayAPIUpload = async (allCards) => {
-  // const eBay = eBayApi.fromEnv();
-  //
-  // eBay.OAuth2.setScope([
-  //   'https://api.ebay.com/oauth/api_scope',
-  //   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
-  //   'https://api.ebay.com/oauth/api_scope/sell.fulfillment'
-  // ]);
-  const token = await loginEbayAPI();
-  const api = axios.create({
-    baseURL: 'https://api.sandbox.ebay.com',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Content-Language': 'en-US',
-    },
-  });
-  Object.values(allCards).forEach((card) => (card.key = `${card.key}-1`));
+  const eBay = await loginEbayAPI();
+  Object.values(allCards).forEach((card) => (card.key = `${card.key}-${Date.now()}`));
   // await getOrders(api);
-  console.log('allCards', allCards);
+  console.log(
+    'allCards',
+    Object.values(allCards).map((card) => card.key),
+  );
+
+  //don't need to do anything with location but do need to ensure it exists
+  await getLocation(eBay);
 
   await Promise.all(
-    Object.values(allCards).map((card) =>
-      api
-        .put('/sell/inventory/v1/inventory_item/' + card.key, convertCardToInventory(card))
-        .then((response) =>
-          api
-            .post('/sell/inventory/v1/offer/', createOfferForCard(card))
-            .then((response) => console.log('offer id', response.data))
-            .catch((error) => {
-              let offerId = null;
-              error.response?.data?.errors?.forEach((error) => {
-                const offerIdParam = error.parameters?.find((param) => param.name === 'offerId');
-                if (offerIdParam) {
-                  offerId = offerIdParam.value;
-                }
-              });
-              console.log('offerId', offerId);
-              if (offerId) {
-                return offerId;
-              } else {
-                throw error;
-              }
-            })
-            .then((offerId) =>
-              api.post(`/sell/inventory/v1/offer/${offerId}/publish`).then((response) => {
-                if (response.data.warnings) {
-                  throw new Error(JSON.stringify(response.data.warnings, null, 2));
-                } else {
-                  console.log(`Successfully create ${chalk.magenta(response.data.lis)} ${chalk.green(card.title)}`);
-                }
-              }),
-            ),
-        )
-        .catch((error) => {
-          // console.error('ERROR', error);
-          if (error.response) {
-            console.error('ERROR', JSON.stringify(error.response.data, null, 2));
-          } else {
-            console.error('ERROR', error);
-          }
-          console.error('data', JSON.stringify(error.config.data, null, 2));
-        }),
-    ),
+    Object.values(allCards).map(async (card) => {
+      try {
+        console.log('aspects', JSON.stringify(convertCardToInventory(card).product.aspects, null, 2));
+        await eBay.sell.inventory.createOrReplaceInventoryItem(card.key, convertCardToInventory(card));
+        const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
+        console.log('offer', offer);
+        const publish = await eBay.sell.inventory.publishOffer(offer.offerId);
+        console.log('publish', publish);
+      } catch (e) {
+        console.log('inventoryItem error', e);
+        if (e.meta?.res?.data) {
+          console.log('inventoryItem error info', JSON.stringify(e.meta?.res?.data, null, 2));
+        } else {
+          console.log('inventoryItem error', e);
+        }
+        console.error('Failed to upload card', chalk.red(card.title));
+      }
+    }),
   );
+};
+
+export const reverseTitle = (title) => {
+  const cardNumberIndex = title.indexOf('#');
+  const yearIdx = title.match(/\D*-?\D+/)?.index;
+  let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
+  const card = {
+    cardNumber: title.match(/#([^\s]+)\s/)?.[1],
+    year: title.split(' ')[0],
+    parallel: '',
+    insert: '',
+    // setName: setName.join('|'),
+    // manufacture: 'Panini',
+    setName: setInfo,
+    // sport: 'Football',
+  };
+
+  const manufacture = manufactures.find((m) => setInfo.toLowerCase().indexOf(m) > -1);
+  if (manufacture) {
+    if (manufacture === 'score') {
+      card.manufacture = 'Panini';
+    } else {
+      card.manufacture = setInfo.slice(setInfo.toLowerCase().indexOf(manufacture), manufacture.length);
+      setInfo = setInfo.replace(card.manufacture, '').trim();
+    }
+  }
+
+  const set = sets.find((s) => setInfo.toLowerCase().indexOf(s) > -1);
+  if (set) {
+    card.setName = setInfo.slice(setInfo.toLowerCase().indexOf(set), set.length);
+    setInfo = setInfo.replace(card.setName, '').trim();
+  }
+
+  const insertIndex = setInfo.toLowerCase().indexOf('insert');
+  if (insertIndex > -1) {
+    card.insert = setInfo.slice(0, insertIndex).trim();
+    setInfo = setInfo.replace(card.insert, '').trim();
+  }
+
+  const parallelIndex = setInfo.toLowerCase().indexOf('parallel');
+  if (parallelIndex > -1) {
+    card.parallel = setInfo.slice(0, parallelIndex).trim();
+    setInfo = setInfo.replace(card.parallel, '').trim();
+  }
+
+  if (card.manufacture === 'Panini') {
+    card.sport = 'Football';
+  } else {
+    card.sport = 'Baseball';
+  }
+
+  return card;
+};
+
+export const getEbaySales = async () => {
+  const eBay = await loginEbayAPI();
+
+  //don't need to do anything with location but do need to ensure it exists
+  await getLocation(eBay);
+  const response = await eBay.sell.fulfillment.getOrders({
+    filter: 'orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}',
+  });
+  // console.log(response);
+  const cards = [];
+  response.orders.forEach((order) => {
+    order.lineItems.forEach((lineItem) => {
+      cards.push({
+        platform: 'ebay',
+        ...reverseTitle(lineItem.title),
+        title: lineItem.title,
+        quantity: lineItem.quantity,
+      });
+    });
+  });
+  return cards;
+};
+
+export const removeFromEbay = async (cards) => {
+  const toRemove = cards.filter((card) => card.platform !== 'ebay');
 };
 
 export default writeEbayFile;

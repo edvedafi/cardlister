@@ -1,9 +1,8 @@
-import vision from "@google-cloud/vision";
-import { isTeam, sports } from "../utils/teams.js";
-import { titleCase } from "../utils/data.js";
-import { HfInference } from "@huggingface/inference";
-import dotenv from "dotenv";
-import e from "express";
+import vision from '@google-cloud/vision';
+import { isTeam, sports } from '../utils/teams.js';
+import { inserts, manufactures, sets, titleCase } from '../utils/data.js';
+import { HfInference } from '@huggingface/inference';
+import dotenv from 'dotenv';
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -14,67 +13,11 @@ const hf = new HfInference(process.env.HF_TOKEN);
 // console.log(spacy)
 // const nlp = spacy.load('en_core_web_sm');
 
-const manufactures = ["topps", "panini", "sage", "upper deck", "donruss", "fleer", "score", "pinnacle", "playoff"];
-
-const sets = [
-  "prizm",
-  "bowman",
-  "donruss",
-  "donruss optic",
-  "optic",
-  "sage",
-  "score",
-  "topps",
-  "fleer",
-  "pinnacle",
-  "playoff",
-  "upper deck",
-  "elite",
-  "contenders",
-  "select",
-  "absolute",
-  "gridiron kings",
-  "classics",
-  "prestige",
-  "crown royale",
-  "limited",
-  "topps chrome",
-  "topps finest",
-  "topps stadium club",
-  "topps heritage",
-  "topps archives",
-  "topps tribute",
-  "topps inception",
-  "topps allen & ginter",
-  "topps gypsy queen",
-  "topps tier one",
-  "topps tribute",
-  "topps dynasty",
-  "topps museum collection",
-  "topps five star",
-  "topps triple threads",
-  "topps archives signature series",
-  "topps clearly authentic",
-  "topps luminaries",
-  "topps gold label",
-  "topps update",
-  "topps holiday",
-  "topps opening day",
-  "topps heritage high number",
-  "topps big league",
-  "topps heritage minors",
-  "topps allen & ginter x",
-  "topps heritage high number",
-  "topps heritage minors",
-];
-
-const inserts = ["invicta", "next level", "elite series", "the rookies"];
-
 const detectionFeatures = [
-  { type: "LABEL_DETECTION" },
-  { type: "LOGO_DETECTION" },
-  { type: "DOCUMENT_TEXT_DETECTION" },
-  { type: "OBJECT_LOCALIZATION" },
+  { type: 'LABEL_DETECTION' },
+  { type: 'LOGO_DETECTION' },
+  { type: 'DOCUMENT_TEXT_DETECTION' },
+  { type: 'OBJECT_LOCALIZATION' },
 ];
 
 async function getTextFromImage(front, back = undefined, setData = {}) {
@@ -148,7 +91,7 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
         labelAnnotations.map((label) => {
           const searchValue = {
             word: label.description,
-            words: label.description.split(" "),
+            words: label.description.split(' '),
             confidence: (isFront ? 102 : 101) + label.score,
             isFront,
           };
@@ -169,7 +112,7 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
         logoAnnotations.map((logo) => {
           const searchValue = {
             word: logo.description,
-            words: logo.description.split(" "),
+            words: logo.description.split(' '),
             confidence: (isFront ? 602 : 601) + logo.score,
             isFront,
           };
@@ -187,15 +130,15 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
   const addSearch = async (textResult, isFront) => {
     if (textResult) {
       const textBlocks =
-        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter((block) => block.blockType === "TEXT") || [];
+        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter((block) => block.blockType === 'TEXT') || [];
 
       const blocks = await Promise.all(
         textBlocks.map(async (block) => {
           return await Promise.all(
             block.paragraphs?.map(async (paragraph) => {
               const searchValue = {
-                word: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join("")).join(" "),
-                words: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join("")),
+                word: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')).join(' '),
+                words: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')),
                 wordCount: paragraph.words.length,
                 confidence: (isFront ? 302 : 301) + block.confidence,
                 isFront,
@@ -266,7 +209,7 @@ export let callNLP = async (text) => {
   try {
     // console.log('calling NLP', text);
     return await hf.tokenClassification({
-      model: "dslim/bert-base-NER-uncased",
+      model: 'dslim/bert-base-NER-uncased',
       inputs: text,
     });
   } catch (e) {
@@ -286,13 +229,13 @@ export const runNLP = async (text, setData) => {
         return 0;
       }
     };
-    const wordCount = (name) => name.split(" ").length;
+    const wordCount = (name) => name.split(' ').length;
     const results = {};
-    const textBlock = text.map((block) => block.word).join(". ");
+    const textBlock = text.map((block) => block.word).join('. ');
     // console.log('nlp input: ', textBlock);
     const segments = await callNLP(textBlock);
     // console.log('segments', segments);
-    const persons = segments.filter((segment) => segment.entity_group === "PER");
+    const persons = segments.filter((segment) => segment.entity_group === 'PER');
     // console.log('persons', persons)
     // await ask('Continue?');
 
@@ -304,10 +247,10 @@ export const runNLP = async (text, setData) => {
         .map((person) => {
           let finalWord;
           try {
-            if (person.word.includes("#") && !person.word.includes("/")) {
+            if (person.word.includes('#') && !person.word.includes('/')) {
               let rawWord = text.find((word) => word?.lowerCase?.match(person?.word?.replace(/#/g, "[A-Za-z.']+")));
               if (rawWord) {
-                const end = person.word.replace(/#/g, "");
+                const end = person.word.replace(/#/g, '');
                 finalWord = rawWord.word.slice(0, rawWord.lowerCase.indexOf(end) + end.length);
               }
             }
@@ -351,9 +294,9 @@ export const runNLP = async (text, setData) => {
         .filter((name) => !isTeam(name));
 
       // console.log('selecting persons from: ', names)
-      if (names[0]?.includes(" ")) {
+      if (names[0]?.includes(' ')) {
         results.player = titleCase(names[0]);
-      } else if (names[1]?.includes(" ")) {
+      } else if (names[1]?.includes(' ')) {
         results.player = titleCase(names[0]);
       } else if (names.length === 3) {
         const firstInitial = names.find((name) => name.length === 1);
@@ -372,7 +315,7 @@ export const runNLP = async (text, setData) => {
       } else {
         //check to see if any of our options are exact 2 words that both have letters in them
         const twoWords = names.filter((name) => {
-          const split = name.split(" ");
+          const split = name.split(' ');
           return split.length === 2 && split[0].match(/[A-Za-z]/) && split[1].match(/[A-Za-z]/);
         });
 
@@ -406,17 +349,17 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
       }
 
       //look for Philadelphia copyright info
-      const manufactureMatch = block.lowerCase.replace(/\s|[.]/g, "");
-      if (manufactureMatch.indexOf("pcg") > -1) {
-        results.manufacture = "Philadelphia Gum";
-        results.setName = "Philadelphia";
+      const manufactureMatch = block.lowerCase.replace(/\s|[.]/g, '');
+      if (manufactureMatch.indexOf('pcg') > -1) {
+        results.manufacture = 'Philadelphia Gum';
+        results.setName = 'Philadelphia';
         block.set = true;
       }
 
       //look for Topps copyright info
-      if (manufactureMatch.indexOf("tcg") > -1) {
-        results.manufacture = "Topps";
-        results.setName = "Topps";
+      if (manufactureMatch.indexOf('tcg') > -1) {
+        results.manufacture = 'Topps';
+        results.setName = 'Topps';
         block.set = true;
       }
 
@@ -425,7 +368,7 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
         const prefix = block.words
           .slice(0, -1)
           .map((word) => word.toLowerCase())
-          .join("");
+          .join('');
         if (prefix === setData.card_number_prefix.toLowerCase()) {
           results.cardNumber = block.words[block.words.length - 1];
           block.set = true;
@@ -434,19 +377,19 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
 
       //block.set default.printRun if block.word matches a regex that is number then / then number
       if (!results.printRun && block.word.match(/^\d+\/\d+$/)) {
-        results.printRun = block.word.slice(block.word.indexOf("/") + 1);
+        results.printRun = block.word.slice(block.word.indexOf('/') + 1);
         block.set = true;
       }
       //block.set default.printRun if block.word matches a regex that is number then of then number
       if (!results.printRun && block.word.match(/^\d+ of \d+$/)) {
-        results.printRun = block.word.slice(block.word.indexOf("of") + 3);
+        results.printRun = block.word.slice(block.word.indexOf('of') + 3);
         block.set = true;
       }
 
       if (!results.cardNumber) {
         const firstWord = block.words[0].toLowerCase();
-        if (wordCountBetween(2, 4) && ["no", "no."].includes(firstWord)) {
-          results.cardNumber = block.words.slice(block.words.findIndex((word) => word.indexOf(".") >= 0) + 1).join("");
+        if (wordCountBetween(2, 4) && ['no', 'no.'].includes(firstWord)) {
+          results.cardNumber = block.words.slice(block.words.findIndex((word) => word.indexOf('.') >= 0) + 1).join('');
           block.set = true;
         }
       }
@@ -464,15 +407,15 @@ const runFirstPass = async (searchParagraphs, defaults, setData) => {
         block.set = true;
       }
 
-      if (block.word === "RC") {
-        results.features = addFeature(results.features, "RC");
+      if (block.word === 'RC') {
+        results.features = addFeature(results.features, 'RC');
       }
 
       let teamTest;
       if (!results.team) {
         block.words.find((word) => {
           teamTest = isTeam(word, setData.sport);
-          if (teamTest && teamTest.display === "USA MLB") {
+          if (teamTest && teamTest.display === 'USA MLB') {
             return false;
           }
           return teamTest;
@@ -568,13 +511,13 @@ export const paniniMatch = (searchParagraphs, defaults) => {
   const results = {};
   const match = searchParagraphs.find((block) => block.lowerCase.match(/^\d\d\d\d panini - /));
   if (match) {
-    results.manufacture = defaults.manufacture || "Panini";
+    results.manufacture = defaults.manufacture || 'Panini';
     results.year = defaults.year || match.words[0];
     results.setName = defaults.setName || titleCase(match.words[3]);
     const updateInsert = !defaults.insert;
     let i = 4;
-    while (match.words[i] && !match.words[i].startsWith("Ⓒ") && !sports.includes(match.words[i].toLowerCase())) {
-      if (match.words[i].toLowerCase() === "draft" && match.words[i + 1]?.toLowerCase() === "picks") {
+    while (match.words[i] && !match.words[i].startsWith('Ⓒ') && !sports.includes(match.words[i].toLowerCase())) {
+      if (match.words[i].toLowerCase() === 'draft' && match.words[i + 1]?.toLowerCase() === 'picks') {
         results.setName = `${results.setName} Draft Picks`;
         i++;
       } else if (

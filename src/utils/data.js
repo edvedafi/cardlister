@@ -1,8 +1,8 @@
 export const isYes = (str) =>
-  (typeof str === "boolean" && str) ||
-  (typeof str === "string" && ["yes", "YES", "y", "Y", "Yes", "YEs", "YeS", "yES"].includes(str));
+  (typeof str === 'boolean' && str) ||
+  (typeof str === 'string' && ['yes', 'YES', 'y', 'Y', 'Yes', 'YEs', 'YeS', 'yES'].includes(str));
 export const isNo = (str) =>
-  (typeof str === "boolean" && !str) || (typeof str === "string" && ["no", "NO", "n", "N", "No"].includes(str));
+  (typeof str === 'boolean' && !str) || (typeof str === 'string' && ['no', 'NO', 'n', 'N', 'No'].includes(str));
 
 export const titleCase = (str) => {
   if (!str) {
@@ -11,23 +11,23 @@ export const titleCase = (str) => {
   try {
     return str
       .trim()
-      .split(" ")
+      .split(' ')
       .map((word) => {
-        if (word.length > 3 && word.toLowerCase().startsWith("mc")) {
-          return "Mc" + word[2].toUpperCase() + word.slice(3).toLowerCase();
+        if (word.length > 3 && word.toLowerCase().startsWith('mc')) {
+          return 'Mc' + word[2].toUpperCase() + word.slice(3).toLowerCase();
         } else {
           return word[0].toUpperCase() + word.slice(1).toLowerCase();
         }
       })
-      .join(" ")
-      .split(".")
+      .join(' ')
+      .split('.')
       .map((word) => word[0]?.toUpperCase() + word.slice(1))
-      .join(".")
+      .join('.')
       .split("'")
       .map((word) => word[0]?.toUpperCase() + word.slice(1))
       .join("'");
   } catch (e) {
-    console.log("error title casing", str);
+    console.log('error title casing', str);
     throw e;
   }
 };
@@ -52,27 +52,93 @@ export const byCardNumber = (a, b) => {
 };
 
 export const graders = [
-  "PSA",
-  "BCCG",
-  "BVG",
-  "BGS",
-  "CSG",
-  "CGC",
-  "SGC",
-  "KSA",
-  "GMA",
-  "HGA",
-  "ISA",
-  "PCA",
-  "GSG",
-  "PGS",
-  "MNT",
-  "TAG",
-  "Rare",
-  "RCG",
-  "PCG",
-  "Ace",
-  "CGA",
-  "TCG",
-  "ARK",
+  'PSA',
+  'BCCG',
+  'BVG',
+  'BGS',
+  'CSG',
+  'CGC',
+  'SGC',
+  'KSA',
+  'GMA',
+  'HGA',
+  'ISA',
+  'PCA',
+  'GSG',
+  'PGS',
+  'MNT',
+  'TAG',
+  'Rare',
+  'RCG',
+  'PCG',
+  'Ace',
+  'CGA',
+  'TCG',
+  'ARK',
 ];
+
+export const manufactures = [
+  'topps',
+  'panini',
+  'sage',
+  'upper deck',
+  'donruss',
+  'fleer',
+  'score',
+  'pinnacle',
+  'playoff',
+];
+
+export const sets = [
+  'prizm',
+  'bowman',
+  'donruss',
+  'donruss optic',
+  'optic',
+  'sage',
+  'score',
+  'topps',
+  'fleer',
+  'pinnacle',
+  'playoff',
+  'upper deck',
+  'elite',
+  'contenders',
+  'select',
+  'absolute',
+  'gridiron kings',
+  'classics',
+  'prestige',
+  'crown royale',
+  'limited',
+  'topps chrome',
+  'topps finest',
+  'topps stadium club',
+  'topps heritage',
+  'topps archives',
+  'topps tribute',
+  'topps inception',
+  'topps allen & ginter',
+  'topps gypsy queen',
+  'topps tier one',
+  'topps tribute',
+  'topps dynasty',
+  'topps museum collection',
+  'topps five star',
+  'topps triple threads',
+  'topps archives signature series',
+  'topps clearly authentic',
+  'topps luminaries',
+  'topps gold label',
+  'topps update',
+  'topps holiday',
+  'topps opening day',
+  'topps heritage high number',
+  'topps big league',
+  'topps heritage minors',
+  'topps allen & ginter x',
+  'topps heritage high number',
+  'topps heritage minors',
+];
+
+export const inserts = ['invicta', 'next level', 'elite series', 'the rookies'];

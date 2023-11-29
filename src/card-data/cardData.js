@@ -517,7 +517,11 @@ export const getTeam = async (defaults) => {
       defaultTeam = defaults.team;
     } else if (defaults.team.searchExact) {
       defaultTeam = defaults.team.searchExact;
-    } else if (defaults.team.length > 0 && defaults.team[defaultCounter] && defaults.team[defaultCounter].searchExact) {
+    } else if (
+      defaults.team.length > 0 &&
+      defaults.team?.[defaultCounter] &&
+      defaults.team?.[defaultCounter].searchExact
+    ) {
       defaultTeam = defaults.team[0].searchExact;
     }
   }
@@ -530,7 +534,7 @@ export const getTeam = async (defaults) => {
       defaultCounter++;
       newTeam = await ask(
         'Teams',
-        defaults.team[defaultCounter] ? defaults.team[defaultCounter].searchExact : undefined,
+        defaults.team?.[defaultCounter] ? defaults.team?.[defaultCounter].searchExact : undefined,
         {
           selectOptions: getTeamSelections(defaults.sport),
         },
