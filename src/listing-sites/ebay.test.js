@@ -4,6 +4,7 @@ jest.mock('open', () => jest.fn());
 jest.mock('ebay-api', () => jest.fn());
 jest.mock('csv-writer', () => jest.fn());
 jest.mock('../utils/ask');
+jest.mock('chalk', () => jest.fn());
 
 describe('ebay', () => {
   describe('reverseTitle - used when no SKU data is available', () => {

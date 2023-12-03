@@ -2,6 +2,7 @@ import { convertTitleToCard } from './sportlots.js';
 
 jest.mock('open', () => jest.fn());
 jest.mock('../utils/ask');
+jest.mock('chalk', () => jest.fn());
 
 describe('Sport Lots', () => {
   describe('convertTitleToCard', () => {
@@ -14,6 +15,7 @@ describe('Sport Lots', () => {
         manufacture: 'Topps',
         setName: 'Big League',
         sport: 'Baseball',
+        title: '2023 Topps Big League #80 Adolis Garcia BB',
       });
     });
     it('should convert a simple Football title', () => {
@@ -24,6 +26,8 @@ describe('Sport Lots', () => {
         manufacture: 'Panini',
         setName: 'Score',
         sport: 'Football',
+        title: '2021 Score Base Set #260 Raheem Mostert FB',
+        parallel: '',
       });
     });
     it('should convert an insert title', () => {
@@ -35,6 +39,7 @@ describe('Sport Lots', () => {
         manufacture: 'Panini',
         setName: 'Chronicles',
         sport: 'Football',
+        title: '2020 Panini Chronicles Prestige Rookies Update #310 Jalen Hurts FB',
       });
     });
   });
