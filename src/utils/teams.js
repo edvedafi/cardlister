@@ -1,5 +1,4 @@
 //load up the possible team names
-import e from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const teams = [];

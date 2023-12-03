@@ -4,7 +4,7 @@ import { isNo, isYes } from '../utils/data.js';
 import { gradeIds, graderIds } from './ebayConstants.js';
 import open from 'open';
 import eBayApi from 'ebay-api';
-import { inserts, manufactures, sets, titleCase } from '../utils/data.js';
+import { manufactures, sets } from '../utils/data.js';
 
 const defaultValues = {
   action: 'Add',
@@ -157,7 +157,7 @@ async function writeEbayFile(data) {
   console.log(chalk.magenta('Ebay Completed Upload'));
 }
 
-import { Builder, Browser, By, until } from 'selenium-webdriver';
+import { Builder, Browser, By } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
 import chalk from 'chalk';
 import { useWaitForElement } from './uploads.js';
@@ -286,7 +286,7 @@ export const loginEbayAPI = async () => {
     });
     const server = app.listen(3000);
 
-    console.log(eBay.OAuth2.generateAuthUrl());
+    // console.log(eBay.OAuth2.generateAuthUrl());
     await open(eBay.OAuth2.generateAuthUrl());
     const code = await authCode;
     // console.log('code', code);
@@ -308,10 +308,6 @@ export const loginEbayAPI = async () => {
   return eBay;
 };
 
-export const getOrders = async (api) => {
-  const response = await api.get('/sell/fulfillment/v1/order?limit=10');
-  console.log(response);
-};
 export const getFeatures = (card) => {
   let features = card.features.split('|');
   if ((features.length === 1 && isNo(features[0])) || features[0] === '') {
@@ -341,7 +337,7 @@ export const getFeatures = (card) => {
     features.push('Base');
   }
 
-  console.log('features', features);
+  // console.log('features', features);
   return features;
 };
 
@@ -623,7 +619,7 @@ export const getLocation = async (eBay) => {
     } catch (e) {
       //this is "location not found" error
       if (e.meta?.errorId === 25804) {
-        let location = await eBay.sell.inventory.createInventoryLocation('CardLister', {
+        location = await eBay.sell.inventory.createInventoryLocation('CardLister', {
           location: {
             address: {
               addressLine1: '3458 Edinburgh Rd',
@@ -693,12 +689,12 @@ export const ebayAPIUpload = async (allCards) => {
   await Promise.all(
     Object.values(allCards).map(async (card) => {
       try {
-        console.log('aspects', JSON.stringify(convertCardToInventory(card).product.aspects, null, 2));
+        // console.log('aspects', JSON.stringify(convertCardToInventory(card).product.aspects, null, 2));
         await eBay.sell.inventory.createOrReplaceInventoryItem(card.key, convertCardToInventory(card));
         const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
-        console.log('offer', offer);
+        // console.log('offer', offer);
         const publish = await eBay.sell.inventory.publishOffer(offer.offerId);
-        console.log('publish', publish);
+        // console.log('publish', publish);
       } catch (e) {
         console.log('inventoryItem error', e);
         if (e.meta?.res?.data) {
@@ -777,25 +773,152 @@ export const getEbaySales = async () => {
   const cards = [];
   response.orders.forEach((order) => {
     order.lineItems.forEach((lineItem) => {
-      cards.push({
-        platform: 'ebay',
+      const card = {
+        platform: `ebay: ${order.buyer.username}`,
         ...reverseTitle(lineItem.title),
         title: lineItem.title,
         quantity: lineItem.quantity,
-      });
+      };
+      if (card.cardNumber) {
+        cards.push(card);
+      }
     });
   });
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on ebay'));
-  if (cards.length > 0) {
-    await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
-  }
+  // if (cards.length > 0) {
+  //   await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  // }
   return cards;
 };
 
-export const removeFromEbay = async (cards) => {
-  const toRemove = cards.filter((card) => card.platform !== 'ebay');
+export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
+  const ebay = await loginEbayAPI();
+  const item = await ebay.trading.GetItem({ ItemID: itemNumber });
+  const updatedQuantity = parseInt(item.Item.Quantity) - parseInt(quantity);
+  if (updatedQuantity <= 0) {
+    try {
+      await ebay.trading.EndFixedPriceItem({ ItemID: itemNumber, EndingReason: 'NotAvailable' });
+      console.log(chalk.green(`Successfully ended ${title} on ebay`));
+    } catch (e) {
+      if (e.meta.Errors.ErrorCode === 1047) {
+        console.log(chalk.green(`${itemNumber} | ${title} has already been ended on ebay`));
+        // console.log(e);
+      }
+    }
+  } else {
+    try {
+      await ebay.trading.ReviseInventoryStatus({
+        InventoryStatus: {
+          ItemID: itemNumber,
+          Quantity: updatedQuantity,
+        },
+      });
+      console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+    } catch (e) {
+      console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
+      console.error(e);
+      console.log('update: ', {
+        InventoryStatus: {
+          ItemID: itemNumber,
+          Quantity: updatedQuantity,
+        },
+      });
+      console.log('for item', item);
+      console.log('for item', item.Item.Quantity, quantity, updatedQuantity);
+      throw e;
+    }
+  }
+};
+
+export const removeFromEbay = async (cards = [], db) => {
+  const toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
+
+  if (toRemove.length === 0) {
+    console.log(chalk.magenta('No cards to remove from ebay'));
+    return;
+  }
+
+  const eBay = await loginEbayAPI();
+
   let removed = [];
-  // console.log('Would be removed from ebay:', toRemove);
+  const removals = [];
+
+  for (let card of toRemove) {
+    // console.log('card', card);
+    const query = db.collection('OldSales').where('year', '==', card.year).where('sport', '==', card.sport);
+
+    const queryResults = await query.get();
+    let possibleCards = [];
+    queryResults.forEach((doc) => {
+      possibleCards.push(doc.data());
+    });
+
+    let match = possibleCards.find(
+      (c) =>
+        card.cardNumber === c.cardNumber &&
+        card.setName === c.setName &&
+        card.manufacture === c.manufacture &&
+        card.insert === c.insert &&
+        card.parallel === c.parallel,
+    );
+    if (match) {
+      removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
+      removed.push(card);
+    } else {
+      match = possibleCards.find(
+        (c) =>
+          card.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+          card.setName === c.setName &&
+          card.manufacture === c.manufacture &&
+          card.insert === c.insert &&
+          card.parallel === c.parallel,
+      );
+      if (match) {
+        removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
+        removed.push(card);
+      } else {
+        const searchSet = card.year === '2021' && card.setName.indexOf('Absolute') > -1 ? 'Absolute' : card.setName;
+        match = possibleCards.find(
+          (c) =>
+            card.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+            c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
+            (!card.insert || c.Title.toLowerCase().indexOf(card.insert.toLowerCase()) > -1) &&
+            (!card.parallel || c.Title.toLowerCase().indexOf(card.parallel.toLowerCase()) > -1),
+        );
+
+        if (match) {
+          removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
+          removed.push(card);
+        } else if (card.setName === 'Chronicles') {
+          match = possibleCards.find(
+            (c) =>
+              card.cardNumber === c.cardNumber &&
+              c.Title.toLowerCase().indexOf(card.setName.toLowerCase()) > -1 &&
+              (!card.insert ||
+                c.Title.toLowerCase().indexOf(
+                  card.insert
+                    .toLowerCase()
+                    .replace('update rookies', '')
+                    .replace('rookie update', '')
+                    .replace('rookies update', '')
+                    .trim(),
+                ) > -1) &&
+              (!card.parallel || c.Title.toLowerCase().indexOf(card.parallel.toLowerCase()) > -1),
+          );
+          if (match) {
+            removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
+            removed.push(card);
+          } else {
+            console.log(chalk.red('Could not find card on ebay: '), card.title);
+          }
+        } else {
+          console.log(chalk.red('Could not find card on ebay: '), card.title);
+        }
+      }
+    }
+  }
+
+  await Promise.all(removals);
 
   if (removed.length === toRemove.length) {
     console.log(
@@ -811,6 +934,8 @@ export const removeFromEbay = async (cards) => {
       chalk.red(toRemove.length),
       chalk.magenta('cards from ebay'),
     );
+    // await open('https://www.ebay.com/sh/lst/active');
+    // await ask("Please manually remove the rest from ebay's inventory");
   }
 };
 

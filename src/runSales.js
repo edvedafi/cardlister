@@ -2,21 +2,29 @@ import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
 import dotenv from 'dotenv';
 import 'zx/globals';
 import { createGroups } from './listing-sites/uploads.js';
-import chalk from 'chalk';
+import chalk, { foregroundColorNames } from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots } from './listing-sites/sportlots.js';
 import { removeFromMyCardPost } from './listing-sites/mycardpost.js';
 import { removeFromBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
+import { getFileSales, updateSport, uploadOldListings } from './listing-sites/firebase.js';
+import { getFirestore } from 'firebase-admin/firestore';
+import initializeFirebase from './utils/firebase.js';
 
 $.verbose = false;
 
 dotenv.config();
 
+const firebase = initializeFirebase();
+const db = getFirestore(firebase);
+
+// await updateSport(db);
+
 const sales = [];
 //gather sales
 console.log(chalk.cyan('Gather listings from sites'));
-await Promise.all([getEbaySales(), getSalesSportLots()]).then((results) =>
+await Promise.all([getFileSales(), getEbaySales(), getSalesSportLots()]).then((results) =>
   results.forEach((result) => sales.push(...result)),
 );
 console.log(chalk.cyan('Found'), chalk.green(sales.length), chalk.cyan('cards sold'));
@@ -26,11 +34,11 @@ console.log(chalk.cyan('Found'), chalk.green(sales.length), chalk.cyan('cards so
 console.log(chalk.cyan('Remove listings from sites'));
 const groupedCards = createGroups({}, sales);
 await Promise.all([
-  removeFromEbay(sales),
-  removeFromShopify(sales),
-  removeFromSportLots(groupedCards),
-  removeFromMyCardPost(sales),
-  removeFromBuySportsCards(groupedCards),
+  removeFromEbay(sales, db),
+  // removeFromShopify(sales),
+  // removeFromSportLots(groupedCards),
+  // removeFromMyCardPost(sales),
+  // removeFromBuySportsCards(groupedCards),
 ]);
 console.log(chalk.cyan('Completed removing listings from sites'));
 
@@ -50,12 +58,52 @@ const divider = {
 };
 Object.values(groupedCards).forEach((cards) =>
   cards.forEach((card) =>
-    Object.keys(divider).forEach((key) => (divider[key] = '-'.repeat(Math.max(card[key].length, divider[key].length)))),
+    Object.keys(divider).forEach(
+      (key) => (divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length), parseInt(divider[key]?.length)))),
+    ),
   ),
 );
 
 const displayCards = [];
 let color = chalk.magenta;
+const orderColors = {};
+const orderColor = (orderId) => {
+  if (!orderColors[orderId]) {
+    orderColors[orderId] = [
+      chalk.red,
+      chalk.green,
+      chalk.yellow,
+      chalk.blue,
+      // chalk.magenta,
+      chalk.cyan,
+      chalk.white,
+      chalk.redBright,
+      chalk.greenBright,
+      chalk.yellowBright,
+      // chalk.blueBright,
+      chalk.magentaBright,
+      chalk.cyanBright,
+      chalk.whiteBright,
+      chalk.bgRed,
+      chalk.bgGreen,
+      chalk.bgYellow,
+      chalk.bgBlue,
+      chalk.bgMagenta,
+      chalk.bgCyan,
+      chalk.bgWhite,
+      chalk.bgBlackBright,
+      chalk.bgRedBright,
+      chalk.bgGreenBright,
+      chalk.bgYellowBright,
+      chalk.bgBlueBright,
+      chalk.bgMagentaBright,
+      chalk.bgCyanBright,
+      chalk.bgWhiteBright,
+    ][Object.keys(orderColors).length];
+  }
+  // console.log(`order ${orderId} is color ${orderColors[orderId]}`);
+  return chalk[orderColors[orderId]];
+};
 Object.keys(groupedCards)
   .sort()
   .forEach((key, i) => {
@@ -76,7 +124,9 @@ Object.keys(groupedCards)
           }
         })
         .map((card) => {
-          Object.keys(card).forEach((key) => (card[key] = color(card[key])));
+          Object.keys(card).forEach(
+            (key) => (card[key] = key === 'platform' ? orderColor(card.platform)(card.platform) : color(card[key])),
+          );
           return card;
         }),
     );

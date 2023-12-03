@@ -1,6 +1,6 @@
 import { convertTitleToCard } from './sportlots.js';
 
-jest.mock('open', () => jest.fn()););
+jest.mock('open', () => jest.fn());
 jest.mock('../utils/ask');
 
 describe('Sport Lots', () => {

@@ -217,6 +217,7 @@ export const convertTitleToCard = (title) => {
     parallel: '',
     insert: '',
     sport: { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)],
+    title,
   };
 
   const manufacture = manufactures.find((m) => setInfoLower.indexOf(m) > -1);
@@ -274,32 +275,33 @@ export async function getSalesSportLots() {
     const waitForElement = useWaitForElement(driver);
     await driver.sleep(500);
     await driver.get('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
-    //find the div that contains text "Qty Filled"
-    const headerRow = await waitForElement(By.xpath(`//div[contains(text(), 'Qty Filled')]`));
-    //find the parent table of the table that contains text "Qty Filled"
-    const parentTable = await headerRow.findElement(By.xpath('..'));
 
-    //find all of the divs that contains a select element
-    const rows = await parentTable.findElements(By.xpath(`./div[descendant::select]`));
-    for (let row of rows) {
-      const select = await row.findElement(By.xpath(`.//select`));
-      const quantity = await select.getAttribute('value');
-      // the next div has the card's title in it
-      const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
-      const title = await titleDiv.getText();
-      cards.push({
-        platform: 'SportLots',
-        title,
-        quantity,
-        ...convertTitleToCard(title),
-      });
+    //first make sure that the page has loaded
+    const wrapper = await waitForElement(By.xpath(`//div[@data-name = 'results body']`));
+
+    const orders = await wrapper.findElements(By.xpath('./div/form'));
+    for (let order of orders) {
+      const orderNumber = await order.findElement(By.xpath(`./div/a`));
+      const orderNumberText = await orderNumber.getText();
+      const rows = await order.findElements(By.xpath(`./div[descendant::select]`));
+      for (let row of rows) {
+        const select = await row.findElement(By.xpath(`.//select`));
+        const quantity = await select.getAttribute('value');
+        const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
+        const title = await titleDiv.getText();
+        cards.push({
+          platform: `SportLots: ${orderNumberText}`,
+          title,
+          quantity,
+          ...convertTitleToCard(title),
+        });
+      }
     }
   } finally {
     if (driver) {
       await driver.quit();
     }
   }
-  // await ask('Press any key to continue...');
 
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
   return cards;

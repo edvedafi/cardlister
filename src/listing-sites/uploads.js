@@ -38,6 +38,23 @@ export const createGroups = (allCards = {}, bulk = []) => {
   return groups;
 };
 
+const createSKU = (card) =>
+  `${card.sport}|${card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year}|${
+    card.manufacture
+  }|${card.setName}|${card.insert || ''}|${card.parallel || ''}|${card.cardNumber}`;
+export const parseSKU = (key) => {
+  const [sport, year, manufacture, setName, insert, parallel, cardNumber] = key.split('|');
+  return {
+    sport,
+    year,
+    manufacture,
+    setName,
+    insert,
+    parallel,
+    cardNumber,
+  };
+};
+
 export const waitForElement = async (driver, locator, hidden = false) => {
   // console.log('looking for element: ', locator);
   await driver.wait(until.elementLocated(locator));
