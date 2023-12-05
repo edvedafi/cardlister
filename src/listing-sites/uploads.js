@@ -1,4 +1,4 @@
-import { By, until } from 'selenium-webdriver';
+import { By, Select, until } from 'selenium-webdriver';
 
 const createKey = (card) =>
   `${card.sport}|${card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year}|${
@@ -60,9 +60,12 @@ export const waitForElement = async (driver, locator, hidden = false) => {
   await driver.wait(until.elementLocated(locator));
   // console.log('located element: ', locator);
   const element = driver.findElement(locator);
+  //turn the element yellow
+  await driver.executeScript("arguments[0].setAttribute('style', 'background: yellow');", element);
 
   // console.log('found element: ', locator);
   await waitForElementToBeReady(driver, element, hidden);
+  await driver.executeScript("arguments[0].setAttribute('style', 'background: green');", element);
   // console.log('ready element: ', locator);
   return element;
 };
@@ -71,6 +74,13 @@ export const useWaitForElement =
   (driver) =>
   (locator, hidden = false) =>
     waitForElement(driver, locator, hidden);
+
+export const useSetSelectValue = (driver) => async (name, value) => {
+  // console.log(`Looking for ${name} to set to ${value}`);
+  const brandSelector = await useWaitForElement(driver)(By.name(name));
+  let brandSelectorSelect = new Select(brandSelector);
+  await brandSelectorSelect.selectByValue('' + value);
+};
 
 const waitForElementToBeReady = async (driver, element, hidden) => {
   if (!hidden) {

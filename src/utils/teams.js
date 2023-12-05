@@ -125,3 +125,18 @@ export const getTeamSelections = (sport) =>
         })),
       )
     : [];
+
+// export const getSportOfTeam = (team) => teams.find((t) => t.display === team)?.sport;
+export const findTeamInString = (title) => {
+  // console.log('looking for sport of team', title);
+  // console.log(
+  //   'teams',
+  //   teams.map((t) => t.display),
+  // );
+  return teams.find((t) => {
+    // if (t.display === 'Kansas City Chiefs') {
+    //   console.log('Chiefs: ', title.indexOf(t.display), t.sport);
+    // }
+    return title.indexOf(t.display) > -1;
+  })?.sport;
+};

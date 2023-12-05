@@ -2,10 +2,11 @@ import initializeFirebase from '../utils/firebase.js';
 import { doc, setDoc } from 'firebase/firestore';
 import { getFirestore } from 'firebase-admin/firestore';
 import chalk from 'chalk';
-import csv from 'csv-parser';
 import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
+import { findTeamInString } from '../utils/teams.js';
+import { titleCase } from '../utils/data.js';
 
 export async function uploadToFirebase(allCards) {
   console.log(chalk.magenta('Firebase Starting Upload'));
@@ -91,13 +92,6 @@ export async function uploadOldListings() {
   for (const card of oldListings) {
     console.log('adding', card);
     await collection.doc(card.ItemID).set(card);
-    // const docRef = doc(db, 'OldSales', card['Item number']);
-    // await setDoc(docRef, {
-    //   ItemID: card['Item number'],
-    //   quantity: card.quantity,
-    //   title: card.Title,
-    //   ...reverseTitle(card.Title),
-    // });
   }
 }
 
@@ -117,6 +111,112 @@ export async function updateSport(db) {
   }
 }
 
+export async function getListingInfo(db, cards) {
+  const removals = [];
+  for (let card of cards) {
+    // console.log('card', card);
+    const updatedCard = {
+      ...card,
+      sport: findTeamInString(card.title) || card.sport,
+    };
+    // console.log('card', updatedCard);
+    let query = db.collection('OldSales').where('year', '==', updatedCard.year);
+    if (updatedCard.sport) {
+      query = query.where('sport', '==', titleCase(updatedCard.sport));
+    }
+    // if (updatedCard.cardNumber === 175) {
+    // console.log('card', updatedCard);
+    // }
+
+    const queryResults = await query.get();
+    let possibleCards = [];
+    queryResults.forEach((doc) => {
+      possibleCards.push(doc.data());
+    });
+    // console.log('found possible cards', possibleCards.length);
+
+    let match = possibleCards.find(
+      (c) =>
+        updatedCard.cardNumber === c.cardNumber &&
+        updatedCard.setName === c.setName &&
+        updatedCard.manufacture === c.manufacture &&
+        updatedCard.insert === c.insert &&
+        updatedCard.parallel === c.parallel,
+    );
+    if (match) {
+      removals.push({
+        ...updatedCard,
+        ...match,
+      });
+    } else {
+      match = possibleCards.find(
+        (c) =>
+          updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+          updatedCard.setName === c.setName &&
+          updatedCard.manufacture === c.manufacture &&
+          updatedCard.insert === c.insert &&
+          updatedCard.parallel === c.parallel,
+      );
+      if (match) {
+        removals.push({
+          ...updatedCard,
+          ...match,
+        });
+      } else {
+        const searchSet =
+          updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1
+            ? 'Absolute'
+            : updatedCard.setName;
+        match = possibleCards.find(
+          (c) =>
+            updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+            c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
+            (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
+            (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+        );
+
+        if (match) {
+          removals.push({
+            ...updatedCard,
+            ...match,
+          });
+        } else if (updatedCard.setName === 'Chronicles') {
+          match = possibleCards.find(
+            (c) =>
+              updatedCard.cardNumber === c.cardNumber &&
+              c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
+              (!updatedCard.insert ||
+                c.Title.toLowerCase().indexOf(
+                  updatedCard.insert
+                    .toLowerCase()
+                    .replace('update rookies', '')
+                    .replace('rookie update', '')
+                    .replace('rookies update', '')
+                    .trim(),
+                ) > -1) &&
+              (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+            !updatedCard.parallel ||
+              c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
+          );
+          if (match) {
+            removals.push({
+              ...updatedCard,
+              ...match,
+            });
+          } else {
+            console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+            removals.push(updatedCard);
+          }
+        } else {
+          console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+          removals.push(updatedCard);
+        }
+      }
+    }
+  }
+  return removals;
+}
+
 export async function getFileSales() {
   //ADD A CARD
 
@@ -129,16 +229,20 @@ export async function getFileSales() {
   // ];
 
   // ADD A FILE
-  return fs
-    .readFileSync('bigsale.csv', { encoding: 'utf-8' })
-    .split('\n')
-    .map((line) => {
-      const words = line.split(',');
-      return {
-        ...convertTitleToCard(words[0]),
-        quantity: words[1],
-        platform: 'BigSale',
-      };
-    })
-    .filter((card) => card.cardNumber);
+  if (fs.existsSync('offline_sales.csv')) {
+    return fs
+      .readFileSync('offline_sales.csv', { encoding: 'utf-8' })
+      .split('\n')
+      .map((line) => {
+        const words = line.split(',');
+        return {
+          ...convertTitleToCard(words[0]),
+          quantity: words[1],
+          platform: 'offline_sales',
+        };
+      })
+      .filter((card) => card.cardNumber);
+  } else {
+    return [];
+  }
 }

@@ -751,12 +751,6 @@ export const reverseTitle = (title) => {
     setInfo = setInfo.replace(card.parallel, '').trim();
   }
 
-  if (card.manufacture === 'Panini') {
-    card.sport = 'Football';
-  } else {
-    card.sport = 'Baseball';
-  }
-
   return card;
 };
 
@@ -833,109 +827,31 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
 export const removeFromEbay = async (cards = [], db) => {
   const toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
 
-  if (toRemove.length === 0) {
-    console.log(chalk.magenta('No cards to remove from ebay'));
-    return;
-  }
-
-  const eBay = await loginEbayAPI();
-
-  let removed = [];
-  const removals = [];
-
-  for (let card of toRemove) {
-    // console.log('card', card);
-    const query = db.collection('OldSales').where('year', '==', card.year).where('sport', '==', card.sport);
-
-    const queryResults = await query.get();
-    let possibleCards = [];
-    queryResults.forEach((doc) => {
-      possibleCards.push(doc.data());
-    });
-
-    let match = possibleCards.find(
-      (c) =>
-        card.cardNumber === c.cardNumber &&
-        card.setName === c.setName &&
-        card.manufacture === c.manufacture &&
-        card.insert === c.insert &&
-        card.parallel === c.parallel,
-    );
-    if (match) {
-      removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
-      removed.push(card);
-    } else {
-      match = possibleCards.find(
-        (c) =>
-          card.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-          card.setName === c.setName &&
-          card.manufacture === c.manufacture &&
-          card.insert === c.insert &&
-          card.parallel === c.parallel,
-      );
-      if (match) {
-        removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
-        removed.push(card);
-      } else {
-        const searchSet = card.year === '2021' && card.setName.indexOf('Absolute') > -1 ? 'Absolute' : card.setName;
-        match = possibleCards.find(
-          (c) =>
-            card.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-            c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
-            (!card.insert || c.Title.toLowerCase().indexOf(card.insert.toLowerCase()) > -1) &&
-            (!card.parallel || c.Title.toLowerCase().indexOf(card.parallel.toLowerCase()) > -1),
-        );
-
-        if (match) {
-          removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
-          removed.push(card);
-        } else if (card.setName === 'Chronicles') {
-          match = possibleCards.find(
-            (c) =>
-              card.cardNumber === c.cardNumber &&
-              c.Title.toLowerCase().indexOf(card.setName.toLowerCase()) > -1 &&
-              (!card.insert ||
-                c.Title.toLowerCase().indexOf(
-                  card.insert
-                    .toLowerCase()
-                    .replace('update rookies', '')
-                    .replace('rookie update', '')
-                    .replace('rookies update', '')
-                    .trim(),
-                ) > -1) &&
-              (!card.parallel || c.Title.toLowerCase().indexOf(card.parallel.toLowerCase()) > -1),
-          );
-          if (match) {
-            removals.push(removeFromEbayItemNumber(match.ItemID, card.quantity, card.title));
-            removed.push(card);
-          } else {
-            console.log(chalk.red('Could not find card on ebay: '), card.title);
-          }
-        } else {
-          console.log(chalk.red('Could not find card on ebay: '), card.title);
-        }
-      }
+  if (toRemove.length > 0) {
+    const removals = [];
+    for (const card of toRemove) {
+      removals.push(await removeFromEbayItemNumber(card.itemNumber, card.quantity, card.title));
     }
-  }
 
-  await Promise.all(removals);
+    const removed = await Promise.all(removals);
 
-  if (removed.length === toRemove.length) {
-    console.log(
-      chalk.magenta('Successfully removed all'),
-      chalk.green(removed.length),
-      chalk.magenta('cards from ebay'),
-    );
+    if (removed.length === toRemove.length) {
+      console.log(
+        chalk.magenta('Successfully removed all'),
+        chalk.green(removed.length),
+        chalk.magenta('cards from ebay'),
+      );
+    } else {
+      console.log(
+        chalk.magenta('Only removed'),
+        chalk.red(removed.length),
+        chalk.magenta('of'),
+        chalk.red(toRemove.length),
+        chalk.magenta('cards from ebay'),
+      );
+    }
   } else {
-    console.log(
-      chalk.magenta('Only removed'),
-      chalk.red(removed.length),
-      chalk.magenta('of'),
-      chalk.red(toRemove.length),
-      chalk.magenta('cards from ebay'),
-    );
-    // await open('https://www.ebay.com/sh/lst/active');
-    // await ask("Please manually remove the rest from ebay's inventory");
+    console.log(chalk.magenta('No cards to remove from ebay'));
   }
 };
 

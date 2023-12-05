@@ -93,6 +93,7 @@ export const sets = [
   'prizm',
   'bowman',
   'chronicles',
+  'chronicles draft picks',
   'donruss',
   'donruss optic',
   'optic',
