@@ -57,7 +57,11 @@ export const parseSKU = (key) => {
 
 export const waitForElement = async (driver, locator, hidden = false) => {
   // console.log('looking for element: ', locator);
-  await driver.wait(until.elementLocated(locator));
+  try {
+    await driver.wait(until.elementLocated(locator), 1000, `Looking for: ${locator}`);
+  } catch (e) {
+    await driver.wait(until.elementLocated(locator));
+  }
   // console.log('located element: ', locator);
   const element = driver.findElement(locator);
   //turn the element yellow
@@ -65,7 +69,7 @@ export const waitForElement = async (driver, locator, hidden = false) => {
 
   // console.log('found element: ', locator);
   await waitForElementToBeReady(driver, element, hidden);
-  await driver.executeScript("arguments[0].setAttribute('style', 'background: green');", element);
+  await driver.executeScript("arguments[0].setAttribute('style', 'background: #7CFC00');", element);
   // console.log('ready element: ', locator);
   return element;
 };
@@ -89,8 +93,10 @@ const waitForElementToBeReady = async (driver, element, hidden) => {
   await driver.wait(until.elementIsEnabled(element));
 };
 
-export const useWaitForElementToBeReady = (driver) => async (element, hidden) =>
-  waitForElementToBeReady(driver, element, hidden);
+export const useWaitForElementToBeReady =
+  (driver) =>
+  async (element, hidden = false) =>
+    waitForElementToBeReady(driver, element, hidden);
 
 export const caseInsensitive = (text) =>
   `[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '${text}')]`;

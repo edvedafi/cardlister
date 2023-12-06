@@ -147,6 +147,7 @@ export async function getListingInfo(db, cards) {
       removals.push({
         ...updatedCard,
         ...match,
+        quantity: updatedCard.quantity,
       });
     } else {
       match = possibleCards.find(
@@ -161,6 +162,7 @@ export async function getListingInfo(db, cards) {
         removals.push({
           ...updatedCard,
           ...match,
+          quantity: updatedCard.quantity,
         });
       } else {
         const searchSet =
@@ -179,6 +181,7 @@ export async function getListingInfo(db, cards) {
           removals.push({
             ...updatedCard,
             ...match,
+            quantity: updatedCard.quantity,
           });
         } else if (updatedCard.setName === 'Chronicles') {
           match = possibleCards.find(
@@ -202,6 +205,7 @@ export async function getListingInfo(db, cards) {
             removals.push({
               ...updatedCard,
               ...match,
+              quantity: updatedCard.quantity,
             });
           } else {
             console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);

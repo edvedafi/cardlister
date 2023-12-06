@@ -6,57 +6,33 @@ import chalk, { foregroundColorNames } from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
 import { removeFromMyCardPost } from './listing-sites/mycardpost.js';
-import { removeFromBuySportsCards } from './listing-sites/bsc.js';
+import { removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import { getFileSales, getListingInfo, updateSport, uploadOldListings } from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import initializeFirebase from './utils/firebase.js';
 import { loadTeams } from './utils/teams.js';
+import minimist from 'minimist';
+import { ask } from './utils/ask.js';
+import open from 'open';
+
+const args = minimist(process.argv.slice(2));
 
 $.verbose = false;
 
 dotenv.config();
 
 const shutdown = async () => {
-  await Promise.all([shutdownSportLots()]);
+  await Promise.all([shutdownSportLots(), shutdownBuySportsCards()]);
 };
+
 process.on('SIGINT', async function () {
   console.log('Caught interrupt signal');
   await shutdown();
   process.exit();
 });
 
-try {
-  const firebase = initializeFirebase();
-  const db = getFirestore(firebase);
-  await loadTeams(firebase);
-
-  //gather sales
-  console.log(chalk.cyan('Gather listings from sites'));
-  const results = await Promise.all([getFileSales(), getEbaySales(), getSalesSportLots()]);
-  const rawSales = results.reduce((s, result) => s.concat(result), []);
-  console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
-
-  //prep listings to remove
-  console.log(chalk.cyan('Updating sales with listing info'));
-  const sales = await getListingInfo(db, rawSales);
-  const groupedCards = createGroups({}, sales);
-  console.log(chalk.cyan('Completed adding listing info to cards'));
-
-  //remove listings from sites
-  console.log(chalk.cyan('Remove listings from sites'));
-  await Promise.all([
-    removeFromEbay(sales, db),
-    // removeFromShopify(sales),
-    removeFromSportLots(groupedCards),
-    // removeFromMyCardPost(sales),
-    // removeFromBuySportsCards(groupedCards),
-  ]);
-  console.log(chalk.cyan('Completed removing listings from sites'));
-
-  //output a pick list
-  console.log(chalk.cyan('All Sales:'));
-
+function buildTableData(groupedCards) {
   const divider = {
     sport: '--------',
     year: '----',
@@ -117,7 +93,25 @@ try {
     return orderColors[orderId];
   };
   Object.keys(groupedCards)
-    .sort()
+    .sort((k1, k2) => {
+      const [sport1, year1, manufacture1, setName1, insert1, parallel1] = k1.split('|');
+      const [sport2, year2, manufacture2, setName2, insert2, parallel2] = k2.split('|');
+      if (sport1 !== sport2) {
+        return sport1 < sport2 ? -1 : 1;
+      } else if (year1 !== year2) {
+        return year1 < year2 ? -1 : 1;
+      } else if (manufacture1 !== manufacture2) {
+        return manufacture1 < manufacture2 ? -1 : 1;
+      } else if (setName1 !== setName2) {
+        return setName1 < setName2 ? -1 : 1;
+      } else if (insert1 !== insert2) {
+        return insert1 < insert2 ? -1 : 1;
+      } else if (parallel1 !== parallel2) {
+        return parallel1 < parallel2 ? -1 : 1;
+      } else {
+        return 0;
+      }
+    })
     .forEach((key, i) => {
       if (i > 0) displayCards.push(divider);
       displayCards.push(
@@ -144,6 +138,48 @@ try {
       );
       color = color === chalk.magenta ? chalk.blueBright : chalk.magenta;
     });
+  return displayCards;
+}
+
+try {
+  const firebase = initializeFirebase();
+  const db = getFirestore(firebase);
+  await loadTeams(firebase);
+
+  //gather sales
+  console.log(chalk.cyan('Gather listings from sites'));
+  const results = await Promise.all([getFileSales(), getEbaySales(), getSalesSportLots()]);
+  const rawSales = results.reduce((s, result) => s.concat(result), []);
+  console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
+
+  //prep listings to remove
+  console.log(chalk.cyan('Updating sales with listing info'));
+  const sales = await getListingInfo(db, rawSales);
+  const groupedCards = createGroups({}, sales);
+  console.log(chalk.cyan('Completed adding listing info to cards'));
+
+  //remove listings from sites
+  console.log(chalk.cyan('Remove listings from sites'));
+
+  if (args.r) {
+    if (await ask('Remove from Ebay?', true)) {
+      await removeFromEbay(sales, db);
+    }
+    if (await ask('Remove from Sportlots?', true)) {
+      await removeFromSportLots(groupedCards);
+    }
+    if (await ask('Remove from BuySportsCards?', true)) {
+      await removeFromBuySportsCards(groupedCards);
+    }
+  } else {
+    await removeFromEbay(sales, db);
+    await removeFromSportLots(groupedCards);
+    await removeFromBuySportsCards(groupedCards);
+  }
+  console.log(chalk.cyan('Completed removing listings from sites'));
+
+  //output a pick list
+  console.log(chalk.cyan('All Sales:'));
 
   console.log(
     chalkTable(
@@ -161,9 +197,22 @@ try {
           { field: 'platform', name: 'Sold On' },
         ],
       },
-      displayCards,
+      buildTableData(groupedCards),
     ),
   );
+
+  if (sales.find((sale) => sale.platform.indexOf('sportlots'))) {
+    await open('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('bsc'))) {
+    await open('https://www.buysportscards.com/sell ers/orders');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('mcp'))) {
+    await open('https://mycardpost.com/edvedafi/offers');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('ebay'))) {
+    await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  }
 } finally {
   await shutdown();
 }

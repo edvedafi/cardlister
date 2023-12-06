@@ -4,24 +4,17 @@ import { isNo, isYes } from './data.js';
 import filterSelectPrompt from './filterSelectPrompt.js';
 import chalkTable from 'chalk-table';
 
-export const ask = async (questionText, defaultAnswer = undefined, { maxLength, selectOptions, isYN } = {}) => {
+export const ask = async (
+  questionText,
+  defaultAnswer = undefined,
+  { maxLength, selectOptions, isYN, cancellable = false } = {},
+) => {
   if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
     isYN = true;
   }
   let answer;
   if (selectOptions) {
     let choices = selectOptions.map((option) => (typeof option === 'string' ? { value: option } : option));
-    // if (defaultAnswer) {
-    //   choices = choices.sort((a, b) => {
-    //     if (a.value === defaultAnswer) {
-    //       return -1;
-    //     } else if (b.value === defaultAnswer) {
-    //       return 1;
-    //     } else {
-    //       return 0;
-    //     }
-    //   });
-    // }
     answer = await filterSelectPrompt({
       message: questionText,
       choices: choices,
@@ -40,25 +33,41 @@ export const ask = async (questionText, defaultAnswer = undefined, { maxLength, 
 
     displayText = `${displayText}:`;
     if (isYN) {
-      answer = await confirmPrompt({
-        message: displayText,
-        default: defaultAnswer,
-      });
+      if (cancellable) {
+        answer = confirmPrompt({
+          message: displayText,
+          default: defaultAnswer,
+        });
+      } else {
+        answer = await confirmPrompt({
+          message: displayText,
+          default: defaultAnswer,
+        });
+      }
     } else {
       // answer = await question(`${displayText}: `);
-      answer = await input({ message: displayText, default: defaultAnswer });
+      if (cancellable) {
+        answer = input({ message: displayText, default: defaultAnswer });
+      } else {
+        answer = await input({ message: displayText, default: defaultAnswer });
+      }
     }
   }
 
   if (maxLength && answer.length > maxLength) {
-    answer = await ask(questionText, answer, { maxLength });
+    if (cancellable) {
+      answer = ask(questionText, answer, { maxLength });
+    } else {
+      answer = await ask(questionText, answer, { maxLength });
+    }
   }
 
+  // console.log(`Answer: ${answer}`);
   return answer;
 };
 
-export const confirm = async (questionText, defaultAnswer) => {
-  return await ask(questionText, defaultAnswer, { isYN: true });
+export const confirm = (questionText, defaultAnswer) => {
+  return ask(questionText, defaultAnswer, { isYN: true, cancellable: true });
 };
 
 /**

@@ -825,12 +825,17 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
 };
 
 export const removeFromEbay = async (cards = [], db) => {
-  const toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
+  const toRemove = cards.filter((card) => !card.platform?.startsWith('ebay') && card.ItemID);
 
   if (toRemove.length > 0) {
     const removals = [];
     for (const card of toRemove) {
-      removals.push(await removeFromEbayItemNumber(card.itemNumber, card.quantity, card.title));
+      if (card.ItemID) {
+        removals.push(await removeFromEbayItemNumber(card.ItemID, card.quantity, card.title));
+      } else {
+        console.log(`Could not remove ${chalk.red(card.title)} from ebay because no Item Number was found`);
+        console.log(card);
+      }
     }
 
     const removed = await Promise.all(removals);

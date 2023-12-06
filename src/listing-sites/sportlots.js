@@ -4,6 +4,7 @@ import { ask } from '../utils/ask.js';
 import { parseKey, useSetSelectValue, useWaitForElement, waitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
+import { confirm } from '@inquirer/prompts';
 
 const brands = {
   bowman: 'Bowman',
@@ -77,6 +78,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
     };
     try {
       let found = false;
+      await driver.sleep(500);
       const rows = await driver.findElements(By.xpath(`//*[contains(text(), '${setName}')]`));
       for (let row of rows) {
         const fullSetText = await row.getText();
@@ -98,7 +100,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
         return setInfoForRun;
       }
     } catch (e) {
-      console.log(e);
+      // console.log(e);
       return await selectDonrus();
     }
   };
@@ -361,7 +363,7 @@ export async function removeFromSportLots(groupedCards) {
       toRemove[key] = toRemoveAtKey;
     }
   });
-  console.log('Removing:', JSON.stringify(toRemove, null, 2));
+  // console.log('Removing:', JSON.stringify(toRemove, null, 2));
 
   const driver = await login();
   const waitForElement = useWaitForElement(driver);
@@ -371,10 +373,10 @@ export async function removeFromSportLots(groupedCards) {
   const selectBrand = useSelectBrand(driver, 'updinven', 'year', 'sportx', 'brd');
   const selectSet = useSelectSet(driver, selectBrand);
 
-  for (const key in groupedCards) {
+  for (const key in toRemove) {
     console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(key)}`);
     let setInfo = parseKey(key);
-    const setExists = await selectBrand(setInfo);
+    await selectBrand(setInfo);
 
     await waitForElement(By.xpath("//*[contains(normalize-space(), 'Dealer Inventory Summary')]"));
     setInfo = await selectSet(setInfo, async (fullSetText, row) => {
@@ -383,18 +385,55 @@ export async function removeFromSportLots(groupedCards) {
 
     let found = setInfo.found;
 
-    if (found) {
-      await waitForElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`));
-    } else {
-      found = await Promise.any([
-        await ask(
-          `Does this set exist on SportLots? ${chalk.red(
+    try {
+      await driver.findElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`));
+    } catch (e) {
+      const find = new Promise((resolve) => {
+        let askFail, waitFail;
+
+        const askPromise = confirm({
+          message: `Does this set exist on SportLots? ${chalk.red(
             key,
           )}. Please select the proper filters and hit enter or say No`,
-          true,
-        ),
-        await waitForElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`)),
-      ]);
+        });
+
+        askPromise
+          .then((found) => {
+            // console.log('ask - then');
+            // console.log('resolved ask');
+            // console.log('resolved ask');
+            resolve(true);
+          })
+          .catch((e) => {
+            // console.log('ask - catch');
+            askFail = e;
+            if (waitFail) {
+              // console.log('askFail', askFail);
+              // console.log('waitFail', waitFail);
+              // resolve(false);
+            }
+          });
+        waitForElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`))
+          .then(() => {
+            // console.log('element - then');
+            // try {
+            askPromise.cancel();
+            resolve(true);
+            // } catch (e) {
+            //   console.log(e);
+            // }
+          })
+          .catch((e) => {
+            // console.log('element - catch');
+            waitFail = e;
+            if (askFail) {
+              // console.log('askFail', askFail);
+              // console.log('waitFail', waitFail);
+              resolve(false);
+            }
+          });
+      });
+      found = await find;
     }
 
     if (found) {

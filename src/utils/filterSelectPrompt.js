@@ -9,7 +9,6 @@ import {
   isDownKey,
   isNumberKey,
   isBackspaceKey,
-  Paginator,
 } from '@inquirer/core';
 import chalk from 'chalk';
 import figures from 'figures';
@@ -25,7 +24,6 @@ function isEscapeKey(key) {
 }
 
 export default createPrompt((config, done) => {
-  const paginator = useRef(new Paginator()).current;
   const firstRender = useRef(true);
 
   const prefix = usePrefix();
