@@ -20,7 +20,7 @@ function isSelectableChoice(choice) {
   return choice != null && !choice.disabled;
 }
 
-function isEsacpeKey(key) {
+function isEscapeKey(key) {
   return key.name === 'escape';
 }
 
@@ -59,7 +59,7 @@ export default createPrompt((config, done) => {
       setSearchTerm('');
       setStatus('done');
       done(choice?.value || typedValue);
-    } else if (isEsacpeKey(key)) {
+    } else if (isEscapeKey(key)) {
       if (config.cancelable && searchTerm === '') {
         setChoices([]);
         setStatus('aborted');
