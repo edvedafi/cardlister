@@ -161,31 +161,15 @@ try {
   const groupedCards = createGroups({}, sales);
 
   if (sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1)) {
-    console.log(
-      'opening sportlots',
-      sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1),
-    );
     openSalesSites.push('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
   }
   if (sales.find((sale) => sale.platform.indexOf('BSC: ') > -1)) {
-    console.log(
-      'opening BSC',
-      sales.find((sale) => sale.platform.indexOf('BSC: ') > -1),
-    );
     openSalesSites.push('https://www.buysportscards.com/sellers/orders');
   }
   if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
-    console.log(
-      'opening MCP',
-      sales.find((sale) => sale.platform.indexOf('MCP: ') > -1),
-    );
     openSalesSites.push('https://mycardpost.com/edvedafi/offers');
   }
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
-    console.log(
-      'opening ebay',
-      sales.find((sale) => sale.platform.indexOf('ebay: ') > -1),
-    );
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
   console.log(chalk.cyan('Completed adding listing info to cards'));
