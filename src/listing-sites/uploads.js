@@ -1,9 +1,10 @@
 import { By, Select, until } from 'selenium-webdriver';
+import { titleCase } from '../utils/data.js';
 
 const createKey = (card) =>
-  `${card.sport}|${card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year}|${
-    card.manufacture
-  }|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
+  `${titleCase(card.sport)}|${
+    card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year
+  }|${card.manufacture}|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
 export const parseKey = (key) => {
   const [sport, year, manufacture, setName, insert, parallel] = key.split('|');
   return {
@@ -55,6 +56,11 @@ export const parseSKU = (key) => {
   };
 };
 
+export const useHighlightElement =
+  (driver, color = 'green') =>
+  async (element) =>
+    driver.executeScript(`arguments[0].setAttribute('style', 'background: ${color}');`, element);
+
 export const waitForElement = async (driver, locator, hidden = false) => {
   // console.log('looking for element: ', locator);
   try {
@@ -65,11 +71,11 @@ export const waitForElement = async (driver, locator, hidden = false) => {
   // console.log('located element: ', locator);
   const element = driver.findElement(locator);
   //turn the element yellow
-  await driver.executeScript("arguments[0].setAttribute('style', 'background: yellow');", element);
+  await useHighlightElement(driver, 'yellow')(element);
 
   // console.log('found element: ', locator);
   await waitForElementToBeReady(driver, element, hidden);
-  await driver.executeScript("arguments[0].setAttribute('style', 'background: #7CFC00');", element);
+  await useHighlightElement(driver)(element);
   // console.log('ready element: ', locator);
   return element;
 };

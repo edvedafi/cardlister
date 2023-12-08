@@ -6,7 +6,7 @@ import chalk, { foregroundColorNames } from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
 import { removeFromMyCardPost } from './listing-sites/mycardpost.js';
-import { removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
+import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import { getFileSales, getListingInfo, updateSport, uploadOldListings } from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -46,9 +46,10 @@ function buildTableData(groupedCards) {
   };
   Object.values(groupedCards).forEach((cards) =>
     cards.forEach((card) =>
-      Object.keys(divider).forEach(
-        (key) => (divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length), parseInt(divider[key]?.length)))),
-      ),
+      Object.keys(divider).forEach((key) => {
+        console.log('key', key, 'card[key]', card[key], 'divider[key]', divider[key]);
+        divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length || 0), parseInt(divider[key]?.length || 0)));
+      }),
     ),
   );
 
@@ -148,14 +149,45 @@ try {
 
   //gather sales
   console.log(chalk.cyan('Gather listings from sites'));
-  const results = await Promise.all([getFileSales(), getEbaySales(), getSalesSportLots()]);
+  const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
 
   //prep listings to remove
   console.log(chalk.cyan('Updating sales with listing info'));
+  const openSalesSites = [];
+
   const sales = await getListingInfo(db, rawSales);
   const groupedCards = createGroups({}, sales);
+
+  if (sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1)) {
+    console.log(
+      'opening sportlots',
+      sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1),
+    );
+    openSalesSites.push('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('BSC: ') > -1)) {
+    console.log(
+      'opening BSC',
+      sales.find((sale) => sale.platform.indexOf('BSC: ') > -1),
+    );
+    openSalesSites.push('https://www.buysportscards.com/sellers/orders');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
+    console.log(
+      'opening MCP',
+      sales.find((sale) => sale.platform.indexOf('MCP: ') > -1),
+    );
+    openSalesSites.push('https://mycardpost.com/edvedafi/offers');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
+    console.log(
+      'opening ebay',
+      sales.find((sale) => sale.platform.indexOf('ebay: ') > -1),
+    );
+    openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  }
   console.log(chalk.cyan('Completed adding listing info to cards'));
 
   //remove listings from sites
@@ -201,17 +233,8 @@ try {
     ),
   );
 
-  if (sales.find((sale) => sale.platform.indexOf('sportlots'))) {
-    await open('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('bsc'))) {
-    await open('https://www.buysportscards.com/sell ers/orders');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('mcp'))) {
-    await open('https://mycardpost.com/edvedafi/offers');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('ebay'))) {
-    await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  for (const site of openSalesSites) {
+    await open(site);
   }
 } finally {
   await shutdown();

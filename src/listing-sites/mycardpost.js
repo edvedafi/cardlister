@@ -152,5 +152,5 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
 };
 
 export async function removeFromMyCardPost(cardsToRemove) {
-  return open('https://mycardpost.com/edvedafi');
+  return [];
 }

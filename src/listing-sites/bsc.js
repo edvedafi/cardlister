@@ -1,12 +1,9 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
-import { Browser, Builder, By, until } from 'selenium-webdriver';
+import { Browser, Builder, By, Key, until } from 'selenium-webdriver';
 import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady } from './uploads.js';
 import { validateUploaded } from './validate.js';
-import open from 'open';
-import eBayApi from 'ebay-api';
-import express from 'express';
-import axios from 'axios';
+import chalk from 'chalk';
 
 dotenv.config();
 
@@ -16,6 +13,14 @@ const userWaitForButton = (driver) => async (text) => {
 };
 
 let _driver;
+
+const baseHeaders = {
+  accept: 'application/json, text/plain, */*',
+  'accept-language': 'en-US,en;q=0.9',
+  assumedrole: 'sellers',
+  'content-type': 'application/json',
+};
+
 const login = async () => {
   if (!_driver) {
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
@@ -36,16 +41,85 @@ const login = async () => {
     const nextButton = await waitForElement(By.id('next'));
     await nextButton.click();
     await waitForButton('welcome back,');
+
+    await _driver.findElement(By.css('body')).sendKeys(Key.F12);
   }
+
+  const reduxAsString = await _driver.executeScript(
+    'return Object.values(localStorage).find((value) => value.includes("secret"));',
+  );
+  const redux = JSON.parse(reduxAsString);
+  baseHeaders.authorization = `Bearer ${redux.secret}`;
   return _driver;
 };
 
-export async function shutdownBuySportsCards() {
-  if (_driver) {
-    await _driver.quit();
+const fetchJson = async (path, method = 'GET', body) => {
+  const fetchOptions = {
+    headers: baseHeaders,
+    method: method,
+  };
+
+  if (body) {
+    fetchOptions.body = JSON.stringify(body);
   }
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, fetchOptions);
+
+  if (responseObject.status === 401) {
+    console.log('BSC Token Expired');
+    await login();
+  } else if (responseObject.status < 200 || responseObject.status >= 300) {
+    console.group(`Error from BSC ${method} ${path}`);
+    if (body) console.log('Body: ', JSON.stringify(body, null, 2));
+    if (responseObject) console.log('Response: ', JSON.stringify(responseObject, null, 2));
+    console.groupEnd();
+    throw new Error(
+      `Error from PUT https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
+    );
+  }
+
+  const text = await responseObject.text();
+
+  if (text === '' || text.trim().length === 0) {
+    console.group('Empty response from BSC');
+    if (body) {
+      console.log(JSON.stringify(body, null, 2));
+    }
+    console.log('path: ', `https://api-prod.buysportscards.com/${path}`);
+    console.groupEnd();
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.log(`Error parsing JSON response from PUT ${path}`, text);
+    console.log(e);
+    throw e;
+  }
+};
+
+const get = fetchJson;
+const put = async (path, body) => fetchJson(path, 'PUT', body);
+const post = async (path, body) => fetchJson(path, 'POST', body);
+
+export async function shutdownBuySportsCards() {
+  await _driver?.quit();
 }
 
+const useWaitForPageToLoad =
+  (driver) =>
+  async (url = undefined) => {
+    if (url) {
+      await driver.wait(until.urlIs(url), 10000);
+    }
+    try {
+      const element = await driver.findElement(By.className('MuiSkeleton-pulse'));
+      await driver.wait(until.stalenessOf(element), 10000); // Adjust the timeout as needed (in milliseconds)
+    } catch (e) {
+      //do nothing
+      console.log('Waiting for page to load error');
+    }
+  };
 const runUpdates = async (groupedCards) => {
   try {
     const driver = await login();
@@ -270,6 +344,49 @@ export const uploadToBuySportsCards = async (groupedCards) => {
   await runUpdates(groupedCards);
   console.log(chalk.magenta('BSC Upload COMPLETE!'));
 };
+
+export async function getBuySportsCardsSales() {
+  console.log(chalk.magenta('Checking BuySportsCards for Sales'));
+  await login();
+  const sales = [];
+  const history = await post('seller/order/history', {
+    name: '',
+    orderNo: '',
+    fromDate: null,
+    toDate: null,
+    page: 0,
+    size: 5,
+    status: ['READY_TO_SHIP', 'PARTIALLY_REFUNDED_READY_TO_SHIP'],
+  });
+
+  for (const order of history.results) {
+    const orderDetails = await get(`seller/order/${order.orderId}`);
+
+    for (const item of orderDetails.orderItems) {
+      const card = {
+        cardNumber: item.card.cardNo,
+        year: item.card.year,
+        setName: item.card.setName.replace(item.card.year, '').trim(),
+        sport: item.card.sport,
+        player: item.card.players,
+        quantity: item.orderQuantity,
+        platform: `BSC: ${order.buyer.username}`,
+        title: `${item.card.setName} ${item.card.variantName} #${item.card.cardNo} ${item.card.players}}}`,
+      };
+
+      if (item.card.variant === 'Parallel') {
+        card.parallel = item.card.variantName;
+      } else if (item.card.variant === 'Insert') {
+        card.insert = item.card.variantName;
+      }
+
+      sales.push(card);
+    }
+  }
+
+  console.log(chalk.magenta('Found'), chalk.green(sales.length), chalk.magenta('cards sold on BuySportsCards'));
+  return sales;
+}
 
 export async function removeFromBuySportsCards(cardsToRemove) {
   console.log(chalk.magenta('BSC Starting Removal'));
