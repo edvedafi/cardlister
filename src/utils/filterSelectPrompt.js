@@ -9,136 +9,142 @@ import {
   isDownKey,
   isNumberKey,
   isBackspaceKey,
+  Separator,
 } from '@inquirer/core';
 import chalk from 'chalk';
 import figures from 'figures';
 import ansiEscapes from 'ansi-escapes';
 import Fuse from 'fuse.js';
+import { useMemo, usePagination } from '@inquirer/prompts';
 
-function isSelectableChoice(choice) {
-  return choice != null && !choice.disabled;
+function isSelectable(item) {
+  return !Separator.isSeparator(item) && !item.disabled;
 }
 
 function isEscapeKey(key) {
   return key.name === 'escape';
 }
 
-export default createPrompt((config, done) => {
-  const firstRender = useRef(true);
+function renderItem({ item, isActive }) {
+  if (item) {
+    if (Separator.isSeparator(item)) {
+      return ` ${item.separator}`;
+    }
 
+    const line = item.name || item.value;
+    if (item.disabled) {
+      const disabledLabel = typeof item.disabled === 'string' ? item.disabled : '(disabled)';
+      return chalk.dim(`- ${line} ${disabledLabel}`);
+    }
+
+    const color = isActive ? chalk.cyan : (x) => x;
+    const prefix = isActive ? figures.pointer : ` `;
+    return color(`${prefix} ${line}`);
+  } else {
+    return '';
+  }
+}
+
+export default createPrompt((config, done) => {
+  const { loop = true, pageSize } = config;
+  const firstRender = useRef(true);
   const prefix = usePrefix();
   const [status, setStatus] = useState('pending');
-  const [searchTerm, setSearchTerm] = useState(config.default?.display || config.default || '');
+  const [searchTerm, setSearchTerm] = useState(config.default?.name || config.default || '');
 
-  const keys =
-    config.choices &&
-    config.choices.length > 0 &&
-    config.choices[config.choices.length - 1].name &&
-    config.choices[config.choices.length - 1].description
-      ? ['name', 'description']
-      : ['value'];
-
-  const defaultFuse = useRef(new Fuse(config.choices, { keys })).current;
-  const [choices, setChoices] = useState(
+  const defaultFuse = useRef(new Fuse(config.choices, { keys: ['name', 'value', 'description'] })).current;
+  const [items, setItems] = useState(
     config.default
-      ? defaultFuse.search(config?.default?.display || config.default).map((result) => result.item)
+      ? defaultFuse.search(config?.default?.name || config.default).map((result) => result.item)
       : config.choices,
   );
 
-  const [cursorPosition, setCursorPos] = useState(0);
+  const bounds = useMemo(() => {
+    let first = items.findIndex(isSelectable);
+    // TODO: Replace with `findLastIndex` when it's available.
+    const last = items.length - 1 - [...items].reverse().findIndex(isSelectable);
+    return { first, last };
+  }, [items]);
+
+  const defaultItemIndex = useMemo(() => {
+    if (!('default' in config)) return -1;
+    return items.findIndex((item) => isSelectable(item) && item.value === config.default);
+  }, [config.default, items]);
+
+  const [active, setActive] = useState(defaultItemIndex === -1 ? bounds.first : defaultItemIndex);
 
   // Safe to assume the cursor position always point to a Choice.
-  const choice = choices[cursorPosition];
+  const selectedChoice = items[active] || { description: 'No values match filter. Press escape to clear filter.' };
 
   useKeypress((key) => {
-    // console.log(key);
-    if (isEnterKey(key)) {
-      const typedValue = searchTerm;
-      setSearchTerm('');
-      setStatus('done');
-      done(choice?.value || typedValue);
-    } else if (isEscapeKey(key)) {
-      if (config.cancelable && searchTerm === '') {
-        setChoices([]);
-        setStatus('aborted');
-        done(undefined);
+    if (isEscapeKey(key)) {
+      if (searchTerm === '') {
+        setStatus('done');
+        done();
       } else {
         setSearchTerm('');
-        setChoices(config.choices);
-        setCursorPos(0);
+        setItems(config.choices);
+        setActive(0);
+      }
+    } else if (isEnterKey(key)) {
+      setStatus('done');
+      if (selectedChoice) {
+        done(selectedChoice.value);
+      } else {
+        done();
       }
     } else if (isUpKey(key) || isDownKey(key)) {
-      let newCursorPosition = cursorPosition;
-      const offset = isUpKey(key) ? -1 : 1;
-      let selectedOption;
-
-      while (!isSelectableChoice(selectedOption)) {
-        newCursorPosition = (newCursorPosition + offset + choices.length) % choices.length;
-        selectedOption = choices[newCursorPosition];
+      if (loop || (isUpKey(key) && active !== bounds.first) || (isDownKey(key) && active !== bounds.last)) {
+        const offset = isUpKey(key) ? -1 : 1;
+        let next = active;
+        do {
+          next = (next + offset + items.length) % items.length;
+        } while (items[next] ? !isSelectable(items[next]) : false);
+        setActive(next);
       }
-
-      setCursorPos(newCursorPosition);
-      setSearchTerm('');
     } else if (isNumberKey(key)) {
-      // Adjust index to start at 1
-      const newCursorPosition = Number(key.name) - 1;
-
-      // Abort if the choice doesn't exists or if disabled
-      if (!isSelectableChoice(choices[newCursorPosition])) {
-        return;
+      const position = Number(key.name) - 1;
+      const item = items[position];
+      if (item != null && isSelectable(item)) {
+        setActive(position);
       }
-
-      setCursorPos(newCursorPosition);
     } else {
       //search choices for the closest matches
 
       // Change the pattern
-      const pattern = isBackspaceKey(key) ? searchTerm.slice(0, -1) : searchTerm + key.sequence;
+      const pattern = isBackspaceKey(key) ? searchTerm.slice(0, -1) : searchTerm + key.name;
       if (pattern === '') {
-        setChoices(config.choices);
-        setCursorPos(0);
+        setItems(config.choices);
       } else {
-        setChoices(defaultFuse.search(pattern).map((result) => result.item));
-        setCursorPos(0);
+        setItems(defaultFuse.search(pattern).map((result) => result.item));
       }
       setSearchTerm(pattern);
+      setActive(0);
     }
   });
 
   let message = chalk.bold(config.message);
-  if (searchTerm) {
-    message += chalk.dim(' ' + searchTerm);
-  }
   if (firstRender.current) {
-    message += chalk.dim(' (Use arrow keys or type to search)');
     firstRender.current = false;
+    message += chalk.dim(' (Use arrow keys)');
+  }
+
+  let page = '';
+  if (items.length > 0) {
+    page = usePagination({
+      items,
+      active,
+      renderItem,
+      pageSize,
+      loop,
+    });
   }
 
   if (status === 'done') {
-    return `${prefix} ${message} ${chalk.cyan(choice?.name || choice?.value || searchTerm)}`;
+    return `${prefix} ${message} ${chalk.cyan(selectedChoice.name || selectedChoice.value)}`;
   }
 
-  const allChoices = choices
-    .map((choice, index) => {
-      const line = choice.name || choice.value;
-      if (choice.disabled) {
-        const disabledLabel = typeof choice.disabled === 'string' ? choice.disabled : '(disabled)';
-        return chalk.dim(`- ${line} ${disabledLabel}`);
-      }
+  const choiceDescription = selectedChoice.description ? `\n${selectedChoice.description}` : ``;
 
-      if (index === cursorPosition) {
-        return chalk.cyan(`${figures.pointer} ${line}`);
-      }
-
-      return `  ${line}`;
-    })
-    .join('\n');
-
-  const windowedChoices = paginator.paginate(allChoices, cursorPosition, config.pageSize);
-  // console.log(allChoices);
-  const choiceDescription = choice ? (choice.description ? `\n${choice.description}` : ``) : 'No Matches';
-
-  return status === 'aborted'
-    ? `${prefix} ${message}`
-    : `${prefix} ${message}\n${windowedChoices}${choiceDescription}${ansiEscapes.cursorHide}`;
+  return `${prefix} ${message}: ${searchTerm}\n${page}${choiceDescription}${ansiEscapes.cursorHide}`;
 });
