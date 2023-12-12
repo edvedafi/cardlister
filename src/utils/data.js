@@ -142,6 +142,7 @@ export const sets = [
   'topps heritage high number',
   'topps heritage minors',
   'chronicles',
+  'mosaic',
 ];
 
 export const inserts = ['invicta', 'next level', 'elite series', 'the rookies'];

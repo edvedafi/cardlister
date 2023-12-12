@@ -115,7 +115,7 @@ export const getTeams = (sport) => {
 
 export const getTeamSelections = (sport) =>
   allTeams[sport]
-    ? [{ name: '', description: 'N/A', value: '' }].concat(
+    ? [{ name: '(No Team)', description: 'N/A', value: '' }].concat(
         allTeams[sport].map((team) => ({
           name: `${team.location} ${team.team}`,
           description: `${team.location} ${team.team}${

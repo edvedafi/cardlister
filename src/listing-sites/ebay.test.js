@@ -16,7 +16,6 @@ describe('ebay', () => {
         insert: '',
         manufacture: 'Panini',
         setName: 'Score',
-        sport: 'Football',
       });
     });
     it('should reverse a parallel title', () => {
@@ -27,7 +26,6 @@ describe('ebay', () => {
         insert: '',
         manufacture: 'Panini',
         setName: 'Playoff',
-        sport: 'Football',
       });
     });
     it('should reverse an insert title', () => {
@@ -38,7 +36,6 @@ describe('ebay', () => {
         insert: 'Squad',
         manufacture: 'Panini',
         setName: 'Score',
-        sport: 'Football',
       });
     });
     it('should reverse a title without a manufacture', () => {
@@ -49,7 +46,16 @@ describe('ebay', () => {
         insert: 'Squad',
         manufacture: 'Panini',
         setName: 'Score',
-        sport: 'Football',
+      });
+    });
+    it('should reverse Mosaic example', () => {
+      expect(reverseTitle('2021 Panini Mosaic #257 Micah Parsons Dallas Cowboys RC')).toEqual({
+        cardNumber: '257',
+        year: '2021',
+        parallel: '',
+        insert: '',
+        manufacture: 'Panini',
+        setName: 'Mosaic',
       });
     });
   });

@@ -136,39 +136,39 @@ describe('uploads', () => {
       const result = createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys([
-        'football|2020|panini|base set||',
-        'football|2020|panini|base set|insert set|',
-        'football|2020|panini|base set|another insert set|',
-        'football|2020|panini|base set||parallel set',
-        'football|2020|panini|base set||shiny parallel set',
-        'football|2020|panini|base set|insert set|parallel set',
-        'football|2020|panini|base set|second insert set|parallel set',
-        'football|2020|panini|base set|insert set|second parallel set',
-        'football|2020|panini|base set|third insert set|third parallel set',
+        'Football|2020|panini|base set||',
+        'Football|2020|panini|base set|insert set|',
+        'Football|2020|panini|base set|another insert set|',
+        'Football|2020|panini|base set||parallel set',
+        'Football|2020|panini|base set||shiny parallel set',
+        'Football|2020|panini|base set|insert set|parallel set',
+        'Football|2020|panini|base set|second insert set|parallel set',
+        'Football|2020|panini|base set|insert set|second parallel set',
+        'Football|2020|panini|base set|third insert set|third parallel set',
       ]);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([
         examples.base.card,
         examples.base.another,
       ]);
-      expect(result['football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
-      expect(result['football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
+      expect(result['Football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
         examples.insert.another,
       ]);
-      expect(result['football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
-      expect(result['football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
+      expect(result['Football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
         examples.parallel.shiny,
       ]);
-      expect(result['football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.card,
       ]);
-      expect(result['football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_insert_same_parallel,
       ]);
-      expect(result['football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_parallel_same_insert,
       ]);
-      expect(result['football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
         examples.insert_parallel.third_insert_third_parallel,
       ]);
     });
@@ -191,39 +191,39 @@ describe('uploads', () => {
       const result = createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys([
-        'football|2020|panini|base set||',
-        'football|2020|panini|base set|insert set|',
-        'football|2020|panini|base set|another insert set|',
-        'football|2020|panini|base set||parallel set',
-        'football|2020|panini|base set||shiny parallel set',
-        'football|2020|panini|base set|insert set|parallel set',
-        'football|2020|panini|base set|second insert set|parallel set',
-        'football|2020|panini|base set|insert set|second parallel set',
-        'football|2020|panini|base set|third insert set|third parallel set',
+        'Football|2020|panini|base set||',
+        'Football|2020|panini|base set|insert set|',
+        'Football|2020|panini|base set|another insert set|',
+        'Football|2020|panini|base set||parallel set',
+        'Football|2020|panini|base set||shiny parallel set',
+        'Football|2020|panini|base set|insert set|parallel set',
+        'Football|2020|panini|base set|second insert set|parallel set',
+        'Football|2020|panini|base set|insert set|second parallel set',
+        'Football|2020|panini|base set|third insert set|third parallel set',
       ]);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([
         examples.base.card,
         examples.base.another,
       ]);
-      expect(result['football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
-      expect(result['football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
+      expect(result['Football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
         examples.insert.another,
       ]);
-      expect(result['football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
-      expect(result['football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
+      expect(result['Football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
         examples.parallel.shiny,
       ]);
-      expect(result['football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.card,
       ]);
-      expect(result['football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_insert_same_parallel,
       ]);
-      expect(result['football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_parallel_same_insert,
       ]);
-      expect(result['football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
         examples.insert_parallel.third_insert_third_parallel,
       ]);
     });
@@ -247,39 +247,39 @@ describe('uploads', () => {
       const result = createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys([
-        'football|2020|panini|base set||',
-        'football|2020|panini|base set|insert set|',
-        'football|2020|panini|base set|another insert set|',
-        'football|2020|panini|base set||parallel set',
-        'football|2020|panini|base set||shiny parallel set',
-        'football|2020|panini|base set|insert set|parallel set',
-        'football|2020|panini|base set|second insert set|parallel set',
-        'football|2020|panini|base set|insert set|second parallel set',
-        'football|2020|panini|base set|third insert set|third parallel set',
+        'Football|2020|panini|base set||',
+        'Football|2020|panini|base set|insert set|',
+        'Football|2020|panini|base set|another insert set|',
+        'Football|2020|panini|base set||parallel set',
+        'Football|2020|panini|base set||shiny parallel set',
+        'Football|2020|panini|base set|insert set|parallel set',
+        'Football|2020|panini|base set|second insert set|parallel set',
+        'Football|2020|panini|base set|insert set|second parallel set',
+        'Football|2020|panini|base set|third insert set|third parallel set',
       ]);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([
         examples.base.card,
         examples.base.another,
       ]);
-      expect(result['football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
-      expect(result['football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|']).toIncludeSameMembers([examples.insert.card]);
+      expect(result['Football|2020|panini|base set|another insert set|']).toIncludeSameMembers([
         examples.insert.another,
       ]);
-      expect(result['football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
-      expect(result['football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||parallel set']).toIncludeSameMembers([examples.parallel.card]);
+      expect(result['Football|2020|panini|base set||shiny parallel set']).toIncludeSameMembers([
         examples.parallel.shiny,
       ]);
-      expect(result['football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.card,
       ]);
-      expect(result['football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|second insert set|parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_insert_same_parallel,
       ]);
-      expect(result['football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|insert set|second parallel set']).toIncludeSameMembers([
         examples.insert_parallel.second_parallel_same_insert,
       ]);
-      expect(result['football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set|third insert set|third parallel set']).toIncludeSameMembers([
         examples.insert_parallel.third_insert_third_parallel,
       ]);
     });
@@ -364,9 +364,9 @@ describe('uploads', () => {
 
       const result = createGroups(allCards, bulk);
 
-      expect(result).toContainAllKeys(['football|2020|panini|base set||']);
+      expect(result).toContainAllKeys(['Football|2020|panini|base set||']);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([base3, base7, base13, base17]);
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([base3, base7, base13, base17]);
     });
 
     it('should include alpha and alpha numeric card numbers', () => {
@@ -394,9 +394,9 @@ describe('uploads', () => {
 
       const result = createGroups(allCards, bulk);
 
-      expect(result).toContainAllKeys(['football|2020|panini|base set||']);
+      expect(result).toContainAllKeys(['Football|2020|panini|base set||']);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([bulkAlphaNumber, baseAlphaNumber]);
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([bulkAlphaNumber, baseAlphaNumber]);
     });
 
     it('should exclude duplicates; preference on cards with pictures otherwise takes last', () => {
@@ -423,9 +423,9 @@ describe('uploads', () => {
 
       const result = createGroups(allCards, bulk);
 
-      expect(result).toContainAllKeys(['football|2020|panini|base set||']);
+      expect(result).toContainAllKeys(['Football|2020|panini|base set||']);
 
-      expect(result['football|2020|panini|base set||']).toIncludeSameMembers([
+      expect(result['Football|2020|panini|base set||']).toIncludeSameMembers([
         examples.base.card,
         examples.base.another,
       ]);
@@ -447,7 +447,7 @@ describe('uploads', () => {
 
       const result = createGroups(allCards, bulk);
 
-      expect(result).toContainAllKeys(['football|1980|panini|base set||']);
+      expect(result).toContainAllKeys(['Football|1980|panini|base set||']);
     });
   });
 });

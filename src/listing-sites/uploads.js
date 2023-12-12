@@ -5,16 +5,25 @@ const createKey = (card) =>
   `${titleCase(card.sport)}|${
     card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year
   }|${card.manufacture}|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
-export const parseKey = (key) => {
+export const parseKey = (key, lowercase = false) => {
   const [sport, year, manufacture, setName, insert, parallel] = key.split('|');
-  return {
-    sport,
-    year,
-    manufacture,
-    setName,
-    insert,
-    parallel,
-  };
+  return lowercase
+    ? {
+        sport: sport.toLowerCase(),
+        year: year.toLowerCase(),
+        manufacture: manufacture.toLowerCase(),
+        setName: setName.toLowerCase(),
+        insert: insert.toLowerCase(),
+        parallel: parallel.toLowerCase(),
+      }
+    : {
+        sport,
+        year,
+        manufacture,
+        setName,
+        insert,
+        parallel,
+      };
 };
 
 export const createGroups = (allCards = {}, bulk = []) => {
@@ -36,6 +45,7 @@ export const createGroups = (allCards = {}, bulk = []) => {
   Object.keys(groups).forEach((key) => {
     groups[key] = Object.values(groups[key]);
   });
+  // console.log('groups', groups);
   return groups;
 };
 

@@ -11,7 +11,7 @@ import chalkTable from 'chalk-table';
 import { getFileSales, getListingInfo, updateSport, uploadOldListings } from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import initializeFirebase from './utils/firebase.js';
-import { loadTeams } from './utils/teams.js';
+import { getTeamSelections, loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import { ask } from './utils/ask.js';
 import open from 'open';
@@ -47,7 +47,6 @@ function buildTableData(groupedCards) {
   Object.values(groupedCards).forEach((cards) =>
     cards.forEach((card) =>
       Object.keys(divider).forEach((key) => {
-        console.log('key', key, 'card[key]', card[key], 'divider[key]', divider[key]);
         divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length || 0), parseInt(divider[key]?.length || 0)));
       }),
     ),
@@ -152,6 +151,7 @@ try {
   const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
+  // console.log('rawSales', rawSales);
 
   //prep listings to remove
   console.log(chalk.cyan('Updating sales with listing info'));

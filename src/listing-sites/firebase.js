@@ -113,6 +113,37 @@ export async function updateSport(db) {
 
 export async function getListingInfo(db, cards) {
   const removals = [];
+  const addRemoval = (card, match) => {
+    let updatedCard = { ...card };
+    //this looks stupid, but firebase returns empty strings, which will overwrite good data.
+    if (match) {
+      if (match.title) {
+        updatedCard.title = match.title;
+      }
+      if (match.insert) {
+        updatedCard.insert = match.insert;
+      }
+      if (match.parallel) {
+        updatedCard.parallel = match.parallel;
+      }
+      if (match.sport) {
+        updatedCard.sport = match.sport;
+      }
+      if (match.year) {
+        updatedCard.year = match.year;
+      }
+      if (match.setName) {
+        updatedCard.setName = match.setName;
+      }
+      if (match.manufacture) {
+        updatedCard.manufacture = match.manufacture;
+      }
+      if (match.ItemID) {
+        updatedCard.ItemID = match.ItemID;
+      }
+    }
+    removals.push(updatedCard);
+  };
   for (let card of cards) {
     // console.log('card', card);
     const updatedCard = {
@@ -144,11 +175,7 @@ export async function getListingInfo(db, cards) {
         updatedCard.parallel === c.parallel,
     );
     if (match) {
-      removals.push({
-        ...updatedCard,
-        ...match,
-        quantity: updatedCard.quantity,
-      });
+      addRemoval(updatedCard, match);
     } else {
       match = possibleCards.find(
         (c) =>
@@ -159,11 +186,7 @@ export async function getListingInfo(db, cards) {
           updatedCard.parallel === c.parallel,
       );
       if (match) {
-        removals.push({
-          ...updatedCard,
-          ...match,
-          quantity: updatedCard.quantity,
-        });
+        addRemoval(updatedCard, match);
       } else {
         const searchSet =
           updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1
@@ -178,11 +201,7 @@ export async function getListingInfo(db, cards) {
         );
 
         if (match) {
-          removals.push({
-            ...updatedCard,
-            ...match,
-            quantity: updatedCard.quantity,
-          });
+          addRemoval(updatedCard, match);
         } else if (updatedCard.setName === 'Chronicles') {
           match = possibleCards.find(
             (c) =>
@@ -202,17 +221,13 @@ export async function getListingInfo(db, cards) {
               c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
           );
           if (match) {
-            removals.push({
-              ...updatedCard,
-              ...match,
-              quantity: updatedCard.quantity,
-            });
+            addRemoval(updatedCard, match);
           } else {
-            console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+            console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
             removals.push(updatedCard);
           }
         } else {
-          console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+          console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
           removals.push(updatedCard);
         }
       }

@@ -163,6 +163,7 @@ import chalk from 'chalk';
 import { useWaitForElement } from './uploads.js';
 import express from 'express';
 import fs from 'fs-extra';
+import chalkTable from 'chalk-table';
 
 export const uploadEbayFile = async () => {
   let driver;
@@ -730,6 +731,7 @@ export const reverseTitle = (title) => {
     } else {
       card.manufacture = setInfo.slice(setInfo.toLowerCase().indexOf(manufacture), manufacture.length);
       setInfo = setInfo.replace(card.manufacture, '').trim();
+      card.setName = setInfo;
     }
   }
 
@@ -743,13 +745,27 @@ export const reverseTitle = (title) => {
   if (insertIndex > -1) {
     card.insert = setInfo.slice(0, insertIndex).trim();
     setInfo = setInfo.replace(card.insert, '').trim();
+    setInfo = setInfo.replace('Insert', '').trim();
   }
 
   const parallelIndex = setInfo.toLowerCase().indexOf('parallel');
   if (parallelIndex > -1) {
     card.parallel = setInfo.slice(0, parallelIndex).trim();
     setInfo = setInfo.replace(card.parallel, '').trim();
+    setInfo = setInfo.replace('Parallel', '').trim();
   }
+
+  if (setInfo.length > 0) {
+    if (!card.insert) {
+      card.insert = setInfo;
+    } else if (!card.parallel) {
+      card.parallel = setInfo;
+    } else {
+      console.log('No Field left to put the remaining SetInfo', setInfo, 'for', card);
+    }
+  }
+
+  // console.log('card', card);
 
   return card;
 };
@@ -766,22 +782,24 @@ export const getEbaySales = async () => {
   // console.log(response);
   const cards = [];
   response.orders.forEach((order) => {
-    order.lineItems.forEach((lineItem) => {
-      const card = {
-        platform: `ebay: ${order.buyer.username}`,
-        ...reverseTitle(lineItem.title),
-        title: lineItem.title,
-        quantity: lineItem.quantity,
-      };
-      if (card.cardNumber) {
-        cards.push(card);
-      }
-    });
+    if (order.orderFulfillmentStatus === 'FULFILLED') {
+      console.log(`Order already fulfilled for ${order.buyer.username}`);
+    } else {
+      order.lineItems.forEach((lineItem) => {
+        const card = {
+          platform: `ebay: ${order.buyer.username}`,
+          ...reverseTitle(lineItem.title),
+          title: lineItem.title,
+          quantity: lineItem.quantity,
+        };
+        if (card.cardNumber) {
+          cards.push(card);
+        }
+      });
+    }
   });
+  // console.log('cards', cards);
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on ebay'));
-  // if (cards.length > 0) {
-  //   await open('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
-  // }
   return cards;
 };
 
@@ -789,14 +807,19 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
   const ebay = await loginEbayAPI();
   const item = await ebay.trading.GetItem({ ItemID: itemNumber });
   const updatedQuantity = parseInt(item.Item.Quantity) - parseInt(quantity);
+  const result = { title, quantity, updatedQuantity, removed: false };
   if (updatedQuantity <= 0) {
     try {
       await ebay.trading.EndFixedPriceItem({ ItemID: itemNumber, EndingReason: 'NotAvailable' });
       console.log(chalk.green(`Successfully ended ${title} on ebay`));
+      result.removed = true;
     } catch (e) {
       if (e.meta.Errors.ErrorCode === 1047) {
         console.log(chalk.green(`${itemNumber} | ${title} has already been ended on ebay`));
-        // console.log(e);
+        result.removed = true;
+      } else {
+        result.removed = false;
+        result.error = e.meta.Errors.ErrorCode;
       }
     }
   } else {
@@ -808,24 +831,19 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
         },
       });
       console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+      result.removed = true;
     } catch (e) {
       console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
-      console.error(e);
-      console.log('update: ', {
-        InventoryStatus: {
-          ItemID: itemNumber,
-          Quantity: updatedQuantity,
-        },
-      });
-      console.log('for item', item);
-      console.log('for item', item.Item.Quantity, quantity, updatedQuantity);
-      throw e;
+      result.error = e.meta.Errors.ErrorCode;
     }
   }
+  return result;
 };
 
 export const removeFromEbay = async (cards = [], db) => {
-  const toRemove = cards.filter((card) => !card.platform?.startsWith('ebay') && card.ItemID);
+  let toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
+  const notRemoved = [];
+  const removed = [];
 
   if (toRemove.length > 0) {
     const removals = [];
@@ -833,14 +851,21 @@ export const removeFromEbay = async (cards = [], db) => {
       if (card.ItemID) {
         removals.push(await removeFromEbayItemNumber(card.ItemID, card.quantity, card.title));
       } else {
-        console.log(`Could not remove ${chalk.red(card.title)} from ebay because no Item Number was found`);
-        console.log(card);
+        // console.log(`Could not remove ${chalk.red(card.title)} from ebay because no Item Number was found`);
+        notRemoved.push({ ...card, remaining: '?', error: 'No Item Number' });
       }
     }
 
-    const removed = await Promise.all(removals);
+    const results = await Promise.all(removals);
+    results.forEach((result) => {
+      if (result.removed) {
+        removed.push(result);
+      } else {
+        notRemoved.push(result);
+      }
+    });
 
-    if (removed.length === toRemove.length) {
+    if (removed.length === toRemove.length && toRemove.length === 0) {
       console.log(
         chalk.magenta('Successfully removed all'),
         chalk.green(removed.length),
@@ -853,6 +878,20 @@ export const removeFromEbay = async (cards = [], db) => {
         chalk.magenta('of'),
         chalk.red(toRemove.length),
         chalk.magenta('cards from ebay'),
+      );
+      console.log(
+        chalkTable(
+          {
+            leftPad: 2,
+            columns: [
+              { field: 'title', name: 'Title' },
+              { field: 'quantity', name: 'Sold' },
+              { field: 'updatedQuantity', name: 'Remaining' },
+              { field: 'error', name: 'Error' },
+            ],
+          },
+          notRemoved,
+        ),
       );
     }
   } else {

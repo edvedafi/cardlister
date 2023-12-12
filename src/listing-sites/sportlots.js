@@ -71,7 +71,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
         await selectBrand(donrussManufactured);
         return await selectSet(donrussManufactured);
       } else {
-        console.log(`Please select [${setInfo.manufacture} ${setName}]`);
+        // console.log(`Please select [${setInfo.manufacture} ${setName}]`);
         setInfoForRun.found = false;
         return setInfoForRun;
       }
@@ -79,14 +79,17 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
     try {
       let found = false;
       await driver.sleep(500);
+      console.log(`Searching for [${setName}]`);
       const rows = await driver.findElements(By.xpath(`//*[contains(text(), '${setName}')]`));
       for (let row of rows) {
         const fullSetText = await row.getText();
         // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
         // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
-        const regex = new RegExp(`^\\d+( ${setInfoForRun.manufacture})? ${setName}( Base Set)?( ${sport})?$`);
+        const regex = new RegExp(
+          `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport.toLowerCase()})?$`,
+        );
         // console.log('Testing: ' + fullSetText + ' against ' + regex);
-        if (regex.test(fullSetText)) {
+        if (regex.test(fullSetText.toLowerCase())) {
           // console.log('Found: ' + fullSetText);
           foundAction && (await foundAction(fullSetText, row));
           found = true;
@@ -357,6 +360,7 @@ export async function removeFromSportLots(groupedCards) {
 
   const toRemove = {};
   let removed = 0;
+  const notRemoved = [];
   Object.keys(groupedCards).forEach((key) => {
     const toRemoveAtKey = groupedCards[key].filter((card) => card.platform.indexOf('SportLots') === -1);
     if (toRemoveAtKey?.length > 0) {
@@ -385,8 +389,11 @@ export async function removeFromSportLots(groupedCards) {
 
     let found = setInfo.found;
 
+    const updateInventoryHeader = By.xpath('//h2/*[contains(text(), "Update Inventory")]');
     try {
-      await driver.findElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`));
+      await driver.findElement(updateInventoryHeader);
+      found = true;
+      console.log('found update inventory');
     } catch (e) {
       const find = new Promise((resolve) => {
         let askFail, waitFail;
@@ -413,7 +420,7 @@ export async function removeFromSportLots(groupedCards) {
               // resolve(false);
             }
           });
-        waitForElement(By.xpath(`//*[contains(normalize-space(), 'Update Inventory')]`))
+        waitForElement(updateInventoryHeader)
           .then(() => {
             // console.log('element - then');
             // try {
@@ -444,12 +451,15 @@ export async function removeFromSportLots(groupedCards) {
         try {
           tdWithName = await driver.findElement(By.xpath(`//td[contains(text(), ' ${card.cardNumber} ')]`));
         } catch (e) {
-          // console.log('*** looking for ', `//td[contains(text(), ' ${card.cardNumber.replace(/\D*/, '').trim()} ')]`);
+          // remove all non-numeric characters from the card number and try again
+          const cardNumber = card.cardNumber.replace(/\D/g, '');
+
+          console.log('*** looking for ', `//td[contains(text(), ' ${cardNumber} ')]`);
           try {
-            tdWithName = await driver.findElement(
-              By.xpath(`//td[contains(text(), ' ${card.cardNumber.replace(/\D*/, '').trim()} ')]`),
-            );
-          } catch (e) {}
+            tdWithName = await driver.findElement(By.xpath(`//td[contains(text(), ' ${cardNumber} ')]`));
+          } catch (e) {
+            console.log('could not find element', e);
+          }
         }
         if (tdWithName) {
           const row = await tdWithName.findElement(By.xpath('..'));
@@ -474,6 +484,8 @@ export async function removeFromSportLots(groupedCards) {
         }
       }
       await clickSubmit('Change Dealer Values');
+    } else {
+      throw new Error('Could not find set');
     }
   }
 
