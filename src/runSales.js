@@ -187,10 +187,14 @@ try {
     if (await ask('Remove from BuySportsCards?', true)) {
       await removeFromBuySportsCards(groupedCards);
     }
+    if (await ask('Remove from Shopify?', true)) {
+      await removeFromShopify(sales);
+    }
   } else {
     await removeFromEbay(sales, db);
     await removeFromSportLots(groupedCards);
     await removeFromBuySportsCards(groupedCards);
+    await removeFromShopify(sales);
   }
   console.log(chalk.cyan('Completed removing listings from sites'));
 

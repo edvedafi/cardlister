@@ -842,6 +842,7 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
 
 export const removeFromEbay = async (cards = [], db) => {
   let toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
+  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from Shopify'));
   const notRemoved = [];
   const removed = [];
 

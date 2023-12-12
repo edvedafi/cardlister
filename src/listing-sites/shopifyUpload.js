@@ -4,6 +4,8 @@ import '@shopify/shopify-api/adapters/node';
 import { shopifyApi } from '@shopify/shopify-api';
 import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
 import open from 'open';
+import chalk from 'chalk';
+import chalkTable from 'chalk-table';
 
 const login = async (isRest = false) => {
   const shopifyConfig = {
@@ -11,7 +13,7 @@ const login = async (isRest = false) => {
     apiSecretKey: process.env.SHOPIFY_API_SECRET,
     isCustomStoreApp: true,
     adminApiAccessToken: process.env.SHOPIFY_ACCESS_TOKEN,
-    // scopes: ['write_products'],
+    scopes: ['write_products', 'write_inventory', 'read_inventory', 'read_products'],
     hostName: process.env.SHOPIFY_URL,
     shopName: 'edvedafi',
   };
@@ -218,105 +220,132 @@ const getCollections = (card) => {
   }
 };
 
-export async function removeFromShopify(data) {
-  const [shopify, session] = await login(true);
-  return open('https://admin.shopify.com/store/381dda-3/products/inventory?location_id=84117881140');
-  /*
-  await Promise.all(
-    Object.values(data).map(async (card) => {
-      // Session is built by the OAuth process
+export async function removeFromShopify(cards) {
+  let toRemove = cards.filter((card) => !card.platform.startsWith('Shop: '));
+  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from Shopify'));
+  const client = await login();
+  const notRemoved = [];
 
-      // shopify.productVariant
-      //     .list({ product_id: 'your-product-id', title: 'Your Product Variant Title' })
-      //     .then((variants) => {
-      //       if (variants.length > 0) {
-      //         const variant = variants[0];
-      //         console.log('Variant ID:', variant.id);
-      //         console.log('Inventory Item ID:', variant.inventory_item_id);
-      //       } else {
-      //         console.log('Product variant not found.');
-      //       }
-      //     })
-      //     .catch((error) => console.error('Error:', error));
-      //
-      const products = await shopify.rest.Product.find({ title: card.title, limit: 5 });
-      console.log(products.body.products);
+  for (const card of toRemove) {
+    const query = `query {
+          products(query: "${card.title}", first: 1) {            
+            edges {
+              node {
+                id
+                variants(first: 1) {
+                  edges {
+                    node {
+                      id
+                      inventoryItem {
+                        id
+                        inventoryLevels(first: 1) {
+                          edges {
+                            node {
+                              id
+                              location {
+                                id
+                                name
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }`;
 
-      // const inventory_level = new shopifyApi.rest.InventoryLevel({ session: session });
-      // return inventory_level
-      //   .adjust({
-      //     body: {
-      //       location_id: process.env.SHOPIFY_LOCATION_ID,
-      //       inventory_item_id: 808950810,
-      //       available_adjustment: -1 * card.quantity,
-      //     },
-      //   })
-      //   .then((result) => {
-      //     console.log(result.body);
-      //   })
-      //   .catch((err) => {
-      //     console.log(err);
-      //     throw err;
-      //   });
-      //   const query = `query {
-      //       products(query: "${card.title}", first: 1) {
-      //         edges {
-      //           node {
-      //             id
-      //             title
-      //             variants(first: 1) {
-      //               edges {
-      //                 node {
-      //                   id
-      //                   inventoryQuantity
-      //                 }
-      //               }
-      //             }
-      //           }
-      //         }
-      //       }
-      //     }`;
-      //
-      //   try {
-      //     const productResults = await client.query({ data: query });
-      //
-      //     console.log(JSON.stringify(productResults.body, null, 2));
-      //     const inventoryItem = productResults.body.data.products.edges[0].node.variants.edges[0].node;
-      //     if (!inventoryItem) {
-      //       throw new Error('No inventory item found');
-      //     }
-      //
-      //     const update = `mutation {
-      //         inventoryQuantityAdjust(input: {
-      //           id: "${inventoryItem.id}"
-      //           availableDelta: -${card.quantity}
-      //         }) {
-      //           inventoryLevel {
-      //             available
-      //           }
-      //         }
-      //       }`;
-      //     try {
-      //       const updateResult = await client.query({ data: update });
-      //       console.log(JSON.stringify(updateResult.body, null, 2));
-      //     } catch (e) {
-      //       console.error('Failed to update inventory');
-      //       console.error(e);
-      //       console.error('update: ', update);
-      //     }
-      //     //
-      //     // if (getProduct.body.data.productCreate.userErrors.length > 0) {
-      //     //   console.log('Failed to save to Shopify - userErrors');
-      //     //   throw getProduct.body.data.productCreate.userErrors;
-      //     // }
-      //   } catch (e) {
-      //     console.error('Failed to get product from Shopify');
-      //     console.error(e);
-      //     console.error('query: ', query);
-      //   }
-    }),
-  );
-   */
+    try {
+      const productResults = await client.query({ data: query });
+      // console.log(JSON.stringify(productResults.body, null, 2));
+
+      const inventoryItem = productResults.body.data.products.edges[0].node.variants.edges[0].node.inventoryItem;
+      if (!inventoryItem) {
+        // console.log(JSON.stringify(productResults.body, null, 2));
+        throw new Error('No inventory item found');
+      }
+
+      const allInOneUpdate = `mutation {
+        inventoryAdjustQuantities(input: {
+          name: "available",
+          reason: "correction",
+          changes: [{
+            inventoryItemId: "${inventoryItem.id}",
+            locationId: "${process.env.SHOPIFY_LOCATION_GID}",
+            delta: ${-1 * card.quantity},
+          }]}) {
+          inventoryAdjustmentGroup {
+            createdAt
+            reason
+            app {
+              id
+            }
+            changes {
+              name
+              delta
+              quantityAfterChange
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }`;
+
+      try {
+        const updateResult = await client.query({ data: { query: allInOneUpdate } });
+        // console.log('success!', JSON.stringify(updateResult.body, null, 2));
+      } catch (e) {
+        card.error = `Could not update inventory: ${e.message}`;
+        notRemoved.push(card);
+        // console.error('Failed to update inventory');
+        // console.error(e);
+        // console.error(JSON.stringify(e.response.errors, null, 2));
+        // console.log(allInOneUpdate);
+      }
+    } catch (e) {
+      card.error = `Could not find product: ${e.message}`;
+      notRemoved.push(card);
+      // console.error('Failed to get product from Shopify for ');
+      // console.error(e);
+      // console.error('query: ', query);
+      // throw e;
+    }
+  }
+
+  if (notRemoved.length === 0) {
+    console.log(
+      chalk.magenta('Successfully removed all'),
+      chalk.green(toRemove.length),
+      chalk.magenta('cards from Shopify'),
+    );
+  } else {
+    console.log(
+      chalk.magenta('Only removed'),
+      chalk.red(toRemove.length - notRemoved.length),
+      chalk.magenta('of'),
+      chalk.red(toRemove.length),
+      chalk.magenta('cards from Shopify'),
+    );
+    console.log(
+      chalkTable(
+        {
+          leftPad: 2,
+          columns: [
+            { field: 'title', name: 'Title' },
+            { field: 'quantity', name: 'Sold' },
+            { field: 'updatedQuantity', name: 'Remaining' },
+            { field: 'error', name: 'Error' },
+          ],
+        },
+        notRemoved,
+      ),
+    );
+  }
 }
 
 export default uploadToShopify;
