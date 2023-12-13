@@ -172,7 +172,7 @@ describe('uploads', () => {
         examples.insert_parallel.third_insert_third_parallel,
       ]);
     });
-
+    //   Football|2021|panini|chronicles|gridiron-kings|pink|1
     it('should generate the same result whether bulk or all cards', () => {
       const allCards = undefined;
       const bulk = [
