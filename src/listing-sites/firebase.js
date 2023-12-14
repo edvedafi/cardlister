@@ -1,6 +1,4 @@
-import initializeFirebase from '../utils/firebase.js';
-import { doc, setDoc } from 'firebase/firestore';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore } from '../utils/firebase.js';
 import chalk from 'chalk';
 import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
@@ -10,12 +8,11 @@ import { titleCase } from '../utils/data.js';
 
 export async function uploadToFirebase(allCards) {
   console.log(chalk.magenta('Firebase Starting Upload'));
-  const firebase = initializeFirebase();
-  const db = getFirestore(firebase);
+  const db = getFirestore();
+  const collection = db.collection('CardSales');
   let count = 0;
   for (const card of allCards) {
-    const docRef = doc(db, 'CardSales', card.key);
-    await setDoc(docRef, {
+    await collection.doc('').set({
       sport: card.sport,
       quantity: card.quantity,
       price: card.price,
@@ -36,6 +33,8 @@ export async function uploadToFirebase(allCards) {
       features: card.features,
       longTitle: card.longTitle,
       cardName: card.cardName,
+      sku: card.sku,
+      bin: card.bin,
     });
     count++;
   }
@@ -54,8 +53,7 @@ export async function uploadToFirebase(allCards) {
 
 export async function uploadOldListings() {
   console.log(chalk.magenta('Firebase Starting Upload'));
-  const firebase = initializeFirebase();
-  const db = getFirestore(firebase);
+  const db = getFirestore();
   const oldListings = [];
 
   let finishReadingCsv;
@@ -236,6 +234,11 @@ export async function getListingInfo(db, cards) {
   return removals;
 }
 
+/**
+ * Retrieves sales data from a file named offline_sales.csv in the root directory of the project.
+ *
+ * @returns {Promise<*[]|(*&{quantity: *, platform: string})[]>} Returns an array of sales data objects, each containing card details, quantity, and platform.
+ */
 export async function getFileSales() {
   //ADD A CARD
 
@@ -263,5 +266,108 @@ export async function getFileSales() {
       .filter((card) => card.cardNumber);
   } else {
     return [];
+  }
+}
+
+let _cachedNumbers;
+
+/**
+ * Get the next number in the sequence for the given collection type
+ *
+ * @param collectionType {string}  The collection type to get the next number for
+ * @returns {Promise<number>} The next number in the sequence
+ */
+export async function getNextCounter(collectionType) {
+  if (!_cachedNumbers) {
+    const doc = await getFirestore().collection('counters').doc('Sales').get();
+    _cachedNumbers = doc.data();
+  }
+
+  if (!_cachedNumbers[collectionType]) {
+    _cachedNumbers[collectionType] = 1;
+  }
+
+  return ++_cachedNumbers[collectionType];
+}
+
+/**
+ * Save the current counter values to Firebase
+ */
+export async function shutdownFirebase() {
+  if (_cachedNumbers) {
+    await getFirestore().collection('counters').doc('Sales').update(_cachedNumbers);
+  }
+}
+
+/**
+ * Retrieves a sales group from the database based on the provided information.
+ *
+ * @param {Object} info - The information used to identify the sales group.
+ * @param {string} info.sport - The sport of the sales group.
+ * @param {string} info.year - The year of the sales group.
+ * @param {string} info.manufacture - The manufacture of the sales group.
+ * @param {string} info.setName - The name of the sales group.
+ * @param {string} [info.insert] - The insert of the sales group (optional).
+ * @param {string} [info.parallel] - The parallel of the sales group (optional).
+ * @returns {Promise<{
+ *   sport: string,
+ *   year: string,
+ *   manufacture: string,
+ *   setName: string,
+ *   insert: string|null,
+ *   parallel: string|null,
+ *   skuPrefix: string,
+ *   bin: number
+ * }>} - A promise that resolves to the retrieved sales group or newly saved sales group.
+ */
+export async function getGroup(info) {
+  const db = getFirestore();
+  const collection = db.collection('SalesGroups');
+  const setInfo = {
+    sport: info.sport.toLowerCase(),
+    year: info.year.toLowerCase(),
+    manufacture: info.manufacture.toLowerCase(),
+    setName: info.setName.toLowerCase(),
+    insert: info.insert?.toLowerCase(),
+    parallel: info.parallel?.toLowerCase(),
+  };
+  const query = collection
+    .where('sport', '==', setInfo.sport)
+    .where('year', '==', setInfo.year)
+    .where('manufacture', '==', setInfo.manufacture)
+    .where('setName', '==', setInfo.setName)
+    .where('insert', '==', setInfo.insert || null)
+    .where('parallel', '==', setInfo.parallel || null);
+  const queryResults = await query.get();
+
+  if (queryResults.size === 0) {
+    const group = {
+      sport: setInfo.sport,
+      year: setInfo.year,
+      manufacture: setInfo.manufacture,
+      setName: setInfo.setName,
+      insert: setInfo.insert || null,
+      parallel: setInfo.parallel || null,
+      skuPrefix: `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${setInfo.insert || ''}|${
+        setInfo.parallel || ''
+      }`.replaceAll(' ', '-'),
+      bin: await getNextCounter('Group'),
+    };
+    await collection.doc(`${group.bin}`).set(group);
+    return group;
+  } else if (queryResults.size === 1) {
+    return queryResults.docs[0].data();
+  } else {
+    const choices = [];
+    queryResults.forEach((doc) => {
+      const g = doc.data();
+      choices.push({
+        name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
+        value: g,
+        description: `${g.year} ${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+      });
+    });
+    console.log('Trying to find:', setInfo);
+    return await ask('Which group is correct?', undefined, { selectOptions: choices });
   }
 }
