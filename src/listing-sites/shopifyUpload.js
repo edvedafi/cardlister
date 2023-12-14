@@ -78,7 +78,8 @@ async function uploadToShopify(data) {
               requiresShipping: true,
               taxable: true,
               weight: 1.0,
-              weightUnit: OUNCES
+              weightUnit: OUNCES,
+              sku: "${card.sku}"
             }
           ],
           vendor: "${card.manufacture}"
