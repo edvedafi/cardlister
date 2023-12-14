@@ -378,7 +378,7 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   output = {
     ...output,
     ...group,
-    sku: `${group.skuPrefix}|${output.cardNumber}`,
+    sku: `${group.bin}|${output.cardNumber}`,
   };
 
   output.title = await getCardTitle(output);
@@ -424,7 +424,7 @@ export const getCardData = async (allCards, imageDefaults) => {
     cardNumber = await ask('Card Number', cardNumber);
   }
 
-  let output = allCards[imageDefaults.key || cardNumber];
+  let output = allCards[imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`];
 
   //see if we already have that card number
   if (output) {
@@ -432,7 +432,7 @@ export const getCardData = async (allCards, imageDefaults) => {
   } else {
     //if we haven't found it yet, lets get the new data!
     output = await getNewCardData(cardNumber, {
-      key: imageDefaults.key || cardNumber,
+      key: imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`,
       ...imageDefaults,
       ...output,
     });
@@ -457,7 +457,7 @@ export const getCardData = async (allCards, imageDefaults) => {
   const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
   output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
 
-  allCards[output.key] = output;
+  allCards[output.sku] = output;
   saveAnswers(allCards);
 
   return output;
@@ -631,6 +631,7 @@ export const getLotData = async (imageDefaults, allCards) => {
 
   output.lotCount = 1;
   output.key = `${playerKey}_${output.lotCount}`;
+  output.sku = 'EbayOnly';
   const keyExists = async () => allCards[output.key] || (await fs.pathExists(`${output.directory}/${output.key}`));
   while ((await keyExists()) && output.lotCount < 99) {
     output.key = `${playerKey}_${++output.lotCount}`;

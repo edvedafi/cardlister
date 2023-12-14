@@ -600,7 +600,7 @@ const createOfferForCard = (card) => ({
   //   repairScore: 'number',
   // },
   // secondaryCategoryId: 'string',
-  sku: card.key,
+  sku: card.sku,
   storeCategoryNames: [card.sport],
   // tax: {
   //   applyTax: 'boolean',
