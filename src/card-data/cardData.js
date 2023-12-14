@@ -2,6 +2,7 @@ import { ask, confirm } from '../utils/ask.js';
 import { findLeague, getTeamSelections, sports } from '../utils/teams.js';
 import { graders, isNo, isYes } from '../utils/data.js';
 import fs from 'fs-extra';
+import { getGroup } from '../listing-sites/firebase.js';
 
 //Set up the card name and track with previous for front/back situations
 let answerFile;
@@ -97,6 +98,7 @@ export const getSetData = async () => {
     saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer || 0.01);
     saveData.setData.bscPrice = await ask('BSC Price', saveData.setData.bscPrice || 0.25);
     saveData.setData.slPrice = await ask('SportLots Price', saveData.setData.slPrice || 0.18);
+    saveData.setData.bin = (await getGroup(saveData.setData)).bin;
   } else {
     saveData.setData = {};
   }
@@ -310,20 +312,24 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   await askFor('Year', 'year', { allowUpdates: resetAll });
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
-  await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
-  await askFor('Set Name', 'setName', { allowUpdates: resetAll });
+
+  const updateSetInfo = await ask('Update Set Info?', false, { allowUpdates: resetAll });
+  if (updateSetInfo) {
+    await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
+    await askFor('Set Name', 'setName', { allowUpdates: resetAll });
+  }
 
   let skipShipping = await ask('Is base card?', true, {
     allowUpdates: resetAll,
   });
 
   if (skipShipping) {
-    output.title = await getCardTitle(output);
-    output.cardName = await getCardName(output);
     output.quantity = 1;
   } else {
-    await askFor('Parallel', 'parallel', { allowUpdates: skipShipping || resetAll });
-    await askFor('Insert', 'insert', { allowUpdates: skipShipping || resetAll });
+    if (updateSetInfo) {
+      await askFor('Parallel', 'parallel', { allowUpdates: skipShipping || resetAll });
+      await askFor('Insert', 'insert', { allowUpdates: skipShipping || resetAll });
+    }
     await askFor('Features (RC, etc)', 'features', { allowUpdates: skipShipping || resetAll });
     await askFor('Print Run', 'printRun', { allowUpdates: skipShipping || resetAll });
     await askFor('Autographed', 'autographed', { allowUpdates: skipShipping || resetAll });
@@ -342,9 +348,6 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
       await askFor('Grade', 'grade', { allowUpdates: resetAll });
       await askFor('Cert Number', 'certNumber', { allowUpdates: resetAll });
     }
-
-    output.title = await getCardTitle(output);
-    output.cardName = await getCardName(output);
 
     skipShipping = await ask('Use Standard Card Size/Shipping?', true);
   }
@@ -370,6 +373,16 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     await askFor('Width (iyeah)', 'width', { allowUpdates: resetAll });
     await askFor('Depth (in)', 'depth', { allowUpdates: resetAll });
   }
+
+  const group = await getGroup(output);
+  output = {
+    ...output,
+    ...group,
+    sku: `${group.skuPrefix}|${output.cardNumber}`,
+  };
+
+  output.title = await getCardTitle(output);
+  output.cardName = await getCardName(output);
 
   await askFor('Price', 'price', { allowUpdates: true });
   if (output.price === '0.99' || output.price === 0.99) {

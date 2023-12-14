@@ -8,7 +8,15 @@ import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './lis
 import { removeFromMyCardPost } from './listing-sites/mycardpost.js';
 import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
-import { getFileSales, getListingInfo, updateSport, uploadOldListings } from './listing-sites/firebase.js';
+import {
+  getFileSales,
+  getGroup,
+  getListingInfo,
+  getNextCounter,
+  shutdownFirebase,
+  updateSport,
+  uploadOldListings,
+} from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import initializeFirebase from './utils/firebase.js';
 import { getTeamSelections, loadTeams } from './utils/teams.js';
@@ -23,7 +31,7 @@ $.verbose = false;
 dotenv.config();
 
 const shutdown = async () => {
-  await Promise.all([shutdownSportLots(), shutdownBuySportsCards()]);
+  await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase()]);
 };
 
 process.on('SIGINT', async function () {
@@ -142,88 +150,95 @@ function buildTableData(groupedCards) {
 }
 
 try {
-  const firebase = initializeFirebase();
-  const db = getFirestore(firebase);
-  await loadTeams(firebase);
-
-  //gather sales
-  console.log(chalk.cyan('Gather listings from sites'));
-  const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
-  const rawSales = results.reduce((s, result) => s.concat(result), []);
-  console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
-  // console.log('rawSales', rawSales);
-
-  //prep listings to remove
-  console.log(chalk.cyan('Updating sales with listing info'));
-  const openSalesSites = [];
-
-  const sales = await getListingInfo(db, rawSales);
-  const groupedCards = createGroups({}, sales);
-
-  if (sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1)) {
-    openSalesSites.push('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('BSC: ') > -1)) {
-    openSalesSites.push('https://www.buysportscards.com/sellers/orders');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
-    openSalesSites.push('https://mycardpost.com/edvedafi/offers');
-  }
-  if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
-    openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
-  }
-  console.log(chalk.cyan('Completed adding listing info to cards'));
-
-  //remove listings from sites
-  console.log(chalk.cyan('Remove listings from sites'));
-
-  if (args.r) {
-    if (await ask('Remove from Ebay?', true)) {
-      await removeFromEbay(sales, db);
-    }
-    if (await ask('Remove from Sportlots?', true)) {
-      await removeFromSportLots(groupedCards);
-    }
-    if (await ask('Remove from BuySportsCards?', true)) {
-      await removeFromBuySportsCards(groupedCards);
-    }
-    if (await ask('Remove from Shopify?', true)) {
-      await removeFromShopify(sales);
-    }
-  } else {
-    await removeFromEbay(sales, db);
-    await removeFromSportLots(groupedCards);
-    await removeFromBuySportsCards(groupedCards);
-    await removeFromShopify(sales);
-  }
-  console.log(chalk.cyan('Completed removing listings from sites'));
-
-  //output a pick list
-  console.log(chalk.cyan('All Sales:'));
-
-  console.log(
-    chalkTable(
-      {
-        leftPad: 2,
-        columns: [
-          { field: 'sport', name: chalk.cyan('Sport') },
-          { field: 'year', name: 'Year' },
-          { field: 'setName', name: 'Set' },
-          { field: 'parallel', name: chalk.green('Parallel') },
-          { field: 'insert', name: chalk.blue('Insert') },
-          { field: 'cardNumber', name: 'Card #' },
-          { field: 'quantity', name: 'Count' },
-          { field: 'title', name: 'Title' },
-          { field: 'platform', name: 'Sold On' },
-        ],
-      },
-      buildTableData(groupedCards),
-    ),
-  );
-
-  for (const site of openSalesSites) {
-    await open(site);
-  }
+  const next = await getGroup({
+    sport: 'Football',
+    year: '2023',
+    manufacture: 'Panini',
+    setName: 'score',
+  });
+  console.log('next', next);
+  // const firebase = initializeFirebase();
+  // const db = getFirestore(firebase);
+  // await loadTeams(firebase);
+  //
+  // //gather sales
+  // console.log(chalk.cyan('Gather listings from sites'));
+  // const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
+  // const rawSales = results.reduce((s, result) => s.concat(result), []);
+  // console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
+  // // console.log('rawSales', rawSales);
+  //
+  // //prep listings to remove
+  // console.log(chalk.cyan('Updating sales with listing info'));
+  // const openSalesSites = [];
+  //
+  // const sales = await getListingInfo(db, rawSales);
+  // const groupedCards = createGroups({}, sales);
+  //
+  // if (sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1)) {
+  //   openSalesSites.push('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
+  // }
+  // if (sales.find((sale) => sale.platform.indexOf('BSC: ') > -1)) {
+  //   openSalesSites.push('https://www.buysportscards.com/sellers/orders');
+  // }
+  // if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
+  //   openSalesSites.push('https://mycardpost.com/edvedafi/offers');
+  // }
+  // if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
+  //   openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  // }
+  // console.log(chalk.cyan('Completed adding listing info to cards'));
+  //
+  // //remove listings from sites
+  // console.log(chalk.cyan('Remove listings from sites'));
+  //
+  // if (args.r) {
+  //   if (await ask('Remove from Ebay?', true)) {
+  //     await removeFromEbay(sales, db);
+  //   }
+  //   if (await ask('Remove from Sportlots?', true)) {
+  //     await removeFromSportLots(groupedCards);
+  //   }
+  //   if (await ask('Remove from BuySportsCards?', true)) {
+  //     await removeFromBuySportsCards(groupedCards);
+  //   }
+  //   if (await ask('Remove from Shopify?', true)) {
+  //     await removeFromShopify(sales);
+  //   }
+  // } else {
+  //   await removeFromEbay(sales, db);
+  //   await removeFromSportLots(groupedCards);
+  //   await removeFromBuySportsCards(groupedCards);
+  //   await removeFromShopify(sales);
+  // }
+  // console.log(chalk.cyan('Completed removing listings from sites'));
+  //
+  // //output a pick list
+  // console.log(chalk.cyan('All Sales:'));
+  //
+  // console.log(
+  //   chalkTable(
+  //     {
+  //       leftPad: 2,
+  //       columns: [
+  //         { field: 'sport', name: chalk.cyan('Sport') },
+  //         { field: 'year', name: 'Year' },
+  //         { field: 'setName', name: 'Set' },
+  //         { field: 'parallel', name: chalk.green('Parallel') },
+  //         { field: 'insert', name: chalk.blue('Insert') },
+  //         { field: 'cardNumber', name: 'Card #' },
+  //         { field: 'quantity', name: 'Count' },
+  //         { field: 'title', name: 'Title' },
+  //         { field: 'platform', name: 'Sold On' },
+  //       ],
+  //     },
+  //     buildTableData(groupedCards),
+  //   ),
+  // );
+  //
+  // for (const site of openSalesSites) {
+  //   await open(site);
+  // }
 } finally {
   await shutdown();
 }
