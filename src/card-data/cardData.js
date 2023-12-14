@@ -16,7 +16,7 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
   answerFile = `${inputDirectory}input.json`;
 
   try {
-    if (await fs.exists(answerFile)) {
+    if (fs.existsSync(answerFile)) {
       const answerInput = await fs.readJSON(answerFile);
       // console.log('answerInput', answerInput);
 
@@ -370,7 +370,7 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     await askFor('Weight (lbs)', 'lbs', { allowUpdates: resetAll });
     await askFor('Weight (oz)', 'oz', { allowUpdates: resetAll });
     await askFor('Length (in)', 'length', { allowUpdates: resetAll });
-    await askFor('Width (iyeah)', 'width', { allowUpdates: resetAll });
+    await askFor('Width (in)', 'width', { allowUpdates: resetAll });
     await askFor('Depth (in)', 'depth', { allowUpdates: resetAll });
   }
 
@@ -650,5 +650,3 @@ export const getLotData = async (imageDefaults, allCards) => {
 
   return output;
 };
-
-//Troy Aikman
