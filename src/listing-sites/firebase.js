@@ -330,6 +330,9 @@ export async function getGroup(info) {
     setName: info.setName.toLowerCase(),
     insert: info.insert?.toLowerCase(),
     parallel: info.parallel?.toLowerCase(),
+    bscPrice: info.bscPrice,
+    slPrice: info.slPrice,
+    price: info.price,
   };
   const query = collection
     .where('sport', '==', setInfo.sport)
@@ -370,4 +373,10 @@ export async function getGroup(info) {
     console.log('Trying to find:', setInfo);
     return await ask('Which group is correct?', undefined, { selectOptions: choices });
   }
+}
+
+export async function getGroupByBin(bin) {
+  const db = getFirestore();
+  const group = await db.collection('SalesGroups').doc(bin).get();
+  return group.data();
 }

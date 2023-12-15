@@ -1,10 +1,6 @@
 import { By, Select, until } from 'selenium-webdriver';
 import { titleCase } from '../utils/data.js';
 
-const createKey = (card) =>
-  `${titleCase(card.sport)}|${
-    card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year
-  }|${card.manufacture}|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
 export const parseKey = (key, lowercase = false) => {
   const [sport, year, manufacture, setName, insert, parallel] = key.split('|');
   return lowercase
@@ -31,7 +27,7 @@ export const createGroups = (allCards = {}, bulk = []) => {
   const addCardsToGroup = (cards) =>
     cards.forEach((card) => {
       if (card.quantity && card.quantity > 0 && Number.parseInt(card.quantity) === Number.parseFloat(card.quantity)) {
-        const key = createKey(card);
+        const key = card.bin;
         if (!groups[key]) {
           groups[key] = {};
         }
@@ -42,28 +38,12 @@ export const createGroups = (allCards = {}, bulk = []) => {
     });
   addCardsToGroup(Object.values(allCards));
   addCardsToGroup(bulk);
+
   Object.keys(groups).forEach((key) => {
     groups[key] = Object.values(groups[key]);
   });
   // console.log('groups', groups);
   return groups;
-};
-
-const createSKU = (card) =>
-  `${card.sport}|${card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year}|${
-    card.manufacture
-  }|${card.setName}|${card.insert || ''}|${card.parallel || ''}|${card.cardNumber}`;
-export const parseSKU = (key) => {
-  const [sport, year, manufacture, setName, insert, parallel, cardNumber] = key.split('|');
-  return {
-    sport,
-    year,
-    manufacture,
-    setName,
-    insert,
-    parallel,
-    cardNumber,
-  };
 };
 
 export const useHighlightElement =

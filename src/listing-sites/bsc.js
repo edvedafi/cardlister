@@ -6,6 +6,8 @@ import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
 import pRetry, { AbortError } from 'p-retry';
+import { deepEqual } from 'node:assert';
+import { getGroup, getGroupByBin } from './firebase.js';
 
 dotenv.config();
 
@@ -142,7 +144,7 @@ const runUpdates = async (groupedCards) => {
     await driver.get('https://www.buysportscards.com/sellers/bulk-upload');
 
     for (const key in groupedCards) {
-      const setData = parseKey(key);
+      const setData = getGroupByBin(key);
       const setFilter = async (placeHolderField, checkboxValue) => {
         const sportSearchField = await waitForElement(By.xpath(`//input[@placeholder='${placeHolderField}']`));
         await sportSearchField.clear();
@@ -206,7 +208,20 @@ const runUpdates = async (groupedCards) => {
       await conditionSelect.click();
       const conditionList = await waitForElement(By.xpath(`//*[@data-value='near_mint' or @data-value='nm']`));
       await conditionList.click();
-      // const defaultPriceInput = await waitForElement(By.id('defaultPrice'));
+      if (setData.bscPrice) {
+        const defaultPriceInput = await waitForElement(
+          By.xpath('//div[p[text()="Default Price:"]]/following-sibling::div/div/div/input'),
+        );
+        await defaultPriceInput.clear();
+        await defaultPriceInput.sendKeys(setData.bscPrice);
+      }
+
+      const defaultSkuInput = await waitForElement(
+        By.xpath('//div[p[text()="Default SKU:"]]/following-sibling::div/div/div/input'),
+      );
+      await defaultSkuInput.clear();
+      await defaultSkuInput.sendKeys(setData.bin);
+
       const nextButton = await waitForButton('Generate');
       await nextButton.click();
 
@@ -248,11 +263,18 @@ const runUpdates = async (groupedCards) => {
             newQuantity = 0;
           }
 
-          if (card.bscPrice) {
+          if (card.bscPrice && card.bscPrice !== setData.bscPrice) {
             const priceTextBox = await columns[5].findElement({ css: 'input' });
             await priceTextBox.clear();
             await driver.wait(until.elementTextIs(priceTextBox, ''), 5000);
             await priceTextBox.sendKeys(card.bscPrice);
+          }
+
+          if (card.sku) {
+            const skuTextBox = await columns[7].findElement({ css: 'input' });
+            await skuTextBox.clear();
+            await driver.wait(until.elementTextIs(skuTextBox, ''), 5000);
+            await skuTextBox.sendKeys(card.sku);
           }
 
           await driver.wait(until.elementTextIs(cardNumberTextBox, ''), 5000);
