@@ -7,7 +7,8 @@ import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
 import pRetry, { AbortError } from 'p-retry';
 import { deepEqual } from 'node:assert';
-import { getGroup, getGroupByBin } from './firebase.js';
+import { getGroup, getGroupByBin, updateGroup } from './firebase.js';
+import chalkTable from 'chalk-table';
 
 dotenv.config();
 
@@ -112,7 +113,22 @@ const fetchJson = async (path, method = 'GET', body) => {
 const get = fetchJson;
 const put = async (path, body) => fetchJson(path, 'PUT', body);
 const post = async (path, body) => fetchJson(path, 'POST', body);
+async function postImage(path, imagePath) {
+  const formData = new FormData();
 
+  formData.append('attachment', fs.createReadStream(imagePath));
+
+  const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
+    headers: {
+      ...baseHeaders,
+      ...formData.getHeaders(),
+    },
+    body: formData,
+    method: 'POST',
+  });
+
+  return responseObject.json();
+}
 export async function shutdownBuySportsCards() {
   await _driver?.quit();
 }
@@ -384,12 +400,29 @@ const iterateOverCards = async (cardsToUpdate, body, processRow) => {
   }
 };
 
-export const uploadToBuySportsCards = async (groupedCards) => {
+export const uploadToBuySportsCardsOldUI = async (groupedCards) => {
   console.log(chalk.magenta('BSC Starting Upload'));
   console.log('Uploading:', Object.keys(groupedCards));
   await runUpdates(groupedCards);
   console.log(chalk.magenta('BSC Upload COMPLETE!'));
 };
+
+export async function saveBulk(listings) {
+  await pRetry(
+    async () => {
+      const results = await put('seller/bulk-upload', {
+        sellerId: 'cf987f7871',
+        listings,
+      });
+      if (results.result === 'Saved!') {
+        // console.log('removed', key);
+      } else {
+        throw new Error('Failed to remove cards');
+      }
+    },
+    { retries: 5 },
+  );
+}
 
 export async function getBuySportsCardsSales() {
   console.log(chalk.magenta('Checking BuySportsCards for Sales'));
@@ -440,96 +473,187 @@ export async function getBuySportsCardsSales() {
   return sales;
 }
 
-export async function removeWithAPI(cardsToRemove) {
-  await login();
-  const notRemoved = [];
-  for (const key in cardsToRemove) {
-    const buildBody = (filters) => ({
-      currentListings: true,
-      condition: 'near_mint',
-      productType: 'raw',
-      filters: Object.keys(filters).reduce((result, key) => {
-        result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
-        return result;
-      }, {}),
-    });
+async function getAllListings(setData) {
+  let filters = {
+    sport: [setData.sport],
+    year: [setData.year],
+    setName: [setData.setName],
+  };
+  if (setData.parallel) {
+    filters.variant = ['parallel'];
+    filters.variantName = [setData.parallel];
+  } else if (setData.insert) {
+    filters.variant = ['insert'];
+    filters.variantName = [setData.insert];
+  } else {
+    filters.variant = ['base'];
+  }
 
-    const setData = parseKey(key, true);
-    console.log('Removing: ', key);
-    // console.log('cardsToRemove[key]', cardsToRemove[key]);
-    let filters = {
+  let allPossibleListings = {};
+
+  const buildBody = (filters) => ({
+    currentListings: true,
+    condition: 'near_mint',
+    productType: 'raw',
+    filters: Object.keys(filters).reduce((result, key) => {
+      result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
+      return result;
+    }, {}),
+  });
+
+  try {
+    // console.log('looking for listings', buildBody(filters));
+    allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
+
+    // console.log('first listings', allPossibleListings);
+    if (!allPossibleListings.results || allPossibleListings.results.length === 0) {
+      throw new Error('No listings found');
+    }
+  } catch (e) {
+    // console.log(e);
+    console.log(chalk.red('Error getting listings for'), setData);
+    filters = {
       sport: [setData.sport],
       year: [setData.year],
-      setName: [setData.setName],
     };
+    const getNextFilter = async (text, filterType) => {
+      const filterOptions = await post('search/bulk-upload/filters', { filters });
+      const response = await ask(text, undefined, {
+        selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
+          filterOptions.aggregations[filterType].map((variant) => ({
+            name: variant.label,
+            value: variant.slug,
+          })),
+        ),
+      });
+      return [response];
+    };
+
+    filters.setName = await getNextFilter('Which set would you like to remove?', 'setName');
+
     if (setData.parallel) {
       filters.variant = ['parallel'];
-      filters.variantName = [setData.parallel];
+      filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+      if (filters.variantName === 'None') {
+        filters.variant = ['insert'];
+        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
+      }
     } else if (setData.insert) {
       filters.variant = ['insert'];
-      filters.variantName = [setData.insert];
+      filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
+      if (filters.variantName === 'None') {
+        filters.variant = ['parallel'];
+        filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+      }
     } else {
       filters.variant = ['base'];
     }
 
-    let allPossibleListings;
-    try {
-      // console.log('looking for listings', buildBody(filters));
+    if (filters.variantName === 'None') {
+      console.log(chalk.red('Could not find a match for'), setData);
+    } else {
       allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
-
-      // console.log('first listings', allPossibleListings);
-      if (!allPossibleListings.results || allPossibleListings.results.length === 0) {
-        throw new Error('No listings found');
-      }
-    } catch (e) {
-      // console.log(e);
-      console.log(chalk.red('Error getting listings for'), setData);
-      filters = {
-        sport: [setData.sport],
-        year: [setData.year],
-      };
-      const getNextFilter = async (text, filterType) => {
-        const filterOptions = await post('search/bulk-upload/filters', { filters });
-        const response = await ask(text, undefined, {
-          selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
-            filterOptions.aggregations[filterType].map((variant) => ({
-              name: variant.label,
-              value: variant.slug,
-            })),
-          ),
-        });
-        return [response];
-      };
-
-      filters.setName = await getNextFilter('Which set would you like to remove?', 'setName');
-
-      if (setData.parallel) {
-        filters.variant = ['parallel'];
-        filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
-        if (filters.variantName === 'None') {
-          filters.variant = ['insert'];
-          filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
-        }
-      } else if (setData.insert) {
-        filters.variant = ['insert'];
-        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
-        if (filters.variantName === 'None') {
-          filters.variant = ['parallel'];
-          filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
-        }
-      } else {
-        filters.variant = ['base'];
-      }
-
-      if (filters.variantName === 'None') {
-        console.log(chalk.red('Could not find a match for'), key);
-        notRemoved.push(...cardsToRemove[key]);
-      } else {
-        allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
-      }
     }
+  }
+  return { filters, allPossibleListings };
+}
 
-    const listings = allPossibleListings.results;
+export async function uploadToBuySportsCards(cardsToUpload) {
+  await login();
+  const notAdded = [];
+  for (const key in cardsToUpload) {
+    const setData = await getGroupByBin(key);
+    if (setData) {
+      let listings = {};
+      if (setData.bscFilters) {
+        listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
+      } else {
+        let { filters, allPossibleListings } = await getAllListings(setData);
+        listings = allPossibleListings.results;
+        setData.bscFilters = filters;
+        await updateGroup(setData);
+      }
+
+      if (listings && listings.length > 0) {
+        const updates = [];
+        let updated = 0;
+        for (const listing of listings) {
+          const card = cardsToUpload[key].find((card) => listing.card.cardNo === card.cardNumber);
+          if (card) {
+            const newListing = {
+              ...listing,
+              availableQuantity: listing.availableQuantity + card.quantity,
+              price: card.bscPrice,
+              sellerSku: card.sku || card.bin,
+            };
+            if (card.pics) {
+              if (card.pics[0]) {
+                listing.sellerImgFront = (
+                  await postImage('common/card/undefined/product/undefined/attachment', card.pics[0])
+                ).objectKey;
+              }
+              if (card.pics[1]) {
+                listing.sellerImgBack = (
+                  await postImage('common/card/undefined/product/undefined/attachment', card.pics[1])
+                ).objectKey;
+              }
+            }
+            updates.push(newListing);
+            updated++;
+          } else if (listing.availableQuantity > 0) {
+            updates.push(listing);
+          }
+        }
+
+        if (updated > 0) {
+          try {
+            await saveBulk(updated);
+            console.log(chalk.green('Added'), chalk.green(updates.length), chalk.green('cards to BSC'));
+          } catch (e) {
+            console.log(chalk.red('Bulk API Failed more than limit'));
+            notAdded.push(...cardsToUpload[key]);
+          }
+        }
+      } else {
+        console.log('Could not find any listings for', setData);
+        notAdded.push(...cardsToUpload[key]);
+      }
+    } else {
+      console.log('Could not find setData for ', key);
+      notAdded.push(...cardsToUpload[key]);
+    }
+  }
+
+  if (notAdded.length > 0) {
+    console.log(chalk.magenta('Could not add all cards to BSC. See below for details'));
+    console.log(
+      chalkTable(
+        {
+          leftPad: 2,
+          columns: [
+            { field: 'title', name: 'Title' },
+            { field: 'quantity', name: 'Quantity' },
+            { field: 'error', name: 'Error' },
+          ],
+        },
+        notAdded,
+      ),
+    );
+  } else {
+    console.log(chalk.magenta('All cards added to BSC'));
+  }
+}
+
+export async function removeWithAPI(cardsToRemove) {
+  await login();
+  const notRemoved = [];
+  for (const key in cardsToRemove) {
+    const setData = parseKey(key, true);
+    console.log('Removing: ', key);
+    // console.log('cardsToRemove[key]', cardsToRemove[key]);
+    const allPossibleListings = await getAllListings(setData);
+
+    const listings = allPossibleListings?.results;
 
     if (listings && listings.length > 0) {
       // console.log('cards to remove', cardsToRemove);
@@ -553,20 +677,7 @@ export async function removeWithAPI(cardsToRemove) {
 
       if (updated > 0) {
         try {
-          await pRetry(
-            async () => {
-              const results = await put('seller/bulk-upload', {
-                sellerId: 'cf987f7871',
-                listings,
-              });
-              if (results.result === 'Saved!') {
-                // console.log('removed', key);
-              } else {
-                throw new Error('Failed to remove cards');
-              }
-            },
-            { retries: 5 },
-          );
+          await saveBulk(listings);
           console.log(chalk.green('Removed'), chalk.green(updated), chalk.green('cards from BSC'));
         } catch (e) {
           console.log(chalk.red('Failed to remove cards from BSC'));
@@ -574,7 +685,7 @@ export async function removeWithAPI(cardsToRemove) {
         }
       }
     } else {
-      console.log(chalk.red('Could not find any listings for'), key, buildBody(filters));
+      console.log(chalk.red('Could not find any listings for'), setData);
       console.log('allPossibleListings', allPossibleListings);
       notRemoved.push(...cardsToRemove[key]);
     }

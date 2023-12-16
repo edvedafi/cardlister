@@ -402,3 +402,8 @@ export async function getGroupByBin(bin) {
     return group.data();
   }
 }
+export async function updateGroup(group) {
+  _cachedGroups[bin] = group;
+  const db = getFirestore();
+  await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
+}
