@@ -160,12 +160,22 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       let cardsAdded = 0;
 
       await selectBrand(setInfo);
-      let { found } = await selectSet(setInfo, async (fullSetText, row) => {
-        const fullSetNumbers = fullSetText.split(' ')[0];
-        //find the radio button where the value is fullSetNumbers
-        const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`)); // TODO needs different on updates
+      let found = false;
+      if (setInfo.slId) {
+        const radioButton = waitForElement(By.xpath(`//input[@value = '${setInfo.slId}']`));
         await radioButton.click();
-      });
+        found = true;
+      } else {
+        found = (
+          await selectSet(setInfo, async (fullSetText, row) => {
+            const fullSetNumbers = fullSetText.split(' ')[0];
+            setInfo.slId = fullSetNumbers;
+            //find the radio button where the value is fullSetNumbers
+            const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+            await radioButton.click();
+          })
+        ).found;
+      }
       if (found) {
         await clickSubmit();
       } else {
@@ -218,6 +228,8 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
                 priceTextBox.clear();
                 await priceTextBox.sendKeys(card.slPrice);
                 addedCards.push(card);
+                const binTextBox = await columns[5].findElement({ css: 'input' });
+                await binTextBox.sendKeys(card.sku || card.bin);
                 console.log(`Added Card ${chalk.green(tableCardNumber)}`);
               } else {
                 // console.log(`Card ${chalk.red(tableCardNumber)} not found`);
@@ -384,14 +396,20 @@ export async function removeFromSportLots(groupedCards) {
     console.log('key', key);
     let setInfo = await getGroupByBin(key);
     console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
-    await selectBrand(setInfo);
+    let found = false;
+    if (setInfo.slId) {
+      await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.slId}`);
+      found = true;
+    } else {
+      await selectBrand(setInfo);
 
-    await waitForElement(By.xpath("//*[contains(normalize-space(), 'Dealer Inventory Summary')]"));
-    setInfo = await selectSet(setInfo, async (fullSetText, row) => {
-      await row.click();
-    });
+      await waitForElement(By.xpath("//*[contains(normalize-space(), 'Dealer Inventory Summary')]"));
+      setInfo = await selectSet(setInfo, async (fullSetText, row) => {
+        await row.click();
+      });
 
-    let found = setInfo.found;
+      found = setInfo.found;
+    }
 
     const updateInventoryHeader = By.xpath('//h2/*[contains(text(), "Update Inventory")]');
     try {
