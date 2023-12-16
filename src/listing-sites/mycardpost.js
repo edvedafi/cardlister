@@ -119,7 +119,7 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
       }
 
       const descriptionInput = await formElement(By.xpath(`//textarea[@name='details']`));
-      await descriptionInput.sendKeys(card.longTitle);
+      await descriptionInput.sendKeys(`${card.longTitle}\n\nSKU: ${card.sku}`);
       //
       // const submitButton = await waitForElement(By.xpath(`//button[@type='submit']`));
       // await submitButton.click();
