@@ -1,4 +1,4 @@
-import { await createGroups } from './uploads.js';
+import { createGroups } from './uploads.js';
 
 jest.mock('../utils/ask.js');
 jest.mock('../utils/inputs.js');
@@ -376,7 +376,7 @@ describe('uploads', () => {
       expect(result['1']).toIncludeSameMembers([examples.base.card, examples.base.another]);
     });
 
-    it('should trim a multi year to a single year (1981-82 should be 1981)',  async () => {
+    it('should trim a multi year to a single year (1981-82 should be 1981)', async () => {
       const allCards = {
         3: {
           ...examples.base.card,
