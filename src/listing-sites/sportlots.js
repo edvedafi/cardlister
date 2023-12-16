@@ -5,7 +5,7 @@ import { parseKey, useSetSelectValue, useWaitForElement, waitForElement } from '
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
-import { getGroupByBin } from './firebase.js';
+import { getGroupByBin, updateGroup } from './firebase.js';
 
 const brands = {
   bowman: 'Bowman',
@@ -170,6 +170,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           await selectSet(setInfo, async (fullSetText, row) => {
             const fullSetNumbers = fullSetText.split(' ')[0];
             setInfo.slId = fullSetNumbers;
+            await updateGroup(setInfo);
             //find the radio button where the value is fullSetNumbers
             const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
             await radioButton.click();
