@@ -5,6 +5,7 @@ import { parseKey, useSetSelectValue, useWaitForElement, waitForElement } from '
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
+import { getGroupByBin } from './firebase.js';
 
 const brands = {
   bowman: 'Bowman',
@@ -44,7 +45,7 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
   try {
     await setSelectValue(sportField, { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()]);
     await setSelectValue(yearField, setInfo.year);
-    await setSelectValue(brandField, brands[setInfo.setName?.toLowerCase()] || setInfo.manufacture);
+    // await setSelectValue(brandField, brands[setInfo.setName?.toLowerCase()] || setInfo.manufacture);
     found = true;
   } catch (e) {
     await setSelectValue(brandField, 'All Brands');
@@ -56,12 +57,14 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
 
 const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
   const selectSet = async (setInfoForRun) => {
+    console.log('search for set', setInfoForRun);
     const setName = `${setInfoForRun.setName} ${setInfoForRun.insert || ''} ${setInfoForRun.parallel || ''}`
       .replace('  ', ' ')
       .trim();
     const sport = { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()];
 
     const selectDonrus = async () => {
+      console.log('search for special', setInfoForRun);
       if (setInfoForRun.setName.startsWith('Donruss')) {
         const donrussManufactured = {
           ...setInfoForRun,
@@ -86,7 +89,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
         // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
         // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
         const regex = new RegExp(
-          `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport.toLowerCase()})?$`,
+          `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport})?$`,
         );
         // console.log('Testing: ' + fullSetText + ' against ' + regex);
         if (regex.test(fullSetText.toLowerCase())) {
@@ -153,7 +156,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     const selectSet = useSelectSet(driver, selectBrand);
 
     for (const key in cardsToUpload) {
-      const setInfo = parseKey(key);
+      const setInfo = getGroupByBin(key);
       let cardsAdded = 0;
 
       await selectBrand(setInfo);
@@ -269,7 +272,7 @@ export const convertTitleToCard = (title) => {
   let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
   let setInfoLower = setInfo.toLowerCase();
   const card = {
-    cardNumber: title.match(/#(\S+)\s/)?.[1],
+    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
     year: title.split(' ')[0],
     parallel: '',
     insert: '',
@@ -378,8 +381,9 @@ export async function removeFromSportLots(groupedCards) {
   const selectSet = useSelectSet(driver, selectBrand);
 
   for (const key in toRemove) {
-    console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(key)}`);
-    let setInfo = parseKey(key);
+    console.log('key', key);
+    let setInfo = await getGroupByBin(key);
+    console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
     await selectBrand(setInfo);
 
     await waitForElement(By.xpath("//*[contains(normalize-space(), 'Dealer Inventory Summary')]"));
@@ -465,6 +469,7 @@ export async function removeFromSportLots(groupedCards) {
           const row = await tdWithName.findElement(By.xpath('..'));
           //set the row background to yellow
           await driver.executeScript("arguments[0].style.backgroundColor = 'yellow';", row);
+          await ask(`Please reduce quantity by ${chalk.red(card.quantity)} and Press any key to continue...`);
           let cardNumberTextBox = await row.findElement(By.xpath(`./td/input[starts-with(@name, 'qty')]`));
           const currentQuantity = await cardNumberTextBox.getAttribute('value');
           let newQuantity = parseInt(currentQuantity) - parseInt(card.quantity);

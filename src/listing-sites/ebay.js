@@ -714,7 +714,7 @@ export const reverseTitle = (title) => {
   const yearIdx = title.match(/\D*-?\D+/)?.index;
   let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
   const card = {
-    cardNumber: title.match(/#([^\s]+)\s/)?.[1],
+    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
     year: title.split(' ')[0],
     parallel: '',
     insert: '',
@@ -739,6 +739,17 @@ export const reverseTitle = (title) => {
   if (set) {
     card.setName = setInfo.slice(setInfo.toLowerCase().indexOf(set), set.length);
     setInfo = setInfo.replace(card.setName, '').trim();
+    if (!card.manufacture) {
+      const paniniSearch = `panini ${card.setName.toLowerCase()}`;
+      if (sets.find((s) => s === paniniSearch)) {
+        card.manufacture = 'Panini';
+      } else {
+        const toppsSearch = `topps ${card.setName.toLowerCase()}`;
+        if (sets.find((s) => s === toppsSearch)) {
+          card.manufacture = 'Topps';
+        }
+      }
+    }
   }
 
   const insertIndex = setInfo.toLowerCase().indexOf('insert');

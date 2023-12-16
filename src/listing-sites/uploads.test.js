@@ -1,7 +1,9 @@
-import { createGroups } from './uploads.js';
+import { await createGroups } from './uploads.js';
 
 jest.mock('../utils/ask.js');
 jest.mock('../utils/inputs.js');
+jest.mock('chalk', () => jest.fn());
+jest.mock('open', () => jest.fn());
 
 const examples = {
   base: {
@@ -127,8 +129,8 @@ const examples = {
 };
 
 describe('uploads', () => {
-  describe('createGroups', () => {
-    it('should sort sll cards into each of the groups', () => {
+  describe('await createGroups', () => {
+    it('should sort sll cards into each of the groups', async () => {
       const allCards = {
         3: examples.base.card,
         7: examples.base.another,
@@ -143,7 +145,7 @@ describe('uploads', () => {
       };
       const bulk = undefined;
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1', '2', '8', '3', '9', '4', '5', '6', '7']);
 
@@ -158,7 +160,7 @@ describe('uploads', () => {
       expect(result['7']).toIncludeSameMembers([examples.insert_parallel.third_insert_third_parallel]);
     });
     //   Football|2021|panini|chronicles|gridiron-kings|pink|1
-    it('should generate the same result whether bulk or all cards', () => {
+    it('should generate the same result whether bulk or all cards', async () => {
       const allCards = undefined;
       const bulk = [
         examples.base.card,
@@ -173,7 +175,7 @@ describe('uploads', () => {
         examples.insert_parallel.third_insert_third_parallel,
       ];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1', '2', '8', '3', '9', '4', '5', '6', '7']);
 
@@ -188,7 +190,7 @@ describe('uploads', () => {
       expect(result['7']).toIncludeSameMembers([examples.insert_parallel.third_insert_third_parallel]);
     });
 
-    it('should generate the same result when in both bulk or all cards', () => {
+    it('should generate the same result when in both bulk or all cards', async () => {
       const allCards = {
         3: examples.base.card,
         42: examples.insert.another,
@@ -204,7 +206,7 @@ describe('uploads', () => {
         examples.insert_parallel.second_insert_same_parallel,
       ];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1', '2', '8', '3', '9', '4', '5', '6', '7']);
 
@@ -219,7 +221,7 @@ describe('uploads', () => {
       expect(result['7']).toIncludeSameMembers([examples.insert_parallel.third_insert_third_parallel]);
     });
 
-    it('should not include cards with a quantity of zero', () => {
+    it('should not include cards with a quantity of zero', async () => {
       //build a few base cards to mix in
       const base3 = {
         cardNumber: 3,
@@ -305,14 +307,14 @@ describe('uploads', () => {
       };
       const bulk = [bulk0, base13, emptyStringQuantity, base17, fractionalQuantity];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1']);
 
       expect(result['1']).toIncludeSameMembers([base3, base7, base13, base17]);
     });
 
-    it('should include alpha and alpha numeric card numbers', () => {
+    it('should include alpha and alpha numeric card numbers', async () => {
       const baseAlphaNumber = {
         cardNumber: 'D-7',
         sport: 'football',
@@ -337,14 +339,14 @@ describe('uploads', () => {
       };
       const bulk = [bulkAlphaNumber];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1']);
 
       expect(result['1']).toIncludeSameMembers([bulkAlphaNumber, baseAlphaNumber]);
     });
 
-    it('should exclude duplicates; preference on cards with pictures otherwise takes last', () => {
+    it('should exclude duplicates; preference on cards with pictures otherwise takes last', async () => {
       const allCards = {
         3: examples.base.card,
       };
@@ -367,14 +369,14 @@ describe('uploads', () => {
         },
       ];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1']);
 
       expect(result['1']).toIncludeSameMembers([examples.base.card, examples.base.another]);
     });
 
-    it('should trim a multi year to a single year (1981-82 should be 1981)', () => {
+    it('should trim a multi year to a single year (1981-82 should be 1981)',  async () => {
       const allCards = {
         3: {
           ...examples.base.card,
@@ -388,7 +390,7 @@ describe('uploads', () => {
         },
       ];
 
-      const result = createGroups(allCards, bulk);
+      const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1']);
     });

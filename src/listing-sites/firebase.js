@@ -299,6 +299,7 @@ export async function shutdownFirebase() {
   }
 }
 
+const _cachedGroups = {};
 /**
  * Retrieves a sales group from the database based on the provided information.
  *
@@ -309,6 +310,7 @@ export async function shutdownFirebase() {
  * @param {string} info.setName - The name of the sales group.
  * @param {string} [info.insert] - The insert of the sales group (optional).
  * @param {string} [info.parallel] - The parallel of the sales group (optional).
+ * @param {boolean} [isTemp] - Should only be temp if the group is being created from an old listing that was sold
  * @returns {Promise<{
  *   sport: string,
  *   year: string,
@@ -320,63 +322,83 @@ export async function shutdownFirebase() {
  *   bin: number
  * }>} - A promise that resolves to the retrieved sales group or newly saved sales group.
  */
-export async function getGroup(info) {
-  const db = getFirestore();
-  const collection = db.collection('SalesGroups');
-  const setInfo = {
-    sport: info.sport.toLowerCase(),
-    year: info.year.toLowerCase(),
-    manufacture: info.manufacture.toLowerCase(),
-    setName: info.setName.toLowerCase(),
-    insert: info.insert?.toLowerCase(),
-    parallel: info.parallel?.toLowerCase(),
-    bscPrice: info.bscPrice,
-    slPrice: info.slPrice,
-    price: info.price,
-  };
-  const query = collection
-    .where('sport', '==', setInfo.sport)
-    .where('year', '==', setInfo.year)
-    .where('manufacture', '==', setInfo.manufacture)
-    .where('setName', '==', setInfo.setName)
-    .where('insert', '==', setInfo.insert || null)
-    .where('parallel', '==', setInfo.parallel || null);
-  const queryResults = await query.get();
-
-  if (queryResults.size === 0) {
-    const group = {
-      sport: setInfo.sport,
-      year: setInfo.year,
-      manufacture: setInfo.manufacture,
-      setName: setInfo.setName,
-      insert: setInfo.insert || null,
-      parallel: setInfo.parallel || null,
-      skuPrefix: `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${setInfo.insert || ''}|${
-        setInfo.parallel || ''
-      }`.replaceAll(' ', '-'),
-      bin: await getNextCounter('Group'),
-    };
-    await collection.doc(`${group.bin}`).set(group);
-    return group;
-  } else if (queryResults.size === 1) {
-    return queryResults.docs[0].data();
+export async function getGroup(info, isTemp) {
+  if (isTemp) {
+    if (!_cachedGroups[isTemp]) {
+      _cachedGroups[isTemp] = {
+        sport: info.sport?.toLowerCase(),
+        year: info.year?.toLowerCase(),
+        manufacture: info.manufacture?.toLowerCase(),
+        setName: info.setName?.toLowerCase(),
+        insert: info.insert?.toLowerCase(),
+        parallel: info.parallel?.toLowerCase(),
+        skuPrefix: isTemp,
+        bin: isTemp,
+      };
+    }
+    return _cachedGroups[isTemp];
   } else {
-    const choices = [];
-    queryResults.forEach((doc) => {
-      const g = doc.data();
-      choices.push({
-        name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
-        value: g,
-        description: `${g.year} ${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+    const db = getFirestore();
+    const collection = db.collection('SalesGroups');
+    const setInfo = {
+      sport: info.sport.toLowerCase(),
+      year: info.year.toLowerCase(),
+      manufacture: info.manufacture.toLowerCase(),
+      setName: info.setName.toLowerCase(),
+      insert: info.insert?.toLowerCase() || null,
+      parallel: info.parallel?.toLowerCase() || null,
+    };
+    const query = collection
+      .where('sport', '==', setInfo.sport)
+      .where('year', '==', setInfo.year)
+      .where('manufacture', '==', setInfo.manufacture)
+      .where('setName', '==', setInfo.setName)
+      .where('insert', '==', setInfo.insert)
+      .where('parallel', '==', setInfo.parallel);
+    const queryResults = await query.get();
+
+    if (queryResults.size === 0) {
+      const group = {
+        ...setInfo,
+        skuPrefix: `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${
+          setInfo.insert || ''
+        }|${setInfo.parallel || ''}`.replaceAll(' ', '-'),
+        bin: await getNextCounter('Group'),
+        bscPrice: info.bscPrice,
+        slPrice: info.slPrice,
+        price: info.price,
+      };
+      await collection.doc(`${group.bin}`).set(group);
+      _cachedGroups[group.bin] = group;
+      return group;
+    } else if (queryResults.size === 1) {
+      _cachedGroups[queryResults.docs[0].id] = queryResults.docs[0].data();
+      return queryResults.docs[0].data();
+    } else {
+      const choices = [];
+      queryResults.forEach((doc) => {
+        const g = doc.data();
+        choices.push({
+          name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
+          value: g,
+          description: `${g.year} ${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+        });
       });
-    });
-    console.log('Trying to find:', setInfo);
-    return await ask('Which group is correct?', undefined, { selectOptions: choices });
+      console.log('Trying to find:', setInfo);
+      const response = await ask('Which group is correct?', undefined, { selectOptions: choices });
+      _cachedGroups[response.bin] = response;
+      return response;
+    }
   }
 }
 
 export async function getGroupByBin(bin) {
-  const db = getFirestore();
-  const group = await db.collection('SalesGroups').doc(bin).get();
-  return group.data();
+  if (_cachedGroups[bin]) {
+    return _cachedGroups[bin];
+  } else {
+    const db = getFirestore();
+    const group = await db.collection('SalesGroups').doc(bin).get();
+    _cachedGroups[bin] = group.data();
+    return group.data();
+  }
 }

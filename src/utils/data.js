@@ -137,6 +137,7 @@ export const sets = [
   'topps opening day',
   'topps heritage high number',
   'topps big league',
+  'big league',
   'topps heritage minors',
   'topps allen & ginter x',
   'topps heritage high number',

@@ -19,8 +19,8 @@ describe('ebay', () => {
       });
     });
     it('should reverse a parallel title', () => {
-      expect(reverseTitle('2021 Panini Playoff Kickoff Parallel #94 Justin Herbert Los Angeles Chargers')).toEqual({
-        cardNumber: '94',
+      expect(reverseTitle('2021 Panini Playoff Kickoff Parallel #9 Justin Herbert Los Angeles Chargers')).toEqual({
+        cardNumber: '9',
         year: '2021',
         parallel: 'Kickoff',
         insert: '',
@@ -56,6 +56,16 @@ describe('ebay', () => {
         insert: '',
         manufacture: 'Panini',
         setName: 'Mosaic',
+      });
+    });
+    it('should reverse a card number with spaces', () => {
+      expect(reverseTitle('2023 Big League Big Leaguers Insert #BL - 29 Willie Mays San Francisco Giants')).toEqual({
+        cardNumber: 'BL-29',
+        year: '2023',
+        parallel: '',
+        insert: 'Big Leaguers',
+        manufacture: 'Topps',
+        setName: 'Big League',
       });
     });
   });
