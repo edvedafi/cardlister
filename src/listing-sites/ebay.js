@@ -343,7 +343,13 @@ export const getFeatures = (card) => {
 };
 
 const booleanText = (val) => [isYes(val) ? 'Yes' : 'No'];
-const displayOrNA = (testValue, displayValue) => [testValue && !isNo(testValue) ? displayValue || testValue : 'N/A'];
+const displayOrNA = (testValue, displayValue) => {
+  if (Array.isArray(displayValue) && displayValue.length > 0) {
+    return displayValue;
+  } else {
+    return [testValue && !isNo(testValue) ? displayValue || testValue : 'N/A'];
+  }
+};
 export const convertCardToInventory = (card) => ({
   availability: {
     // pickupAtLocationAvailability: [
@@ -677,35 +683,51 @@ export const getLocation = async (eBay) => {
 
 export const ebayAPIUpload = async (allCards) => {
   const eBay = await loginEbayAPI();
-  Object.values(allCards).forEach((card) => (card.key = `${card.key}-${Date.now()}`));
   // await getOrders(api);
   console.log(
     'allCards',
-    Object.values(allCards).map((card) => card.key),
+    Object.values(allCards).map((card) => card.sku),
   );
 
   //don't need to do anything with location but do need to ensure it exists
   await getLocation(eBay);
 
   await Promise.all(
-    Object.values(allCards).map(async (card) => {
-      try {
-        // console.log('aspects', JSON.stringify(convertCardToInventory(card).product.aspects, null, 2));
-        await eBay.sell.inventory.createOrReplaceInventoryItem(card.key, convertCardToInventory(card));
-        const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
-        // console.log('offer', offer);
-        const publish = await eBay.sell.inventory.publishOffer(offer.offerId);
-        // console.log('publish', publish);
-      } catch (e) {
-        console.log('inventoryItem error', e);
-        if (e.meta?.res?.data) {
-          console.log('inventoryItem error info', JSON.stringify(e.meta?.res?.data, null, 2));
-        } else {
+    Object.values(allCards)
+      // .filter((c) => c.sku !== '5|FS-1')
+      .map(async (card) => {
+        try {
+          await eBay.sell.inventory.createOrReplaceInventoryItem(card.sku, convertCardToInventory(card));
+          let offerId;
+          try {
+            const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
+            offerId = offer.offerId;
+          } catch (e) {
+            const error = e.meta?.res?.data.errors[0];
+            if (error?.errorId === 25002) {
+              offerId = error.parameters[0].value;
+            } else {
+              throw e;
+            }
+          }
+          await eBay.sell.inventory.publishOffer(offerId);
+        } catch (e) {
           console.log('inventoryItem error', e);
+          if (e.meta?.res?.data) {
+            console.log('inventoryItem error info', JSON.stringify(e.meta?.res?.data, null, 2));
+          } else {
+            console.log('inventoryItem error', e);
+          }
+          console.log('Attempted to upload card', card);
+          console.log(
+            `Should have generated inventory item with id ${card.sku}`,
+            JSON.stringify(convertCardToInventory(card), null, 2),
+          );
+          console.log(`Should have generated offer with id ${card.sku}`, createOfferForCard(card));
+          console.log('request', e.meta.req);
+          console.error('Failed to upload card', chalk.red(card.title));
         }
-        console.error('Failed to upload card', chalk.red(card.title));
-      }
-    }),
+      }),
   );
 };
 

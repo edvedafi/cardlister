@@ -302,34 +302,28 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
 
   const askFor = async (text, propName, options) => await addCardData(text, output, propName, defaultValues, options);
 
-  await askFor('Sport', 'sport', {
-    selectOptions: sports,
-    allowUpdates: resetAll,
-  });
-  output.league = findLeague(output.sport);
-  output.storeCategory = findStoreCategory(output.sport);
+  let skipShipping = await ask('Use Set Info?', true, { allowUpdates: resetAll });
+
+  if (skipShipping) {
+    await askFor('Sport', 'sport', {
+      selectOptions: sports,
+      allowUpdates: resetAll,
+    });
+    output.league = findLeague(output.sport);
+    output.storeCategory = findStoreCategory(output.sport);
+    await askFor('Year', 'year', { allowUpdates: resetAll });
+  }
   await askFor('Player/Card Name', 'player', { allowUpdates: resetAll });
-  await askFor('Year', 'year', { allowUpdates: resetAll });
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
-
-  const updateSetInfo = await ask('Update Set Info?', false, { allowUpdates: resetAll });
-  if (updateSetInfo) {
-    await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
-    await askFor('Set Name', 'setName', { allowUpdates: resetAll });
-  }
-
-  let skipShipping = await ask('Is base card?', true, {
-    allowUpdates: resetAll,
-  });
 
   if (skipShipping) {
     output.quantity = 1;
   } else {
-    if (updateSetInfo) {
-      await askFor('Parallel', 'parallel', { allowUpdates: skipShipping || resetAll });
-      await askFor('Insert', 'insert', { allowUpdates: skipShipping || resetAll });
-    }
+    await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
+    await askFor('Set Name', 'setName', { allowUpdates: resetAll });
+    await askFor('Parallel', 'parallel', { allowUpdates: skipShipping || resetAll });
+    await askFor('Insert', 'insert', { allowUpdates: skipShipping || resetAll });
     await askFor('Features (RC, etc)', 'features', { allowUpdates: skipShipping || resetAll });
     await askFor('Print Run', 'printRun', { allowUpdates: skipShipping || resetAll });
     await askFor('Autographed', 'autographed', { allowUpdates: skipShipping || resetAll });
@@ -423,6 +417,14 @@ export const getCardData = async (allCards, imageDefaults) => {
   if (!cardNumber) {
     cardNumber = await ask('Card Number', cardNumber);
   }
+
+  if (imageDefaults.card_number_prefix && !cardNumber.startsWith(imageDefaults.card_number_prefix)) {
+    cardNumber = `${imageDefaults.card_number_prefix}${cardNumber}`;
+  }
+
+  console.log('cardNumber', cardNumber);
+  console.log('looking for card', imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`);
+  console.log('allCards', allCards);
 
   let output = allCards[imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`];
 

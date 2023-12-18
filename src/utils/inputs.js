@@ -6,7 +6,9 @@ export async function getInputs() {
   if (process.argv.length > 2) {
     // console.log(process.argv[2]);
     const zipFile = process.argv[2];
-    if (zipFile.endsWith('.zip')) {
+    if (zipFile === '-r') {
+      return await getInputDirectory();
+    } else if (zipFile.endsWith('.zip')) {
       const dir = `input/${zipFile
         .split('/')
         .pop()

@@ -144,9 +144,9 @@ const processPair = async (front, back, imageDefaults, allCards, overrideImages)
       } else {
         imageDefaults.key = imageDefaults.sku || `${imageDefaults.bin}|${imageDefaults.cardNumber}`;
       }
-      await processImage(front, imageDefaults, allCards, overrideImages);
+      const frontData = await processImage(front, imageDefaults, allCards, overrideImages);
       if (back) {
-        await processImage(back, imageDefaults, allCards, overrideImages);
+        await processImage(back, frontData, allCards, overrideImages);
       }
     }
   } catch (e) {
@@ -163,6 +163,7 @@ const processImage = async (image, imageDefaults, allCards, overrideImages) => {
       const filename = cardData.filename;
       queueImageFiles.push(() => processImageFile(outputFile, filename));
     }
+    return cardData;
   } catch (e) {
     console.error(e);
     throw e;

@@ -11,8 +11,8 @@ export async function uploadToFirebase(allCards) {
   const db = getFirestore();
   const collection = db.collection('CardSales');
   let count = 0;
-  for (const card of allCards) {
-    await collection.doc('').set({
+  for (const card of Object.values(allCards)) {
+    await collection.doc(card.sku).set({
       sport: card.sport,
       quantity: card.quantity,
       price: card.price,
@@ -349,17 +349,23 @@ export async function getGroup(info, isTemp) {
       parallel: info.parallel?.toLowerCase() || null,
     };
     const query = collection
-      .where('sport', '==', setInfo.sport)
-      .where('year', '==', setInfo.year)
-      .where('manufacture', '==', setInfo.manufacture)
-      .where('setName', '==', setInfo.setName)
-      .where('insert', '==', setInfo.insert)
-      .where('parallel', '==', setInfo.parallel);
+      .where('keys.sport', '==', setInfo.sport)
+      .where('keys.year', '==', setInfo.year)
+      .where('keys.manufacture', '==', setInfo.manufacture)
+      .where('keys.setName', '==', setInfo.setName)
+      .where('keys.insert', '==', setInfo.insert)
+      .where('keys.parallel', '==', setInfo.parallel);
     const queryResults = await query.get();
 
     if (queryResults.size === 0) {
       const group = {
-        ...setInfo,
+        sport: info.sport,
+        year: info.year,
+        manufacture: info.manufacture,
+        setName: info.setName,
+        insert: info.insert,
+        parallel: info.parallel,
+        league: info.league,
         skuPrefix: `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${
           setInfo.insert || ''
         }|${setInfo.parallel || ''}`.replaceAll(' ', '-'),
@@ -367,6 +373,8 @@ export async function getGroup(info, isTemp) {
         bscPrice: info.bscPrice,
         slPrice: info.slPrice,
         price: info.price,
+        keys: setInfo,
+        n,
       };
       await collection.doc(`${group.bin}`).set(group);
       _cachedGroups[group.bin] = group;
@@ -381,7 +389,7 @@ export async function getGroup(info, isTemp) {
         choices.push({
           name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
           value: g,
-          description: `${g.year} ${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+          description: `${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
         });
       });
       console.log('Trying to find:', setInfo);
