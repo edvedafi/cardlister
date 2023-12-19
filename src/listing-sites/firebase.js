@@ -109,125 +109,143 @@ export async function updateSport(db) {
   }
 }
 
-export async function getListingInfo(db, cards) {
-  const removals = [];
-  const addRemoval = (card, match) => {
-    let updatedCard = { ...card };
-    //this looks stupid, but firebase returns empty strings, which will overwrite good data.
-    if (match) {
-      if (match.title) {
-        updatedCard.title = match.title;
-      }
-      if (match.insert) {
-        updatedCard.insert = match.insert;
-      }
-      if (match.parallel) {
-        updatedCard.parallel = match.parallel;
-      }
-      if (match.sport) {
-        updatedCard.sport = match.sport;
-      }
-      if (match.year) {
-        updatedCard.year = match.year;
-      }
-      if (match.setName) {
-        updatedCard.setName = match.setName;
-      }
-      if (match.manufacture) {
-        updatedCard.manufacture = match.manufacture;
-      }
-      if (match.ItemID) {
-        updatedCard.ItemID = match.ItemID;
-      }
+export function mergeFirebaseResult(card, match) {
+  let updatedCard = { ...card };
+  //this looks stupid, but firebase returns empty strings, which will overwrite good data.
+  if (match) {
+    if (match.title) {
+      updatedCard.title = match.title;
     }
-    removals.push(updatedCard);
-  };
-  for (let card of cards) {
-    // console.log('card', card);
-    const updatedCard = {
-      ...card,
-      sport: findTeamInString(card.title) || card.sport,
-    };
-    // console.log('card', updatedCard);
-    let query = db.collection('OldSales').where('year', '==', updatedCard.year);
-    if (updatedCard.sport) {
-      query = query.where('sport', '==', titleCase(updatedCard.sport));
+    if (match.insert) {
+      updatedCard.insert = match.insert;
     }
-    // if (updatedCard.cardNumber === 175) {
-    // console.log('card', updatedCard);
-    // }
+    if (match.parallel) {
+      updatedCard.parallel = match.parallel;
+    }
+    if (match.sport) {
+      updatedCard.sport = match.sport;
+    }
+    if (match.year) {
+      updatedCard.year = match.year;
+    }
+    if (match.setName) {
+      updatedCard.setName = match.setName;
+    }
+    if (match.manufacture) {
+      updatedCard.manufacture = match.manufacture;
+    }
+    if (match.ItemID) {
+      updatedCard.ItemID = match.ItemID;
+    }
+    if (match.sku) {
+      updatedCard.sku = match.sku;
+    }
+  }
+  return updatedCard;
+}
 
-    const queryResults = await query.get();
-    let possibleCards = [];
-    queryResults.forEach((doc) => {
-      possibleCards.push(doc.data());
-    });
-    // console.log('found possible cards', possibleCards.length);
+export async function matchOldStyle(db, card) {
+  const updatedCard = { ...card };
+  let query = db.collection('OldSales').where('year', '==', updatedCard.year);
+  if (updatedCard.sport) {
+    query = query.where('sport', '==', titleCase(updatedCard.sport));
+  }
+  // if (updatedCard.cardNumber === 175) {
+  // console.log('card', updatedCard);
+  // }
 
-    let match = possibleCards.find(
+  const queryResults = await query.get();
+  let possibleCards = [];
+  queryResults.forEach((doc) => {
+    possibleCards.push(doc.data());
+  });
+  // console.log('found possible cards', possibleCards.length);
+
+  let match = possibleCards.find(
+    (c) =>
+      updatedCard.cardNumber === c.cardNumber &&
+      updatedCard.setName === c.setName &&
+      updatedCard.manufacture === c.manufacture &&
+      updatedCard.insert === c.insert &&
+      updatedCard.parallel === c.parallel,
+  );
+  if (match) {
+    return mergeFirebaseResult(updatedCard, match);
+  } else {
+    match = possibleCards.find(
       (c) =>
-        updatedCard.cardNumber === c.cardNumber &&
+        updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
         updatedCard.setName === c.setName &&
         updatedCard.manufacture === c.manufacture &&
         updatedCard.insert === c.insert &&
         updatedCard.parallel === c.parallel,
     );
     if (match) {
-      addRemoval(updatedCard, match);
+      return mergeFirebaseResult(updatedCard, match);
     } else {
+      const searchSet =
+        updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
       match = possibleCards.find(
         (c) =>
           updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-          updatedCard.setName === c.setName &&
-          updatedCard.manufacture === c.manufacture &&
-          updatedCard.insert === c.insert &&
-          updatedCard.parallel === c.parallel,
+          c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
+          (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
+          (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
       );
+
       if (match) {
-        addRemoval(updatedCard, match);
-      } else {
-        const searchSet =
-          updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1
-            ? 'Absolute'
-            : updatedCard.setName;
+        return mergeFirebaseResult(updatedCard, match);
+      } else if (updatedCard.setName === 'Chronicles') {
         match = possibleCards.find(
           (c) =>
-            updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-            c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
-            (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
+            updatedCard.cardNumber === c.cardNumber &&
+            c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
+            (!updatedCard.insert ||
+              c.Title.toLowerCase().indexOf(
+                updatedCard.insert
+                  .toLowerCase()
+                  .replace('update rookies', '')
+                  .replace('rookie update', '')
+                  .replace('rookies update', '')
+                  .trim(),
+              ) > -1) &&
             (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+          !updatedCard.parallel ||
+            c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
         );
-
         if (match) {
-          addRemoval(updatedCard, match);
-        } else if (updatedCard.setName === 'Chronicles') {
-          match = possibleCards.find(
-            (c) =>
-              updatedCard.cardNumber === c.cardNumber &&
-              c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
-              (!updatedCard.insert ||
-                c.Title.toLowerCase().indexOf(
-                  updatedCard.insert
-                    .toLowerCase()
-                    .replace('update rookies', '')
-                    .replace('rookie update', '')
-                    .replace('rookies update', '')
-                    .trim(),
-                ) > -1) &&
-              (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
-            !updatedCard.parallel ||
-              c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
-          );
-          if (match) {
-            addRemoval(updatedCard, match);
-          } else {
-            console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
-            removals.push(updatedCard);
-          }
+          return mergeFirebaseResult(updatedCard, match);
         } else {
           console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
-          removals.push(updatedCard);
         }
+      } else {
+        console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
+      }
+    }
+  }
+  //if we never found a match just return the original card
+  return updatedCard;
+}
+
+export async function getListingInfo(db, cards) {
+  const removals = [];
+  for (let card of cards) {
+    if (card.sku) {
+      const doc = await db.collection('CardSales').doc(card.sku).get();
+      if (doc.exists) {
+        removals.push({ ...card, ...doc.data() });
+      } else {
+        const match = await matchOldStyle(db, card);
+        if (match) {
+          removals.push(match);
+        } else {
+          console.log(chalk.red('Could not find listing in firebase: '), card.sku);
+        }
+      }
+    } else {
+      const match = await matchOldStyle(db, card);
+      if (match) {
+        removals.push(match);
       }
     }
   }
