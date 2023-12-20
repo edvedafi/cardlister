@@ -343,16 +343,25 @@ const _cachedGroups = {};
 export async function getGroup(info, isTemp) {
   if (isTemp) {
     if (!_cachedGroups[isTemp]) {
-      _cachedGroups[isTemp] = {
-        sport: info.sport?.toLowerCase(),
-        year: info.year?.toLowerCase(),
-        manufacture: info.manufacture?.toLowerCase(),
-        setName: info.setName?.toLowerCase(),
-        insert: info.insert?.toLowerCase(),
-        parallel: info.parallel?.toLowerCase(),
-        skuPrefix: isTemp,
-        bin: isTemp,
-      };
+      if (info.bin) {
+        const db = getFirestore();
+        const collection = db.collection('SalesGroups');
+        const queryResults = await collection.doc(info.bin).get();
+        if (queryResults.exists) {
+          _cachedGroups[isTemp] = await queryResults.data();
+        }
+      } else {
+        _cachedGroups[isTemp] = {
+          sport: info.sport?.toLowerCase(),
+          year: info.year?.toLowerCase(),
+          manufacture: info.manufacture?.toLowerCase(),
+          setName: info.setName?.toLowerCase(),
+          insert: info.insert?.toLowerCase(),
+          parallel: info.parallel?.toLowerCase(),
+          skuPrefix: isTemp,
+          bin: isTemp,
+        };
+      }
     }
     return _cachedGroups[isTemp];
   } else {
@@ -429,7 +438,7 @@ export async function getGroupByBin(bin) {
   }
 }
 export async function updateGroup(group) {
-  _cachedGroups[bin] = group;
+  _cachedGroups[group.bin] = group;
   const db = getFirestore();
   await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
 }

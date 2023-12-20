@@ -44,8 +44,14 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
 
   try {
     await setSelectValue(sportField, { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()]);
-    await setSelectValue(yearField, setInfo.year);
-    // await setSelectValue(brandField, brands[setInfo.setName?.toLowerCase()] || setInfo.manufacture);
+    await setSelectValue(yearField, setInfo.sportlots.year || setInfo.year);
+    await setSelectValue(
+      brandField,
+      setInfo.sportlots.manufacture ||
+        brands[setInfo.setName?.toLowerCase()] ||
+        brands[setInfo.manufacture?.toLowerCase()] ||
+        'All Brands',
+    );
     found = true;
   } catch (e) {
     await setSelectValue(brandField, 'All Brands');
@@ -144,11 +150,9 @@ export async function shutdownSportLots() {
 async function enterIntoSportLotsWebsite(cardsToUpload) {
   console.log(chalk.magenta('SportLots Starting Upload'));
   console.log('Uploading:', Object.keys(cardsToUpload));
-  let driver;
+  const driver = await login();
 
   try {
-    driver = await new Builder().forBrowser(Browser.CHROME).build();
-
     const waitForElement = useWaitForElement(driver);
     const clickSubmit = useClickSubmit(waitForElement);
     // const setSelectValue = useS
@@ -156,41 +160,94 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     const selectSet = useSelectSet(driver, selectBrand);
 
     for (const key in cardsToUpload) {
-      const setInfo = getGroupByBin(key);
+      const setInfo = await getGroupByBin(key);
+      if (!setInfo.sportlots) {
+        setInfo.sportlots = {};
+      }
       let cardsAdded = 0;
 
       await selectBrand(setInfo);
+      const onFoundSet = async (fullSetText, row) => {
+        const fullSetNumbers = fullSetText.split(' ')[0];
+        setInfo.sportlots.id = fullSetNumbers;
+        //find the radio button where the value is fullSetNumbers
+        const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+        await radioButton.click();
+      };
       let found = false;
-      if (setInfo.slId) {
-        const radioButton = waitForElement(By.xpath(`//input[@value = '${setInfo.slId}']`));
+      if (setInfo.sportlots.id) {
+        const radioButton = await waitForElement(By.xpath(`//input[@value = '${setInfo.sportlots.id}']`));
         await radioButton.click();
         found = true;
       } else {
-        found = (
-          await selectSet(setInfo, async (fullSetText, row) => {
-            const fullSetNumbers = fullSetText.split(' ')[0];
-            setInfo.slId = fullSetNumbers;
-            await updateGroup(setInfo);
-            //find the radio button where the value is fullSetNumbers
-            const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-            await radioButton.click();
-          })
-        ).found;
+        found = (await selectSet(setInfo, onFoundSet)).found;
       }
       if (found) {
+        await updateGroup(setInfo);
         await clickSubmit();
       } else {
-        found = await ask(
-          `Does this set exist on SportLots? ${JSON.stringify(
-            setInfo,
-            null,
-            2,
-          )}. Please select the proper filters and hit enter or say No`,
-          true,
-        );
-        if (found) {
-          await clickSubmit();
+        const inputYear = setInfo.sportlots.year || setInfo.year;
+        const selectedYear = await ask('Year?', inputYear);
+        if (selectedYear !== inputYear) {
+          setInfo.sportlots.year = selectedYear;
+          setInfo.sportlots.manufacture = await ask('Manufacturer?', undefined, {
+            selectOptions: Object.values(brands),
+          });
+          await selectBrand(setInfo);
+          found = (await selectSet(setInfo, onFoundSet)).found;
         }
+        if (found) {
+          await updateGroup(setInfo);
+          await clickSubmit();
+        } else {
+          const tds = await driver.findElements(
+            By.xpath(`//input[@type='radio' and @name='selset']/../following-sibling::td`),
+          );
+          const radioButtonValues = await Promise.all(
+            tds.map(async (td) => {
+              const buttonText = await td.getText();
+              return {
+                value: buttonText.split(' ')[0],
+                name: buttonText,
+              };
+            }),
+          );
+
+          const fullSetNumbers = await ask('Which set is this?', undefined, { selectOptions: radioButtonValues });
+
+          const radioButton = await waitForElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+          radioButton.click();
+          await clickSubmit();
+          found = true;
+
+          setInfo.sportlots.id = fullSetNumbers;
+          await updateGroup(setInfo);
+        }
+        // found = await ask(
+        //   `Does this set exist on SportLots? ${JSON.stringify(
+        //     setInfo,
+        //     null,
+        //     2,
+        //   )}. Please select the proper filters and hit enter or say No`,
+        //   true,
+        // );
+        // if (found) {
+        //   const radioButtons = await driver.findElements(By.xpath(`//input[@type='radio' and @checked]`));
+        //
+        //   if (radioButtons.length > 0) {
+        //     for (let radioButton of radioButtons) {
+        //       console.log('radioButton', await radioButton.getAttribute('value'));
+        //     }
+        //   }
+        //   if (radioButtons.length === 1) {
+        //     const radioButton = radioButtons[0];
+        //     setInfo.sportlots.id = await radioButton.getAttribute('value');
+        //   } else if (radioButtons.length > 1) {
+        //   }
+        //   await updateGroup(setInfo);
+        //   await ask('Press any key to continue...');
+        //   await clickSubmit();
+        // }
       }
 
       if (found) {
@@ -265,6 +322,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         console.log(`${chalk.green(cardsAdded)} cards added to Sportlots at ${chalk.cyan(key)}`);
       } else {
         console.log(`Could not find ${chalk.red(key)} on SportLots`);
+        await ask('Press any key to continue...');
       }
     }
     console.log(chalk.magenta('SportLots Completed Upload!'));
@@ -272,10 +330,6 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     console.log(chalk.red('Failed to upload to SportLots'));
     console.log(e);
     await ask('Press any key to continue...');
-  } finally {
-    if (driver) {
-      await driver.quit();
-    }
   }
 }
 
@@ -400,8 +454,8 @@ export async function removeFromSportLots(groupedCards) {
     let setInfo = await getGroupByBin(key);
     console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
     let found = false;
-    if (setInfo.slId) {
-      await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.slId}`);
+    if (setInfo.sportlots.id) {
+      await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
       found = true;
     } else {
       await selectBrand(setInfo);
