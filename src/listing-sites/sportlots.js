@@ -366,6 +366,8 @@ export async function getSalesSportLots() {
         ...convertTitleToCard(title),
       });
     }
+
+    await driver.get('https://sportlots.com/s/ui/profile.tpl');
   }
 
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
