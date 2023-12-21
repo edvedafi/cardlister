@@ -642,6 +642,13 @@ export async function uploadToBuySportsCards(cardsToUpload) {
         }
 
         if (updated > 0) {
+          if (updated < cardsToUpload[key].length) {
+            notAdded.push(
+              ...cardsToUpload[key].filter(
+                (card) => !updates.find((listing) => listing.card.cardNo === card.cardNumber),
+              ),
+            );
+          }
           try {
             await saveBulk(updates);
             console.log(chalk.green('Added'), chalk.green(updates.length), chalk.green('cards to BSC'));
@@ -669,7 +676,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           columns: [
             { field: 'title', name: 'Title' },
             { field: 'quantity', name: 'Quantity' },
-            { field: 'error', name: 'Error' },
+            // { field: 'error', name: 'Error' },
           ],
         },
         notAdded,
