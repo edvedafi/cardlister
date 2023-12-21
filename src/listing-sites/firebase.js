@@ -401,7 +401,6 @@ export async function getGroup(info, isTemp) {
         slPrice: info.slPrice,
         price: info.price,
         keys: setInfo,
-        n,
       };
       await collection.doc(`${group.bin}`).set(group);
       _cachedGroups[group.bin] = group;
@@ -440,5 +439,6 @@ export async function getGroupByBin(bin) {
 export async function updateGroup(group) {
   _cachedGroups[group.bin] = group;
   const db = getFirestore();
+  // console.log('updating group', group);
   await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
 }

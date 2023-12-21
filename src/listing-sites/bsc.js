@@ -6,7 +6,7 @@ import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
 import pRetry, { AbortError } from 'p-retry';
-import { deepEqual } from 'node:assert';
+import FormData from 'form-data';
 import { getGroup, getGroupByBin, updateGroup } from './firebase.js';
 import chalkTable from 'chalk-table';
 
@@ -24,6 +24,16 @@ const baseHeaders = {
   'accept-language': 'en-US,en;q=0.9',
   assumedrole: 'sellers',
   'content-type': 'application/json',
+  origin: 'https://www.buysportscards.com',
+  referer: 'https://www.buysportscards.com/',
+  'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': 'macOS',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-site',
+  authority: 'api-prod.buysportscards.com',
+  // 'Referrer Policy:': 'strict-origin-when-cross-origin',
 };
 
 const login = async () => {
@@ -51,10 +61,11 @@ const login = async () => {
   }
 
   const reduxAsString = await _driver.executeScript(
-    'return Object.values(localStorage).find((value) => value.includes("secret"));',
+    'return Object.values(localStorage).filter((value) => value.includes("secret")).find(value=>value.includes("Bearer"));',
   );
+
   const redux = JSON.parse(reduxAsString);
-  baseHeaders.authorization = `Bearer ${redux.secret}`;
+  baseHeaders.authorization = 'Bearer ' + redux.secret.trim();
   return _driver;
 };
 
@@ -73,31 +84,24 @@ const fetchJson = async (path, method = 'GET', body) => {
     console.log('BSC Token Expired');
     await login();
   } else if (responseObject.status < 200 || responseObject.status >= 300) {
-    console.group(`**Error from BSC ${method} ${path}`);
-    if (body) {
-      console.log('Body: ', JSON.stringify(body, null, 2));
-      console.log('Body Keys', Object.keys(body));
-    }
-    if (responseObject) console.log('Response: ', JSON.stringify(responseObject, null, 2));
-
-    console.group(
-      `END Error from ${method} https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
-    );
-    console.groupEnd();
-    throw new Error(
+    const err = new Error(
       `Error from ${method} https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
     );
+
+    if (body) {
+      err.body = JSON.stringify(body, null, 2);
+      err.bodyKeys = Object.keys(body);
+    }
+    if (responseObject) {
+      err.response = responseObject;
+    }
+
+    throw err;
   }
 
   const text = await responseObject.text();
 
   if (text === '' || text.trim().length === 0) {
-    // console.group('Empty response from BSC');
-    // if (body) {
-    //   console.log(JSON.stringify(body, null, 2));
-    // }
-    // console.log('path: ', `https://api-prod.buysportscards.com/${path}`);
-    // console.groupEnd();
     return undefined;
   }
 
@@ -118,6 +122,13 @@ async function postImage(path, imagePath) {
 
   formData.append('attachment', fs.createReadStream(imagePath));
 
+  // console.log('formData', formData.getHeaders());
+  // console.log('baseHeaders', baseHeaders);
+  // console.log('headers', {
+  //   ...baseHeaders,
+  //   ...formData.getHeaders(),
+  // });
+
   const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
     headers: {
       ...baseHeaders,
@@ -127,7 +138,21 @@ async function postImage(path, imagePath) {
     method: 'POST',
   });
 
-  return responseObject.json();
+  if (responseObject.status < 200 || responseObject.status >= 300) {
+    console.log('error', responseObject);
+    throw new Error(
+      `Error from POST https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
+    );
+  }
+  try {
+    return await responseObject.json();
+  } catch (e) {
+    console.log(
+      `Error from POST https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
+      e,
+    );
+    throw e;
+  }
 }
 export async function shutdownBuySportsCards() {
   await _driver?.quit();
@@ -490,19 +515,22 @@ async function getAllListings(setData) {
   }
 
   let allPossibleListings = {};
+  let body = {};
 
-  const buildBody = (filters) => ({
-    currentListings: true,
-    condition: 'near_mint',
-    productType: 'raw',
-    filters: Object.keys(filters).reduce((result, key) => {
-      result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
-      return result;
-    }, {}),
-  });
+  const buildBody = (filters) => {
+    body = {
+      currentListings: true,
+      condition: 'near_mint',
+      productType: 'raw',
+      filters: Object.keys(filters).reduce((result, key) => {
+        result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
+        return result;
+      }, {}),
+    };
+    return body;
+  };
 
   try {
-    // console.log('looking for listings', buildBody(filters));
     allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
 
     // console.log('first listings', allPossibleListings);
@@ -531,19 +559,19 @@ async function getAllListings(setData) {
 
     filters.setName = await getNextFilter('Which set would you like to remove?', 'setName');
 
-    if (setData.parallel) {
-      filters.variant = ['parallel'];
-      filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
-      if (filters.variantName === 'None') {
-        filters.variant = ['insert'];
-        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
-      }
-    } else if (setData.insert) {
+    if (setData.insert) {
       filters.variant = ['insert'];
       filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
       if (filters.variantName === 'None') {
         filters.variant = ['parallel'];
         filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+      }
+    } else if (setData.parallel) {
+      filters.variant = ['parallel'];
+      filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+      if (filters.variantName === 'None') {
+        filters.variant = ['insert'];
+        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
       }
     } else {
       filters.variant = ['base'];
@@ -555,7 +583,7 @@ async function getAllListings(setData) {
       allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
     }
   }
-  return { filters, allPossibleListings };
+  return { body, allPossibleListings };
 }
 
 export async function uploadToBuySportsCards(cardsToUpload) {
@@ -568,9 +596,9 @@ export async function uploadToBuySportsCards(cardsToUpload) {
       if (setData.bscFilters) {
         listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
       } else {
-        let { filters, allPossibleListings } = await getAllListings(setData);
+        let { body, allPossibleListings } = await getAllListings(setData);
         listings = allPossibleListings.results;
-        setData.bscFilters = filters;
+        setData.bscFilters = body;
         await updateGroup(setData);
       }
 
@@ -586,16 +614,24 @@ export async function uploadToBuySportsCards(cardsToUpload) {
               price: card.bscPrice,
               sellerSku: card.sku || card.bin,
             };
-            if (card.pics) {
-              if (card.pics[0]) {
-                listing.sellerImgFront = (
-                  await postImage('common/card/undefined/product/undefined/attachment', card.pics[0])
+            if (card.directory) {
+              if (card.frontImage) {
+                newListing.sellerImgFront = (
+                  await postImage(
+                    'common/card/undefined/product/undefined/attachment',
+                    `output/${card.directory}${card.frontImage}`,
+                  )
                 ).objectKey;
+                newListing.imageChanged = true;
               }
-              if (card.pics[1]) {
-                listing.sellerImgBack = (
-                  await postImage('common/card/undefined/product/undefined/attachment', card.pics[1])
+              if (card.backImage) {
+                newListing.sellerImgBack = (
+                  await postImage(
+                    'common/card/undefined/product/undefined/attachment',
+                    `output/${card.directory}${card.backImage}`,
+                  )
                 ).objectKey;
+                newListing.imageChanged = true;
               }
             }
             updates.push(newListing);
@@ -607,7 +643,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
 
         if (updated > 0) {
           try {
-            await saveBulk(updated);
+            await saveBulk(updates);
             console.log(chalk.green('Added'), chalk.green(updates.length), chalk.green('cards to BSC'));
           } catch (e) {
             console.log(chalk.red('Bulk API Failed more than limit'));

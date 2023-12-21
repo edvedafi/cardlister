@@ -5,6 +5,8 @@ import { getInputs } from './utils/inputs.js';
 import writeFiles from './writeFiles.js';
 import minimist from 'minimist';
 
+$.verbose = false;
+
 const args = minimist(process.argv.slice(2));
 
 dotenv.config();
