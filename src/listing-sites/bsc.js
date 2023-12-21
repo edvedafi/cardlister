@@ -680,6 +680,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           ],
         },
         notAdded,
+        0,
       ),
     );
   } else {
