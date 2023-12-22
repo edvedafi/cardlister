@@ -305,14 +305,19 @@ let _cachedNumbers;
  * @returns {Promise<number>} The next number in the sequence
  */
 export async function getNextCounter(collectionType) {
+  const doc = await getFirestore().collection('counters').doc('Sales');
   if (!_cachedNumbers) {
-    const doc = await getFirestore().collection('counters').doc('Sales').get();
-    _cachedNumbers = doc.data();
+    const result = await doc.get();
+    _cachedNumbers = result.data();
   }
 
   if (!_cachedNumbers[collectionType]) {
     _cachedNumbers[collectionType] = 1;
   }
+
+  _cachedNumbers[collectionType]++;
+
+  await doc.set(_cachedNumbers);
 
   return ++_cachedNumbers[collectionType];
 }

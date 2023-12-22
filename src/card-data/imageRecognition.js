@@ -192,6 +192,11 @@ export const extractData = async (searchParagraphs, defaults, setData) => {
   //third pass, lets get really fuzzy
   result = await fuzzyMatch(searchParagraphs, result, setData);
 
+  //clean up some data
+  if (result.cardNumber) {
+    result.cardNumber = result.cardNumber.replaceAll(' ', '');
+  }
+
   return result;
 };
 

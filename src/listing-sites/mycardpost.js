@@ -162,9 +162,6 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
     console.log(chalk.red('Error in MyCardPost upload: '), e);
   } finally {
     console.log(chalk.magenta('MyCardPost Upload COMPLETE! Added ', chalk.green(totalCardsAdded), ' cards'));
-    if (driver) {
-      await driver.quit();
-    }
   }
 };
 

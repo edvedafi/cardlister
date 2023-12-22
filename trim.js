@@ -23,7 +23,7 @@ const shutdown = async () => {
   }
 };
 
-['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGKILL'].forEach((signal) =>
+['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
   process.on(signal, () =>
     shutdown().then(() => {
       process.exit();
