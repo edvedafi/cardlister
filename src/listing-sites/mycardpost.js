@@ -3,19 +3,17 @@ import dotenv from 'dotenv';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
+import chalkTable from 'chalk-table';
 
 dotenv.config();
 
-export const uploadToMyCardPost = async (cardsToUpload) => {
-  console.log(chalk.magenta('MyCardPost Starting Upload'));
-  let driver;
-  let totalCardsAdded = 0;
+let _driver;
+const login = async () => {
+  if (!_driver) {
+    _driver = await new Builder().forBrowser(Browser.CHROME).build();
+    await _driver.get('https://mycardpost.com/login');
 
-  try {
-    driver = await new Builder().forBrowser(Browser.CHROME).build();
-    await driver.get('https://mycardpost.com/login');
-
-    const waitForElement = useWaitForElement(driver);
+    const waitForElement = useWaitForElement(_driver);
 
     const emailInput = await waitForElement(inputByPlaceholder('Email *'));
     await emailInput.sendKeys(process.env.MCP_EMAIL);
@@ -25,6 +23,27 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
     const nextButton = await waitForElement(buttonByText('Login'));
     await nextButton.click();
     await waitForElement(By.xpath(`//h2[text()='edvedafi']`));
+  }
+  return _driver;
+};
+
+export async function shutdownMyCardPost() {
+  if (_driver) {
+    const d = _driver;
+    _driver = undefined;
+    await d.quit();
+  }
+}
+
+export const uploadToMyCardPost = async (cardsToUpload) => {
+  console.log(chalk.magenta('MyCardPost Starting Upload'));
+  let driver;
+  let totalCardsAdded = 0;
+
+  try {
+    driver = await login();
+
+    const waitForElement = useWaitForElement(driver);
 
     //iterate over cardsToUpload values
     for (let card of Object.values(cardsToUpload)) {
@@ -149,6 +168,65 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
   }
 };
 
-export async function removeFromMyCardPost(cardsToRemove) {
-  return [];
+export async function removeFromMyCardPost(cards) {
+  let toRemove = cards.filter((card) => !card.platform.startsWith('MCP: '));
+  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from MyCardPost'));
+  const driver = await login();
+  const waitForElement = useWaitForElement(driver);
+  const xpath = async (text) => waitForElement(By.xpath(text));
+  const notRemoved = [];
+  await driver.get('https://mycardpost.com/edvedafi');
+  const searchInput = await xpath(`//input[@placeholder='Search Cards']`);
+
+  for (const card of toRemove) {
+    try {
+      if (card.sku) {
+        await searchInput.clear();
+        await searchInput.sendKeys(card.sku);
+        await xpath('//h2[text()="All Cards (1)"]');
+        const removeButton = await xpath('//a[text()="Delete"]');
+        await removeButton.click();
+        await ask('Please confirm deletion and press enter to continue');
+        const yesButton = await waitForElement(By.id('delete-btn'));
+        await yesButton.click();
+        await xpath('//h2[text()="All Cards (0)"]');
+      } else {
+        card.error = 'No SKU';
+        notRemoved.push(card);
+      }
+    } catch (e) {
+      card.error = e.message;
+      notRemoved.push(card);
+    }
+  }
+
+  if (notRemoved.length === 0) {
+    console.log(
+      chalk.magenta('Successfully removed all'),
+      chalk.green(toRemove.length),
+      chalk.magenta('cards from MyCardPost'),
+    );
+  } else {
+    console.log(
+      chalk.magenta('Only removed'),
+      chalk.red(toRemove.length - notRemoved.length),
+      chalk.magenta('of'),
+      chalk.red(toRemove.length),
+      chalk.magenta('cards from MyCardPost'),
+    );
+    console.log(
+      chalkTable(
+        {
+          leftPad: 2,
+          columns: [
+            { field: 'title', name: 'Title' },
+            { field: 'quantity', name: 'Sold' },
+            { field: 'updatedQuantity', name: 'Remaining' },
+            { field: 'error', name: 'Error' },
+          ],
+        },
+        notRemoved,
+      ),
+    );
+  }
 }

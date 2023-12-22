@@ -11,6 +11,7 @@ import initializeFirebase from './src/utils/firebase.js';
 import { shutdownSportLots } from './src/listing-sites/sportlots.js';
 import { shutdownBuySportsCards } from './src/listing-sites/bsc.js';
 import { shutdownFirebase } from './src/listing-sites/firebase.js';
+import { shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
 
 $.verbose = false;
 
@@ -18,7 +19,7 @@ let isShuttingDown = false;
 const shutdown = async () => {
   if (!isShuttingDown) {
     isShuttingDown = true;
-    await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase()]);
+    await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase(), shutdownMyCardPost()]);
   }
 };
 

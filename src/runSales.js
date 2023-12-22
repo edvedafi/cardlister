@@ -5,7 +5,7 @@ import { createGroups } from './listing-sites/uploads.js';
 import chalk, { foregroundColorNames } from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
-import { removeFromMyCardPost } from './listing-sites/mycardpost.js';
+import { removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import {
@@ -30,15 +30,21 @@ $.verbose = false;
 
 dotenv.config();
 
+let isShuttingDown = false;
 const shutdown = async () => {
-  await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase()]);
+  if (!isShuttingDown) {
+    isShuttingDown = true;
+    await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase(), shutdownMyCardPost()]);
+  }
 };
 
-process.on('SIGINT', async function () {
-  console.log('Caught interrupt signal');
-  await shutdown();
-  process.exit();
-});
+['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGKILL'].forEach((signal) =>
+  process.on(signal, () =>
+    shutdown().then(() => {
+      process.exit();
+    }),
+  ),
+);
 
 function buildTableData(groupedCards) {
   const divider = {
@@ -185,24 +191,20 @@ try {
   //remove listings from sites
   console.log(chalk.cyan('Remove listings from sites'));
 
-  if (args.r) {
-    if (await ask('Remove from Ebay?', true)) {
-      await removeFromEbay(sales, db);
-    }
-    if (await ask('Remove from Sportlots?', true)) {
-      await removeFromSportLots(groupedCards);
-    }
-    if (await ask('Remove from BuySportsCards?', true)) {
-      await removeFromBuySportsCards(groupedCards);
-    }
-    if (await ask('Remove from Shopify?', true)) {
-      await removeFromShopify(sales);
-    }
-  } else {
+  if (!args.r || (await ask('Remove from Ebay?', true))) {
     await removeFromEbay(sales, db);
+  }
+  if (!args.r || (await ask('Remove from Sportlots?', true))) {
     await removeFromSportLots(groupedCards);
+  }
+  if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
     await removeFromBuySportsCards(groupedCards);
+  }
+  if (!args.r || (await ask('Remove from Shopify?', true))) {
     await removeFromShopify(sales);
+  }
+  if (!args.r || (await ask('Remove from My Card Post?', true))) {
+    await removeFromMyCardPost(sales);
   }
   console.log(chalk.cyan('Completed removing listings from sites'));
 

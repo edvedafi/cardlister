@@ -265,31 +265,35 @@ export async function getListingInfo(db, cards) {
 export async function getFileSales() {
   //ADD A CARD
 
-  // return [
-  //   {
-  //     ...convertTitleToCard('2020 Panini Chronicles Luminance Update Rookies #206 Ceedee Lamb FB'),
-  //     quantity: 1,
-  //     platform: 'BigSale',
-  //   },
-  // ];
+  return [
+    {
+      ...convertTitleToCard(
+        '2019-20 Upper Deck Artifacts Rookie Redemption Mario Ferraro #RED204 San Jose Sharks #/999',
+      ),
+      quantity: 1,
+      platform: 'TestSale',
+      sku: 'testing|1',
+    },
+  ];
 
   // ADD A FILE
-  if (fs.existsSync('offline_sales.csv')) {
-    return fs
-      .readFileSync('offline_sales.csv', { encoding: 'utf-8' })
-      .split('\n')
-      .map((line) => {
-        const words = line.split(',');
-        return {
-          ...convertTitleToCard(words[0]),
-          quantity: words[1],
-          platform: 'offline_sales',
-        };
-      })
-      .filter((card) => card.cardNumber);
-  } else {
-    return [];
-  }
+  // if (fs.existsSync('offline_sales.csv')) {
+  //   return fs
+  //     .readFileSync('offline_sales.csv', { encoding: 'utf-8' })
+  //     .split('\n')
+  //     .map((line) => {
+  //       const words = line.split(',');
+  //       return {
+  //         ...convertTitleToCard(words[0]),
+  //         quantity: words[1],
+  //         platform: 'offline_sales',
+  //         sku: words[2],
+  //       };
+  //     })
+  //     .filter((card) => card.cardNumber);
+  // } else {
+  //   return [];
+  // }
 }
 
 let _cachedNumbers;
