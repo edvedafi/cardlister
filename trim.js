@@ -8,25 +8,47 @@ import 'zx/globals';
 import { getFiles, getInputs } from './src/utils/inputs.js';
 import processSingles from './src/singles.js';
 import initializeFirebase from './src/utils/firebase.js';
-import processBulk from './src/bulk.js';
+import { shutdownSportLots } from './src/listing-sites/sportlots.js';
+import { shutdownBuySportsCards } from './src/listing-sites/bsc.js';
+import { shutdownFirebase } from './src/listing-sites/firebase.js';
 
 $.verbose = false;
 
-const app = initializeFirebase();
-initializeStorage(app);
-await loadTeams(app);
+let isShuttingDown = false;
+const shutdown = async () => {
+  if (!isShuttingDown) {
+    isShuttingDown = true;
+    await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase()]);
+  }
+};
 
-// Set up full run information
-let input_directory = await getInputs();
-const savedAnswers = await initializeAnswers(input_directory);
+['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGKILL'].forEach((signal) =>
+  process.on(signal, () =>
+    shutdown().then(() => {
+      process.exit();
+    }),
+  ),
+);
 
-const setData = await getSetData();
+try {
+  const app = initializeFirebase();
+  initializeStorage(app);
+  await loadTeams(app);
 
-//gather the list of files that we will process
-let files = [];
-console.log(input_directory);
-if (input_directory !== 'input/bulk/') {
-  files = await getFiles(input_directory);
+  // Set up full run information
+  let input_directory = await getInputs();
+  const savedAnswers = await initializeAnswers(input_directory);
+
+  const setData = await getSetData();
+
+  //gather the list of files that we will process
+  let files = [];
+  console.log(input_directory);
+  if (input_directory !== 'input/bulk/') {
+    files = await getFiles(input_directory);
+  }
+
+  await processSingles(savedAnswers, setData, files);
+} finally {
+  await shutdown();
 }
-
-await processSingles(savedAnswers, setData, files);

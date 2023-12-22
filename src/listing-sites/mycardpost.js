@@ -1,10 +1,8 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
-import { backImage, buttonByText, frontImage, inputByPlaceholder, parseKey, useWaitForElement } from './uploads.js';
-import { validateUploaded } from './validate.js';
+import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
-import open from 'open';
 
 dotenv.config();
 

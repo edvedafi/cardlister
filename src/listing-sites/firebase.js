@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
-import { findTeamInString } from '../utils/teams.js';
+import { findTeamInString, sports } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 
 export async function uploadToFirebase(allCards) {
@@ -215,15 +215,20 @@ export async function matchOldStyle(db, card) {
         );
         if (match) {
           return mergeFirebaseResult(updatedCard, match);
-        } else {
-          console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
         }
-      } else {
-        console.log(chalk.red('Could not find listing in firebase: '), updatedCard);
       }
     }
   }
   //if we never found a match just return the original card
+  if (!match) {
+    console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+    updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
+    updatedCard.year = await ask('What year is this card?', updatedCard.year);
+    updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
+    updatedCard.setName = await ask('What set is this card?', updatedCard.setName);
+    updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
+    updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
+  }
   return updatedCard;
 }
 

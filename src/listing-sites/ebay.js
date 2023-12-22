@@ -818,7 +818,7 @@ export const getEbaySales = async () => {
     if (order.orderFulfillmentStatus === 'FULFILLED') {
       console.log(`Order already fulfilled for ${order.buyer.username}`);
     } else {
-      console.log('order', order);
+      // console.log('order', order);
       order.lineItems.forEach((lineItem) => {
         const card = {
           platform: `ebay: ${order.buyer.username}`,

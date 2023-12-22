@@ -1,7 +1,7 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
 import { Browser, Builder, By, Key, until } from 'selenium-webdriver';
-import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady, waitForElement } from './uploads.js';
+import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
@@ -155,7 +155,11 @@ async function postImage(path, imagePath) {
   }
 }
 export async function shutdownBuySportsCards() {
-  await _driver?.quit();
+  if (_driver) {
+    const d = _driver;
+    _driver = undefined;
+    await d.quit();
+  }
 }
 
 const useWaitForPageToLoad =
@@ -688,25 +692,66 @@ export async function uploadToBuySportsCards(cardsToUpload) {
   }
 }
 
+const findListing = async (listings, card) => {
+  let found = false;
+
+  //look for exact card number match
+  let listing = listings.find((listing) => listing.card.cardNo === card.cardNumber);
+  if (listing) {
+    found = true;
+  }
+
+  //look for fuzzy card number match
+  if (!found) {
+    listing = listings.find(
+      (listing) => listing.card.cardNo.replaceAll(/\D/g, '') === card.cardNumber.replaceAll(/\D/g, ''),
+    );
+    if (listing) {
+      found = await ask(`Is this a match? ${listing.card.cardNo} ${listing.card.players}`, true);
+    }
+  }
+
+  //look for player name match
+  if (!found) {
+    console.log('card', card);
+    const names = card.player.toLowerCase().split(/\s+/);
+    listing = listings.find((listing) => names.every((name) => listing.card.players.toLowerCase().includes(name)));
+    if (listing) {
+      found = await ask(`Is this a match? ${listing.card.cardNo} ${listing.card.players}`, true);
+    }
+  }
+
+  //just throw all the cards in a list
+  if (!found) {
+    const selectOptions = [
+      { name: 'None', value: null },
+      ...listings.map((listing) => ({
+        name: `${listing.card.cardNo} ${listing.card.players}`,
+        value: listing,
+      })),
+    ];
+    const listing = await ask(`Which listing is this?`, undefined, { selectOptions });
+  }
+
+  return found ? listing : undefined;
+};
+
 export async function removeWithAPI(cardsToRemove) {
   await login();
   const notRemoved = [];
   for (const key in cardsToRemove) {
-    const setData = parseKey(key, true);
+    const setData = await parseKey(key, true);
     console.log('Removing: ', key);
     // console.log('cardsToRemove[key]', cardsToRemove[key]);
-    const allPossibleListings = await getAllListings(setData);
+    const { allPossibleListings } = await getAllListings(setData);
 
     const listings = allPossibleListings?.results;
 
     if (listings && listings.length > 0) {
-      // console.log('cards to remove', cardsToRemove);
-      // console.log(`cards for ${key}: `, cardsToRemove[key]);
       let updated = 0;
-      cardsToRemove[key].forEach((card) => {
-        const listing = listings.find((listing) => listing.card.cardNo === card.cardNumber);
+      for (const card of cardsToRemove[key]) {
+        const listing = await findListing(listings, card);
         if (listing) {
-          // console.log('found listing', listing);
           let newQuantity = listing.availableQuantity + card.quantity;
           if (newQuantity < 0) {
             newQuantity = 0;
@@ -717,7 +762,7 @@ export async function removeWithAPI(cardsToRemove) {
           console.log('did not find', card);
           notRemoved.push(card);
         }
-      });
+      }
 
       if (updated > 0) {
         try {

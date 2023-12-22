@@ -1,7 +1,7 @@
 import { manufactures, sets } from '../utils/data.js';
 import { Browser, Builder, By, until, Select } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
-import { parseKey, useSetSelectValue, useWaitForElement, waitForElement } from './uploads.js';
+import { caseInsensitive, useSetSelectValue, useWaitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
@@ -44,10 +44,12 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
 
   try {
     await setSelectValue(sportField, { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()]);
-    await setSelectValue(yearField, setInfo.sportlots.year || setInfo.year);
+    console.log('setInfo.sportlots?.year', setInfo.sportlots?.year);
+    console.log('setting year to', setInfo.sportlots?.year || setInfo.year);
+    await setSelectValue(yearField, setInfo.sportlots?.year || setInfo.year);
     await setSelectValue(
       brandField,
-      setInfo.sportlots.manufacture ||
+      setInfo.sportlots?.manufacture ||
         brands[setInfo.setName?.toLowerCase()] ||
         brands[setInfo.manufacture?.toLowerCase()] ||
         'All Brands',
@@ -89,7 +91,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
       let found = false;
       await driver.sleep(500);
       console.log(`Searching for [${setName}]`);
-      const rows = await driver.findElements(By.xpath(`//*[contains(text(), '${setName}')]`));
+      const rows = await driver.findElements(By.xpath(`//*${caseInsensitive(setName)}`));
       for (let row of rows) {
         const fullSetText = await row.getText();
         // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
@@ -143,7 +145,9 @@ async function login() {
 
 export async function shutdownSportLots() {
   if (_driver) {
-    await _driver.quit();
+    const d = _driver;
+    _driver = undefined;
+    await d.quit();
   }
 }
 
@@ -223,31 +227,6 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
           setInfo.sportlots.id = fullSetNumbers;
           await updateGroup(setInfo);
         }
-        // found = await ask(
-        //   `Does this set exist on SportLots? ${JSON.stringify(
-        //     setInfo,
-        //     null,
-        //     2,
-        //   )}. Please select the proper filters and hit enter or say No`,
-        //   true,
-        // );
-        // if (found) {
-        //   const radioButtons = await driver.findElements(By.xpath(`//input[@type='radio' and @checked]`));
-        //
-        //   if (radioButtons.length > 0) {
-        //     for (let radioButton of radioButtons) {
-        //       console.log('radioButton', await radioButton.getAttribute('value'));
-        //     }
-        //   }
-        //   if (radioButtons.length === 1) {
-        //     const radioButton = radioButtons[0];
-        //     setInfo.sportlots.id = await radioButton.getAttribute('value');
-        //   } else if (radioButtons.length > 1) {
-        //   }
-        //   await updateGroup(setInfo);
-        //   await ask('Press any key to continue...');
-        //   await clickSubmit();
-        // }
       }
 
       if (found) {
@@ -454,7 +433,7 @@ export async function removeFromSportLots(groupedCards) {
     let setInfo = await getGroupByBin(key);
     console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
     let found = false;
-    if (setInfo.sportlots.id) {
+    if (setInfo.sportlots?.id) {
       await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
       found = true;
     } else {
@@ -544,7 +523,6 @@ export async function removeFromSportLots(groupedCards) {
           const row = await tdWithName.findElement(By.xpath('..'));
           //set the row background to yellow
           await driver.executeScript("arguments[0].style.backgroundColor = 'yellow';", row);
-          await ask(`Please reduce quantity by ${chalk.red(card.quantity)} and Press any key to continue...`);
           let cardNumberTextBox = await row.findElement(By.xpath(`./td/input[starts-with(@name, 'qty')]`));
           const currentQuantity = await cardNumberTextBox.getAttribute('value');
           let newQuantity = parseInt(currentQuantity) - parseInt(card.quantity);

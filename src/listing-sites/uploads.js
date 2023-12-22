@@ -1,30 +1,35 @@
 import { By, Select, until } from 'selenium-webdriver';
 import { titleCase } from '../utils/data.js';
-import { getGroup } from './firebase.js';
+import { getGroup, getGroupByBin } from './firebase.js';
 
 const createKey = (card) =>
   `${titleCase(card.sport)}|${
     card.year.indexOf('-') > -1 ? card.year.substring(0, card.year.indexOf('-')) : card.year
   }|${card.manufacture}|${card.setName}|${card.insert || ''}|${card.parallel || ''}`;
-export const parseKey = (key, lowercase = false) => {
-  const [sport, year, manufacture, setName, insert, parallel] = key.split('|');
-  return lowercase
-    ? {
-        sport: sport.toLowerCase(),
-        year: year.toLowerCase(),
-        manufacture: manufacture.toLowerCase(),
-        setName: setName.toLowerCase(),
-        insert: insert.toLowerCase(),
-        parallel: parallel.toLowerCase(),
-      }
-    : {
-        sport,
-        year,
-        manufacture,
-        setName,
-        insert,
-        parallel,
-      };
+export const parseKey = async (key, lowercase = false) => {
+  const splitKey = key.split('|');
+  if (splitKey.length > 2) {
+    const [sport, year, manufacture, setName, insert, parallel] = splitKey;
+    return lowercase
+      ? {
+          sport: sport.toLowerCase(),
+          year: year.toLowerCase(),
+          manufacture: manufacture.toLowerCase(),
+          setName: setName.toLowerCase(),
+          insert: insert.toLowerCase(),
+          parallel: parallel.toLowerCase(),
+        }
+      : {
+          sport,
+          year,
+          manufacture,
+          setName,
+          insert,
+          parallel,
+        };
+  } else {
+    return getGroupByBin(splitKey[0]);
+  }
 };
 
 export const createGroups = async (allCards = {}, bulk = []) => {
@@ -101,7 +106,7 @@ export const useWaitForElementToBeReady =
     waitForElementToBeReady(driver, element, hidden);
 
 export const caseInsensitive = (text) =>
-  `[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '${text}')]`;
+  `[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '${text?.toLowerCase()}')]`;
 
 export const buttonByText = (text) => By.xpath(`//button[descendant::text()${caseInsensitive(text.toLowerCase())}]`);
 export const inputByPlaceholder = (text) => By.xpath(`//input[@placeholder='${text}']`);
