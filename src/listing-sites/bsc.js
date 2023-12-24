@@ -546,7 +546,6 @@ async function getAllListings(setData) {
     console.log(chalk.red('Error getting listings for'), setData);
     filters = {
       sport: [setData.sport],
-      year: [setData.year],
     };
     const getNextFilter = async (text, filterType) => {
       const filterOptions = await post('search/bulk-upload/filters', { filters });
@@ -561,7 +560,9 @@ async function getAllListings(setData) {
       return [response];
     };
 
-    filters.setName = await getNextFilter('Which set would you like to remove?', 'setName');
+    filters.year = await getNextFilter('Which year would you like to update?', 'year');
+
+    filters.setName = await getNextFilter('Which set would you like to update?', 'setName');
 
     if (setData.insert) {
       filters.variant = ['insert'];
@@ -712,8 +713,7 @@ const findListing = async (listings, card) => {
   }
 
   //look for player name match
-  if (!found) {
-    console.log('card', card);
+  if (!found && card.player) {
     const names = card.player.toLowerCase().split(/\s+/);
     listing = listings.find((listing) => names.every((name) => listing.card.players.toLowerCase().includes(name)));
     if (listing) {
@@ -730,7 +730,11 @@ const findListing = async (listings, card) => {
         value: listing,
       })),
     ];
-    const listing = await ask(`Which listing is this?`, undefined, { selectOptions });
+    const answer = await ask(`Which listing is this? ${chalk.yellow(card.title)}`, undefined, { selectOptions });
+    if (answer) {
+      listing = answer;
+      found = true;
+    }
   }
 
   return found ? listing : undefined;
@@ -759,7 +763,7 @@ export async function removeWithAPI(cardsToRemove) {
           listing.availableQuantity = newQuantity;
           updated++;
         } else {
-          console.log('did not find', card);
+          card.error = 'No match in set';
           notRemoved.push(card);
         }
       }
@@ -770,19 +774,30 @@ export async function removeWithAPI(cardsToRemove) {
           console.log(chalk.green('Removed'), chalk.green(updated), chalk.green('cards from BSC'));
         } catch (e) {
           console.log(chalk.red('Failed to remove cards from BSC'));
-          notRemoved.push(...cardsToRemove[key]);
+          notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: e.message })));
         }
       }
     } else {
       console.log(chalk.red('Could not find any listings for'), setData);
       console.log('allPossibleListings', allPossibleListings);
-      notRemoved.push(...cardsToRemove[key]);
+      notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: 'No Set Found' })));
     }
   }
   if (notRemoved.length > 0) {
-    notRemoved.forEach((card) => {
-      console.log(chalk.red('Could not remove:'), card.title);
-    });
+    console.log(chalk.magenta('Unable to remove all cards from BuySportsCards'));
+    console.log(
+      chalkTable(
+        {
+          leftPad: 2,
+          columns: [
+            { field: 'title', name: 'Title' },
+            { field: 'quantity', name: 'Quantity' },
+            { field: 'error', name: 'Error' },
+          ],
+        },
+        notRemoved,
+      ),
+    );
   } else {
     console.log(chalk.green('All cards removed from BSC'));
   }

@@ -166,7 +166,11 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
 };
 
 export async function removeFromMyCardPost(cards) {
-  let toRemove = cards.filter((card) => !card.platform.startsWith('MCP: '));
+  let toRemove = cards.filter((card) => !card.platform.startsWith('MCP: ') && !!card.sku);
+  if (toRemove.length === 0) {
+    console.log(chalk.magenta('No cards to remove from MyCardPost'));
+    return;
+  }
   console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from MyCardPost'));
   const driver = await login();
   const waitForElement = useWaitForElement(driver);

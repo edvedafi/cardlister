@@ -422,10 +422,6 @@ export const getCardData = async (allCards, imageDefaults) => {
     cardNumber = `${imageDefaults.card_number_prefix}${cardNumber}`;
   }
 
-  console.log('cardNumber', cardNumber);
-  console.log('looking for card', imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`);
-  console.log('allCards', allCards);
-
   let output = allCards[imageDefaults.sku || `${imageDefaults.bin}|${cardNumber}`];
 
   //see if we already have that card number

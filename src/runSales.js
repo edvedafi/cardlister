@@ -38,13 +38,13 @@ const shutdown = async () => {
   }
 };
 
-['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGKILL'].forEach((signal) =>
-  process.on(signal, () =>
+['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) => {
+  process.on(signal, () => {
     shutdown().then(() => {
       process.exit();
-    }),
-  ),
-);
+    });
+  });
+});
 
 function buildTableData(groupedCards) {
   const divider = {

@@ -1,13 +1,13 @@
-import { ask } from "../utils/ask.js";
-import { isYes } from "../utils/data.js";
-import { getStorage } from "firebase-admin/storage";
-import terminalImage from "terminal-image";
-import sharp from "sharp";
-import fs from "fs-extra";
+import { ask } from '../utils/ask.js';
+import { isYes } from '../utils/data.js';
+import { getStorage } from 'firebase-admin/storage';
+import terminalImage from 'terminal-image';
+import sharp from 'sharp';
+import fs from 'fs-extra';
 
 // import cv from '@u4/opencv4nodejs';
 
-const output_directory = "output/";
+const output_directory = 'output/';
 const MAX_IMAGE_SIZE = 10 * 1000 * 1000; // slightly under 10MB
 
 let storage;
@@ -36,7 +36,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
   // }
   //if the output file already exists, skip it
   if (!overrideImages && fs.existsSync(outputFile)) {
-    console.log("Image already exists, skipping");
+    console.log('Image already exists, skipping');
   } else {
     await $`mkdir -p ${outputLocation}`;
 
@@ -45,7 +45,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
     }
 
     let goodImage = false;
-    let tempImage = "output/temp.jpg";
+    let tempImage = 'output/temp.jpg';
 
     try {
       if (rotate) {
@@ -61,9 +61,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         async () => {
           await $`cp ${input} ${tempImage}`;
           const openCommand = $`open -Wn ${tempImage}`;
-          process.on("SIGINT", function () {
-            openCommand ? openCommand.kill() : process.exit();
-          });
+          process.on('SIGINT', () => openCommand?.kill());
           return openCommand;
         },
       ];
@@ -73,7 +71,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         try {
           await cropAttempts[i]();
           console.log(await terminalImage.file(tempImage, { height: 25 }));
-          found = await ask("Did Image render correct?", true);
+          found = await ask('Did Image render correct?', true);
         } catch (e) {
           console.log(`Crop Attempt failed`, e);
         }
@@ -90,7 +88,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
         await $`mv ${tempImage} ${outputFile}`;
       }
     } catch (e) {
-      console.error("Error cropping image", e);
+      console.error('Error cropping image', e);
       goodImage = false;
     }
 

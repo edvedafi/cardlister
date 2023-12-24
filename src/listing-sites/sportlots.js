@@ -418,7 +418,11 @@ export async function removeFromSportLots(groupedCards) {
       toRemove[key] = toRemoveAtKey;
     }
   });
-  // console.log('Removing:', JSON.stringify(toRemove, null, 2));
+
+  if (Object.keys(toRemove).length === 0) {
+    console.log(chalk.magenta('No cards to remove from SportLots'));
+    return;
+  }
 
   const driver = await login();
   const waitForElement = useWaitForElement(driver);
