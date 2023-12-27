@@ -876,10 +876,43 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
   }
   return result;
 };
+export const removeFromEbayBySKU = async (sku, quantity, title) => {
+  const ebay = await loginEbayAPI();
+  console.log('trying to get offers for ', sku);
+  const offers = await ebay.sell.inventory.getOffers({ sku });
+  const item = offers.offers[0];
+  const updatedQuantity = parseInt(item.availableQuantity) - parseInt(quantity);
+  const result = { title, quantity, updatedQuantity, removed: false };
+  if (updatedQuantity <= 0) {
+    try {
+      await ebay.sell.inventory.deleteOffer(item.offerId);
+      console.log(chalk.green(`Successfully ended ${title} on ebay`));
+      result.removed = true;
+    } catch (e) {
+      if (e.meta.Errors.ErrorCode === 1047) {
+        console.log(chalk.green(`${sku} | ${title} has already been ended on ebay`));
+        result.removed = true;
+      } else {
+        result.removed = false;
+        result.error = e.meta.Errors.ErrorCode;
+      }
+    }
+  } else {
+    try {
+      await ebay.sell.inventory.updateOffer(item.offerId, { ...item, availableQuantity: updatedQuantity });
+      console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+      result.removed = true;
+    } catch (e) {
+      console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
+      result.error = e.meta.Errors.ErrorCode;
+    }
+  }
+  return result;
+};
 
 export const removeFromEbay = async (cards = [], db) => {
   let toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
-  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from Shopify'));
+  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from ebay'));
   const notRemoved = [];
   const removed = [];
 
@@ -888,9 +921,10 @@ export const removeFromEbay = async (cards = [], db) => {
     for (const card of toRemove) {
       if (card.ItemID) {
         removals.push(await removeFromEbayItemNumber(card.ItemID, card.quantity, card.title));
+      } else if (card.sku) {
+        removals.push(await removeFromEbayBySKU(card.sku, card.quantity, card.title));
       } else {
-        // console.log(`Could not remove ${chalk.red(card.title)} from ebay because no Item Number was found`);
-        notRemoved.push({ ...card, remaining: '?', error: 'No Item Number' });
+        notRemoved.push({ ...card, remaining: '?', error: 'No Item Number or SKU' });
       }
     }
 
