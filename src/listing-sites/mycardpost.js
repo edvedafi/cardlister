@@ -187,7 +187,6 @@ export async function removeFromMyCardPost(cards) {
         await xpath('//h2[text()="All Cards (1)"]');
         const removeButton = await xpath('//a[text()="Delete"]');
         await removeButton.click();
-        await ask('Please confirm deletion and press enter to continue');
         const yesButton = await waitForElement(By.id('delete-btn'));
         await yesButton.click();
         await xpath('//h2[text()="All Cards (0)"]');
