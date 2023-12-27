@@ -372,6 +372,25 @@ export const convertTitleToCard = (title) => {
   return card;
 };
 
+export function convertBinNumber(binNumber, cardNumberFromTitle) {
+  const card = {};
+  if (binNumber) {
+    if (binNumber?.indexOf('|') > -1) {
+      const [bin, cardNumber] = binNumber.split('|');
+      card.bin = bin;
+      //this is weird, but it accounts for the fact SportLots bin numbers are short so they do not always have the full card number
+      if (cardNumberFromTitle?.indexOf(cardNumber) > -1) {
+        card.sku = `${bin}|${cardNumberFromTitle}`;
+      } else {
+        card.sku = binNumber;
+      }
+    } else {
+      card.bin = binNumber;
+    }
+  }
+  return card;
+}
+
 export async function getSalesSportLots() {
   console.log(chalk.magenta('Gathering SportLots Sales'));
   const cards = [];
@@ -391,12 +410,16 @@ export async function getSalesSportLots() {
       const select = await row.findElement(By.xpath(`.//select`));
       const quantity = await select.getAttribute('value');
       const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
+      const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
       const title = await titleDiv.getText();
+      const bin = await binDiv.getText();
+      const cardFromTitle = convertTitleToCard(title);
       cards.push({
         platform: `SportLots: ${orderNumberText}`,
         title,
         quantity,
-        ...convertTitleToCard(title),
+        ...cardFromTitle,
+        ...convertBinNumber(bin, cardFromTitle.cardNumber),
       });
     }
 
