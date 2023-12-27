@@ -396,35 +396,40 @@ export async function getSalesSportLots() {
   const cards = [];
   const driver = await login();
   const waitForElement = useWaitForElement(driver);
-  await driver.get('https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=1a');
 
-  //first make sure that the page has loaded
-  const wrapper = await waitForElement(By.xpath(`//div[@data-name = 'results body']`));
+  const addCards = async (orderType) => {
+    await driver.get(`https://sportlots.com/inven/dealbin/dealacct.tpl?ordertype=${orderType}`);
+    //first make sure that the page has loaded
+    const wrapper = await waitForElement(By.xpath(`//div[@data-name = 'results body']`));
 
-  const orders = await wrapper.findElements(By.xpath('./div/form'));
-  for (let order of orders) {
-    const orderNumber = await order.findElement(By.xpath(`./div/a`));
-    const orderNumberText = await orderNumber.getText();
-    const rows = await order.findElements(By.xpath(`./div[descendant::select]`));
-    for (let row of rows) {
-      const select = await row.findElement(By.xpath(`.//select`));
-      const quantity = await select.getAttribute('value');
-      const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
-      const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
-      const title = await titleDiv.getText();
-      const bin = await binDiv.getText();
-      const cardFromTitle = convertTitleToCard(title);
-      cards.push({
-        platform: `SportLots: ${orderNumberText}`,
-        title,
-        quantity,
-        ...cardFromTitle,
-        ...convertBinNumber(bin, cardFromTitle.cardNumber),
-      });
+    const orders = await wrapper.findElements(By.xpath('./div/form'));
+    for (let order of orders) {
+      const orderNumber = await order.findElement(By.xpath(`./div/a`));
+      const orderNumberText = await orderNumber.getText();
+      const rows = await order.findElements(By.xpath(`./div[descendant::select]`));
+      for (let row of rows) {
+        const select = await row.findElement(By.xpath(`.//select`));
+        const quantity = await select.getAttribute('value');
+        const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
+        const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
+        const title = await titleDiv.getText();
+        const bin = await binDiv.getText();
+        const cardFromTitle = convertTitleToCard(title);
+        cards.push({
+          platform: `SportLots: ${orderNumberText}`,
+          title,
+          quantity,
+          ...cardFromTitle,
+          ...convertBinNumber(bin, cardFromTitle.cardNumber),
+        });
+      }
     }
+  };
 
-    await driver.get('https://sportlots.com/s/ui/profile.tpl');
-  }
+  await addCards('1a'); //Fill to Buyer
+  await addCards('1b'); //Fill to Box
+
+  await driver.get('https://sportlots.com/s/ui/profile.tpl');
 
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
   return cards;
