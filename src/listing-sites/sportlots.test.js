@@ -49,6 +49,10 @@ describe('Sport Lots', () => {
       const result = convertBinNumber('', 'Some Title');
       expect(result).toEqual({});
     });
+    it('should return an empty card object when binNumber is actually a condition value (NM)', () => {
+      const result = convertBinNumber('NM', 'Some Title');
+      expect(result).toEqual({});
+    });
 
     it('should correctly parse bin and sku when binNumber contains a pipe character', () => {
       const binNumber = '123|FS-';

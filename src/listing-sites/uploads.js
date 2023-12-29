@@ -53,7 +53,7 @@ export const createGroups = async (allCards = {}, bulk = []) => {
   Object.keys(groups).forEach((key) => {
     groups[key] = Object.values(groups[key]);
   });
-  // console.log('groups', groups);
+  console.log('groups', groups);
   return groups;
 };
 

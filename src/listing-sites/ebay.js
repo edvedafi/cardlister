@@ -334,8 +334,8 @@ export const getFeatures = (card) => {
     features.push('Rookie');
   }
 
-  if (card.features.length) {
-    features.push('Base');
+  if (card.features.length === 0) {
+    features.push('Base Set');
   }
 
   // console.log('features', features);
@@ -878,34 +878,39 @@ export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
 };
 export const removeFromEbayBySKU = async (sku, quantity, title) => {
   const ebay = await loginEbayAPI();
+  const result = { title, quantity, removed: false };
   console.log('trying to get offers for ', sku);
-  const offers = await ebay.sell.inventory.getOffers({ sku });
-  const item = offers.offers[0];
-  const updatedQuantity = parseInt(item.availableQuantity) - parseInt(quantity);
-  const result = { title, quantity, updatedQuantity, removed: false };
-  if (updatedQuantity <= 0) {
-    try {
-      await ebay.sell.inventory.deleteOffer(item.offerId);
-      console.log(chalk.green(`Successfully ended ${title} on ebay`));
-      result.removed = true;
-    } catch (e) {
-      if (e.meta.Errors.ErrorCode === 1047) {
-        console.log(chalk.green(`${sku} | ${title} has already been ended on ebay`));
+  try {
+    const offers = await ebay.sell.inventory.getOffers({ sku });
+    const item = offers.offers[0];
+    const updatedQuantity = parseInt(item.availableQuantity) - parseInt(quantity);
+    result.updatedQuantity = updatedQuantity;
+    if (updatedQuantity <= 0) {
+      try {
+        await ebay.sell.inventory.deleteOffer(item.offerId);
+        console.log(chalk.green(`Successfully ended ${title} on ebay`));
         result.removed = true;
-      } else {
-        result.removed = false;
+      } catch (e) {
+        if (e.meta.Errors.ErrorCode === 1047) {
+          console.log(chalk.green(`${sku} | ${title} has already been ended on ebay`));
+          result.removed = true;
+        } else {
+          result.removed = false;
+          result.error = e.meta.Errors.ErrorCode;
+        }
+      }
+    } else {
+      try {
+        await ebay.sell.inventory.updateOffer(item.offerId, { ...item, availableQuantity: updatedQuantity });
+        console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+        result.removed = true;
+      } catch (e) {
+        console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
         result.error = e.meta.Errors.ErrorCode;
       }
     }
-  } else {
-    try {
-      await ebay.sell.inventory.updateOffer(item.offerId, { ...item, availableQuantity: updatedQuantity });
-      console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
-      result.removed = true;
-    } catch (e) {
-      console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
-      result.error = e.meta.Errors.ErrorCode;
-    }
+  } catch (e) {
+    result.error = e.meta.Errors.ErrorCode;
   }
   return result;
 };

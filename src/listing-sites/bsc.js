@@ -746,10 +746,18 @@ export async function removeWithAPI(cardsToRemove) {
   for (const key in cardsToRemove) {
     const setData = await parseKey(key, true);
     console.log('Removing: ', key);
-    // console.log('cardsToRemove[key]', cardsToRemove[key]);
-    const { allPossibleListings } = await getAllListings(setData);
 
-    const listings = allPossibleListings?.results;
+    let listings;
+    if (setData.bscFilters) {
+      listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
+    } else {
+      let { body, allPossibleListings } = await getAllListings(setData);
+      listings = allPossibleListings.results;
+      if (listings?.length === 0) {
+        setData.bscFilters = body;
+        await updateGroup(setData);
+      }
+    }
 
     if (listings && listings.length > 0) {
       let updated = 0;

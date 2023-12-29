@@ -6,6 +6,7 @@ import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
+import chalkTable from 'chalk-table';
 
 const brands = {
   bowman: 'Bowman',
@@ -23,6 +24,8 @@ const brands = {
   'upper deck': 'Upper Deck',
   ud: 'Upper Deck',
 };
+
+const conditions = ['NM', 'EX/NM', 'EX', 'VG', 'GOOD'];
 
 const useClickSubmit =
   (waitForElement) =>
@@ -374,7 +377,7 @@ export const convertTitleToCard = (title) => {
 
 export function convertBinNumber(binNumber, cardNumberFromTitle) {
   const card = {};
-  if (binNumber) {
+  if (binNumber && conditions.indexOf(binNumber) === -1) {
     if (binNumber?.indexOf('|') > -1) {
       const [bin, cardNumber] = binNumber.split('|');
       card.bin = bin;
@@ -411,9 +414,13 @@ export async function getSalesSportLots() {
         const select = await row.findElement(By.xpath(`.//select`));
         const quantity = await select.getAttribute('value');
         const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
-        const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
         const title = await titleDiv.getText();
-        const bin = await binDiv.getText();
+        const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
+        let bin = await binDiv.getText();
+        if (bin === '5|FS-') {
+          bin = '36';
+        }
+
         const cardFromTitle = convertTitleToCard(title);
         cards.push({
           platform: `SportLots: ${orderNumberText}`,
@@ -430,6 +437,8 @@ export async function getSalesSportLots() {
   await addCards('1b'); //Fill to Box
 
   await driver.get('https://sportlots.com/s/ui/profile.tpl');
+
+  console.log('sportlots cards', cards);
 
   console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
   return cards;
@@ -461,7 +470,7 @@ export async function removeFromSportLots(groupedCards) {
   const selectSet = useSelectSet(driver, selectBrand);
 
   for (const key in toRemove) {
-    console.log('key', key);
+    // console.log('key', key);
     let setInfo = await getGroupByBin(key);
     console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
     let found = false;
@@ -495,11 +504,11 @@ export async function removeFromSportLots(groupedCards) {
         });
 
         askPromise
-          .then((found) => {
+          .then((response) => {
             // console.log('ask - then');
             // console.log('resolved ask');
             // console.log('resolved ask');
-            resolve(true);
+            resolve(response);
           })
           .catch((e) => {
             // console.log('ask - catch');
@@ -534,6 +543,14 @@ export async function removeFromSportLots(groupedCards) {
     }
 
     if (found) {
+      if (!setInfo.sportlots?.id) {
+        const slInfo = setInfo.sportlots || {};
+        const url = await driver.getCurrentUrl();
+        slInfo.bin = url.match(/Set_id=(\d+)/)?.[1];
+        setInfo.sportlots = slInfo;
+        await updateGroup(setInfo);
+      }
+
       for (const card of toRemove[key]) {
         // console.log('    Attempting to remove', card.title);
         //find a td that contains card.cardNumber
@@ -575,7 +592,8 @@ export async function removeFromSportLots(groupedCards) {
       }
       await clickSubmit('Change Dealer Values');
     } else {
-      throw new Error('Could not find set');
+      console.log(`Could not find ${chalk.red(key)} on SportLots`);
+      await ask('Press any key to continue...');
     }
   }
 
@@ -591,6 +609,20 @@ export async function removeFromSportLots(groupedCards) {
       chalk.magenta('of'),
       chalk.red(expected),
       chalk.magenta('cards from SportLots'),
+    );
+    console.log(
+      chalkTable(
+        {
+          leftPad: 2,
+          columns: [
+            { field: 'title', name: 'Title' },
+            { field: 'quantity', name: 'Sold' },
+            { field: 'updatedQuantity', name: 'Remaining' },
+            { field: 'error', name: 'Error' },
+          ],
+        },
+        notRemoved,
+      ),
     );
   }
 }

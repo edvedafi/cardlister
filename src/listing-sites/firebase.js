@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
-import { findTeamInString, sports } from '../utils/teams.js';
+import { findLeague, findTeamInString, sports } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 
 export async function uploadToFirebase(allCards) {
@@ -140,26 +140,27 @@ export function mergeFirebaseResult(card, match) {
     if (match.sku) {
       updatedCard.sku = match.sku;
     }
+    if (match.bin) {
+      updatedCard.bin = match.bin;
+    }
   }
   return updatedCard;
 }
 
 export async function matchOldStyle(db, card) {
-  const updatedCard = { ...card };
+  let updatedCard = { ...card };
+
+  //now try a fairly specific search
   let query = db.collection('OldSales').where('year', '==', updatedCard.year);
   if (updatedCard.sport) {
     query = query.where('sport', '==', titleCase(updatedCard.sport));
   }
-  // if (updatedCard.cardNumber === 175) {
-  // console.log('card', updatedCard);
-  // }
 
   const queryResults = await query.get();
   let possibleCards = [];
   queryResults.forEach((doc) => {
     possibleCards.push(doc.data());
   });
-  // console.log('found possible cards', possibleCards.length);
 
   let match = possibleCards.find(
     (c) =>
@@ -171,54 +172,79 @@ export async function matchOldStyle(db, card) {
   );
   if (match) {
     return mergeFirebaseResult(updatedCard, match);
-  } else {
+  }
+
+  //remove non-digits from the number and search again
+  match = possibleCards.find(
+    (c) =>
+      updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+      updatedCard.setName === c.setName &&
+      updatedCard.manufacture === c.manufacture &&
+      updatedCard.insert === c.insert &&
+      updatedCard.parallel === c.parallel,
+  );
+  if (match) {
+    return mergeFirebaseResult(updatedCard, match);
+  }
+
+  //do some weird stuff for 2021 absolute that was entered in a strange way early on
+  const searchSet =
+    updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
+  match = possibleCards.find(
+    (c) =>
+      updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+      c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
+      (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
+      (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+  );
+
+  if (match) {
+    return mergeFirebaseResult(updatedCard, match);
+  }
+
+  //do some chronicles magic
+  if (updatedCard.setName === 'Chronicles') {
     match = possibleCards.find(
       (c) =>
-        updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-        updatedCard.setName === c.setName &&
-        updatedCard.manufacture === c.manufacture &&
-        updatedCard.insert === c.insert &&
-        updatedCard.parallel === c.parallel,
+        updatedCard.cardNumber === c.cardNumber &&
+        c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
+        (!updatedCard.insert ||
+          c.Title.toLowerCase().indexOf(
+            updatedCard.insert
+              .toLowerCase()
+              .replace('update rookies', '')
+              .replace('rookie update', '')
+              .replace('rookies update', '')
+              .trim(),
+          ) > -1) &&
+        (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+      !updatedCard.parallel ||
+        c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
     );
     if (match) {
       return mergeFirebaseResult(updatedCard, match);
-    } else {
-      const searchSet =
-        updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
-      match = possibleCards.find(
-        (c) =>
-          updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-          c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
-          (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
-          (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
-      );
-
-      if (match) {
-        return mergeFirebaseResult(updatedCard, match);
-      } else if (updatedCard.setName === 'Chronicles') {
-        match = possibleCards.find(
-          (c) =>
-            updatedCard.cardNumber === c.cardNumber &&
-            c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
-            (!updatedCard.insert ||
-              c.Title.toLowerCase().indexOf(
-                updatedCard.insert
-                  .toLowerCase()
-                  .replace('update rookies', '')
-                  .replace('rookie update', '')
-                  .replace('rookies update', '')
-                  .trim(),
-              ) > -1) &&
-            (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
-          !updatedCard.parallel ||
-            c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
-        );
-        if (match) {
-          return mergeFirebaseResult(updatedCard, match);
-        }
-      }
     }
   }
+
+  //try to at least find the group sales info
+  const collection = db.collection('SalesGroups');
+  if (card.bin) {
+    const queryResults = await collection.doc(card.bin).get();
+    if (queryResults.exists) {
+      return mergeFirebaseResult(updatedCard, queryResults.data());
+    }
+  }
+
+  //try to do an exact query on skuPrefix
+  const skuPrefix = getSkuPrefix(card);
+  const skuQuery = collection.where('skuPrefix', '==', skuPrefix);
+  console.log('Search for skuPrefix', skuPrefix);
+  const skuQueryResults = await skuQuery.get();
+  console.log(skuQueryResults.size);
+  if (skuQueryResults.size === 1) {
+    return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
+  }
+
   //if we never found a match just return the original card
   if (!match) {
     console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
@@ -228,6 +254,7 @@ export async function matchOldStyle(db, card) {
     updatedCard.setName = await ask('What set is this card?', updatedCard.setName);
     updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
     updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
+    updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
   }
   return updatedCard;
 }
@@ -332,6 +359,14 @@ export async function shutdownFirebase() {
 }
 
 const _cachedGroups = {};
+
+const getSkuPrefix = (setInfo) =>
+  `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${setInfo.insert || ''}|${
+    setInfo.parallel || ''
+  }`
+    .replaceAll(' ', '-')
+    .toLowerCase();
+
 /**
  * Retrieves a sales group from the database based on the provided information.
  *
@@ -406,14 +441,12 @@ export async function getGroup(info, isTemp) {
         setName: info.setName,
         insert: info.insert,
         parallel: info.parallel,
-        league: info.league,
-        skuPrefix: `${setInfo.sport}|${setInfo.year}|${setInfo.manufacture}|${setInfo.setName}|${
-          setInfo.insert || ''
-        }|${setInfo.parallel || ''}`.replaceAll(' ', '-'),
+        league: info.league || findLeague(info.sport) || 'Other',
+        skuPrefix: getSkuPrefix(setInfo),
         bin: await getNextCounter('Group'),
-        bscPrice: info.bscPrice,
-        slPrice: info.slPrice,
-        price: info.price,
+        bscPrice: info.bscPrice || 0.25,
+        slPrice: info.slPrice || 0.18,
+        price: info.price || 0.99,
         keys: setInfo,
       };
       await collection.doc(`${group.bin}`).set(group);
