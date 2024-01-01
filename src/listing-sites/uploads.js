@@ -1,6 +1,12 @@
 import { By, Select, until } from 'selenium-webdriver';
 import { titleCase } from '../utils/data.js';
 import { getGroup, getGroupByBin } from './firebase.js';
+import chalk from 'chalk';
+import { useSpinners } from '../utils/spinners.js';
+
+const color = chalk.yellow;
+const log = (...params) => console.log(color(...params));
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('uploads', color);
 
 const createKey = (card) =>
   `${titleCase(card.sport)}|${
@@ -33,6 +39,7 @@ export const parseKey = async (key, lowercase = false) => {
 };
 
 export const createGroups = async (allCards = {}, bulk = []) => {
+  showSpinner('createGroups', 'Creating Groups');
   const groups = {};
   const addCardsToGroup = async (cards = []) => {
     for (const card of cards) {
@@ -53,7 +60,7 @@ export const createGroups = async (allCards = {}, bulk = []) => {
   Object.keys(groups).forEach((key) => {
     groups[key] = Object.values(groups[key]);
   });
-  console.log('groups', groups);
+  finishSpinner('createGroups', `Created Groups: [${Object.keys(groups)}]`);
   return groups;
 };
 

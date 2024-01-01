@@ -8,9 +8,8 @@ import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.yellow;
-const running = chalk.bgYellow.black;
-const log = (...params) => console.log(chalk.yellow(...params));
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('ebay', chalk.yellow);
+const log = (...params) => console.log(color(...params));
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', color);
 
 export async function uploadToFirebase(allCards) {
   console.log(chalk.magenta('Firebase Starting Upload'));
@@ -275,6 +274,7 @@ export async function getListingInfo(db, cards) {
       const doc = await db.collection('CardSales').doc(card.sku).get();
       if (doc.exists) {
         removals.push({ ...card, ...doc.data() });
+        finishSpinner(card.sku, card.sku);
       } else {
         const match = await matchOldStyle(db, card);
         if (match) {
