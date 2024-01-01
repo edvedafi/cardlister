@@ -9,8 +9,11 @@ import pRetry, { AbortError } from 'p-retry';
 import FormData from 'form-data';
 import { getGroup, getGroupByBin, updateGroup } from './firebase.js';
 import chalkTable from 'chalk-table';
+import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
+
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('bsc', chalk.hex('#e5e5e5'));
 
 const userWaitForButton = (driver) => async (text) => {
   const waitForElement = useWaitForElement(driver);
@@ -38,34 +41,42 @@ const baseHeaders = {
 
 const login = async () => {
   if (!_driver) {
+    showSpinner('login', 'Logging into BSC');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
     await _driver.get('https://www.buysportscards.com');
     const waitForElement = useWaitForElement(_driver);
 
     const waitForButton = userWaitForButton(_driver);
 
+    updateSpinner('login', 'Waiting for sign in button');
     const signInButton = await waitForButton('sign in');
     await signInButton.click();
 
-    const emailInput = await waitForElement(By.id('email'));
+    updateSpinner('login', 'Waiting for email');
+    const emailInput = await waitForElement(By.id('signInName'));
     await emailInput.sendKeys(process.env.BSC_EMAIL);
+    updateSpinner('login', 'Waiting for password');
     const passwordInput = await waitForElement(By.id('password'));
     await passwordInput.sendKeys(process.env.BSC_PASSWORD);
 
-    //click the  button with id "next"
+    updateSpinner('login', 'Waiting for login button');
     const nextButton = await waitForElement(By.id('next'));
     await nextButton.click();
     await waitForButton('welcome back,');
 
     await _driver.findElement(By.css('body')).sendKeys(Key.F12);
+
+    updateSpinner('login', 'Getting BSC Token');
+    const reduxAsString = await _driver.executeScript(
+      'return Object.values(localStorage).filter((value) => value.includes("secret")).find(value=>value.includes("Bearer"));',
+    );
+
+    const redux = JSON.parse(reduxAsString);
+    baseHeaders.authorization = 'Bearer ' + redux.secret.trim();
+
+    finishSpinner('login');
   }
 
-  const reduxAsString = await _driver.executeScript(
-    'return Object.values(localStorage).filter((value) => value.includes("secret")).find(value=>value.includes("Bearer"));',
-  );
-
-  const redux = JSON.parse(reduxAsString);
-  baseHeaders.authorization = 'Bearer ' + redux.secret.trim();
   return _driver;
 };
 
@@ -454,7 +465,7 @@ export async function saveBulk(listings) {
 }
 
 export async function getBuySportsCardsSales() {
-  console.log(chalk.magenta('Checking BuySportsCards for Sales'));
+  showSpinner('sales', 'Checking BSC for Sales');
   await login();
   const sales = [];
   const history = await post('seller/order/history', {
@@ -498,7 +509,7 @@ export async function getBuySportsCardsSales() {
     }
   }
 
-  console.log(chalk.magenta('Found'), chalk.green(sales.length), chalk.magenta('cards sold on BuySportsCards'));
+  finishSpinner('sales', `Found ${chalk.green(sales.length)} cards sold on BuySportsCards`);
   return sales;
 }
 

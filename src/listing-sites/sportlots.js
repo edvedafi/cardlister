@@ -7,6 +7,10 @@ import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import chalkTable from 'chalk-table';
+import { useSpinners } from '../utils/spinners.js';
+
+const log = (...params) => console.log(chalk.blue(...params));
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sportlots', chalk.blue);
 
 const brands = {
   bowman: 'Bowman',
@@ -395,7 +399,7 @@ export function convertBinNumber(binNumber, cardNumberFromTitle) {
 }
 
 export async function getSalesSportLots() {
-  console.log(chalk.magenta('Gathering SportLots Sales'));
+  showSpinner('sales', 'Getting SportLots Sales');
   const cards = [];
   const driver = await login();
   const waitForElement = useWaitForElement(driver);
@@ -438,9 +442,7 @@ export async function getSalesSportLots() {
 
   await driver.get('https://sportlots.com/s/ui/profile.tpl');
 
-  console.log('sportlots cards', cards);
-
-  console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on SportLots'));
+  finishSpinner('sales', `Found ${chalk.green(cards.length)} cards sold on SportLots`);
   return cards;
 }
 export async function removeFromSportLots(groupedCards) {

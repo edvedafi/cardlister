@@ -5,6 +5,12 @@ import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, findTeamInString, sports } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
+import { useSpinners } from '../utils/spinners.js';
+
+const color = chalk.yellow;
+const running = chalk.bgYellow.black;
+const log = (...params) => console.log(chalk.yellow(...params));
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('ebay', chalk.yellow);
 
 export async function uploadToFirebase(allCards) {
   console.log(chalk.magenta('Firebase Starting Upload'));
@@ -290,6 +296,8 @@ export async function getListingInfo(db, cards) {
  * @returns {Promise<*[]|(*&{quantity: *, platform: string})[]>} Returns an array of sales data objects, each containing card details, quantity, and platform.
  */
 export async function getFileSales() {
+  showSpinner('getFileSales', 'Getting offline sales');
+  let results = [];
   //ADD A CARD
 
   // return [
@@ -305,7 +313,7 @@ export async function getFileSales() {
 
   // ADD A FILE
   if (fs.existsSync('offline_sales.csv')) {
-    return fs
+    results = fs
       .readFileSync('offline_sales.csv', { encoding: 'utf-8' })
       .split('\n')
       .map((line) => {
@@ -318,9 +326,9 @@ export async function getFileSales() {
         };
       })
       .filter((card) => card.cardNumber);
-  } else {
-    return [];
   }
+  finishSpinner('getFileSales', `Found ${chalk.green(results.length)} offline sales`);
+  return results;
 }
 
 let _cachedNumbers;

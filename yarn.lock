@@ -4623,7 +4623,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cli-cursor@npm:^3.1.0":
+"cli-cursor@npm:^3.0.0, cli-cursor@npm:^3.1.0":
   version: 3.1.0
   resolution: "cli-cursor@npm:3.1.0"
   dependencies:
@@ -9910,6 +9910,7 @@ __metadata:
     shopify: ^0.1.0
     spacy: ^0.0.4
     spacy-nlp: ^1.0.11
+    spinnies: ^0.5.1
     terminal-image: ^1.0.0
     tesseract.js: ^4.0.5
     ts-jest: ^29.1.0
@@ -10391,6 +10392,17 @@ __metadata:
   dependencies:
     node-fetch: ^2.1.2
   checksum: 527e2632225d235c6e57b5243f461ecabff59a6a31745e819e21a3f928e97264bd8f66e1db885f1089fd5c203102fc3337e81e407246106b44ee1e5e4dbffdf8
+  languageName: node
+  linkType: hard
+
+"spinnies@npm:^0.5.1":
+  version: 0.5.1
+  resolution: "spinnies@npm:0.5.1"
+  dependencies:
+    chalk: ^2.4.2
+    cli-cursor: ^3.0.0
+    strip-ansi: ^5.2.0
+  checksum: 7407c8cae31ff5868e56cfa12898e5a2db6f42b278c098637e28939d53ed6c7b0726027796c8e12bc6705f7dd5ec405d467c7cacf989d0beefca14c69440be77
   languageName: node
   linkType: hard
 

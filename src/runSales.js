@@ -23,8 +23,12 @@ import { getTeamSelections, loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import { ask } from './utils/ask.js';
 import open from 'open';
+import { useSpinners } from './utils/spinners.js';
 
 const args = minimist(process.argv.slice(2));
+
+const log = (...params) => console.log(chalk.cyan(...params));
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sales', chalk.cyan);
 
 $.verbose = false;
 
@@ -161,10 +165,11 @@ try {
   await loadTeams(firebase);
 
   //gather sales
-  console.log(chalk.cyan('Gather listings from sites'));
+  log('Running sales processing');
+  showSpinner('gathering', 'Gathering sales from sites');
   const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
-  console.log(chalk.cyan('Found'), chalk.green(rawSales.length), chalk.cyan('cards sold'));
+  finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
   // console.log('rawSales', rawSales);
 
   //prep listings to remove
@@ -190,22 +195,22 @@ try {
 
   //remove listings from sites
   console.log(chalk.cyan('Remove listings from sites'));
-
-  if (!args.r || (await ask('Remove from Ebay?', true))) {
-    await removeFromEbay(sales, db);
-  }
-  if (!args.r || (await ask('Remove from Sportlots?', true))) {
-    await removeFromSportLots(groupedCards);
-  }
-  if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
-    await removeFromBuySportsCards(groupedCards);
-  }
-  if (!args.r || (await ask('Remove from Shopify?', true))) {
-    await removeFromShopify(sales);
-  }
-  if (!args.r || (await ask('Remove from My Card Post?', true))) {
-    await removeFromMyCardPost(sales);
-  }
+  //
+  // if (!args.r || (await ask('Remove from Ebay?', true))) {
+  //   await removeFromEbay(sales, db);
+  // }
+  // if (!args.r || (await ask('Remove from Sportlots?', true))) {
+  //   await removeFromSportLots(groupedCards);
+  // }
+  // if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
+  //   await removeFromBuySportsCards(groupedCards);
+  // }
+  // if (!args.r || (await ask('Remove from Shopify?', true))) {
+  //   await removeFromShopify(sales);
+  // }
+  // if (!args.r || (await ask('Remove from My Card Post?', true))) {
+  //   await removeFromMyCardPost(sales);
+  // }
   console.log(chalk.cyan('Completed removing listings from sites'));
 
   //output a pick list
@@ -231,9 +236,10 @@ try {
     ),
   );
 
-  for (const site of openSalesSites) {
-    await open(site);
-  }
+  // for (const site of openSalesSites) {
+  //   await open(site);
+  // }
+  finishSpinner('proc');
 } finally {
   await shutdown();
 }

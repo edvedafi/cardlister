@@ -6,6 +6,9 @@ import open from 'open';
 import eBayApi from 'ebay-api';
 import { manufactures, sets } from '../utils/data.js';
 
+const log = (...params) => console.log(chalk.hex('#E53238')(...params));
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('ebay', chalk.hex('#E53238'));
+
 const defaultValues = {
   action: 'Add',
   category: '261328',
@@ -164,6 +167,7 @@ import { useWaitForElement } from './uploads.js';
 import express from 'express';
 import fs from 'fs-extra';
 import chalkTable from 'chalk-table';
+import { useSpinners } from '../utils/spinners.js';
 
 export const uploadEbayFile = async () => {
   let driver;
@@ -804,7 +808,7 @@ export const reverseTitle = (title) => {
 };
 
 export const getEbaySales = async () => {
-  console.log(chalk.magenta('Checking eBay for Sales'));
+  showSpinner('sales', 'Checking eBay for Sales');
   const eBay = await loginEbayAPI();
 
   //don't need to do anything with location but do need to ensure it exists
@@ -835,8 +839,8 @@ export const getEbaySales = async () => {
       });
     }
   });
-  // console.log('cards', cards);
-  console.log(chalk.magenta('Found'), chalk.green(cards.length), chalk.magenta('cards sold on ebay'));
+
+  finishSpinner('sales', `Found ${chalk.green(cards.length)} cards sold on ebay`);
   return cards;
 };
 

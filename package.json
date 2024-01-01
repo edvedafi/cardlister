@@ -37,6 +37,7 @@
     "shopify": "^0.1.0",
     "spacy": "^0.0.4",
     "spacy-nlp": "^1.0.11",
+    "spinnies": "^0.5.1",
     "terminal-image": "^1.0.0",
     "tesseract.js": "^4.0.5",
     "typescript": "^5.0.4",
