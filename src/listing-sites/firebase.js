@@ -10,7 +10,7 @@ import { useSpinners } from '../utils/spinners.js';
 const color = chalk.yellow;
 const running = chalk.bgYellow.black;
 const log = (...params) => console.log(chalk.yellow(...params));
-const { showSpinner, finishSpinner, errorSpinner } = useSpinners('ebay', chalk.yellow);
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('ebay', chalk.yellow);
 
 export async function uploadToFirebase(allCards) {
   console.log(chalk.magenta('Firebase Starting Upload'));
@@ -266,9 +266,12 @@ export async function matchOldStyle(db, card) {
 }
 
 export async function getListingInfo(db, cards) {
+  log('Getting listing info from Firebase'); //once oldMatch goes away can use spinner
+  // showSpinner('firebase', 'Getting listing info from Firebase');
   const removals = [];
   for (let card of cards) {
     if (card.sku) {
+      showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
       const doc = await db.collection('CardSales').doc(card.sku).get();
       if (doc.exists) {
         removals.push({ ...card, ...doc.data() });
@@ -276,8 +279,9 @@ export async function getListingInfo(db, cards) {
         const match = await matchOldStyle(db, card);
         if (match) {
           removals.push(match);
+          finishSpinner(card.sku, card.sku);
         } else {
-          console.log(chalk.red('Could not find listing in firebase: '), card.sku);
+          errorSpinner(card.sku, card.sku);
         }
       }
     } else {
@@ -287,6 +291,8 @@ export async function getListingInfo(db, cards) {
       }
     }
   }
+  log('Finished getting listing info from Firebase'); //once oldMatch goes away can use spinner
+  // finishSpinner('firebase', 'Getting listing info from Firebase');
   return removals;
 }
 

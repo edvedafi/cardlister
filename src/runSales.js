@@ -170,10 +170,9 @@ try {
   const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
-  // console.log('rawSales', rawSales);
 
   //prep listings to remove
-  console.log(chalk.cyan('Updating sales with listing info'));
+  log('Updating sales with listing info');
   const openSalesSites = [];
 
   const sales = await getListingInfo(db, rawSales);
