@@ -190,30 +190,30 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
-  console.log(chalk.cyan('Completed adding listing info to cards'));
+  log('Completed adding listing info to cards');
 
   //remove listings from sites
-  console.log(chalk.cyan('Remove listings from sites'));
-  //
-  // if (!args.r || (await ask('Remove from Ebay?', true))) {
-  //   await removeFromEbay(sales, db);
-  // }
-  // if (!args.r || (await ask('Remove from Sportlots?', true))) {
-  //   await removeFromSportLots(groupedCards);
-  // }
-  // if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
-  //   await removeFromBuySportsCards(groupedCards);
-  // }
-  // if (!args.r || (await ask('Remove from Shopify?', true))) {
-  //   await removeFromShopify(sales);
-  // }
-  // if (!args.r || (await ask('Remove from My Card Post?', true))) {
-  //   await removeFromMyCardPost(sales);
-  // }
-  console.log(chalk.cyan('Completed removing listings from sites'));
+  log('Remove listings from sites');
+
+  if (!args.r || (await ask('Remove from Ebay?', true))) {
+    await removeFromEbay(sales, db);
+  }
+  if (!args.r || (await ask('Remove from Sportlots?', true))) {
+    await removeFromSportLots(groupedCards);
+  }
+  if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
+    await removeFromBuySportsCards(groupedCards);
+  }
+  if (!args.r || (await ask('Remove from Shopify?', true))) {
+    await removeFromShopify(sales);
+  }
+  if (!args.r || (await ask('Remove from My Card Post?', true))) {
+    await removeFromMyCardPost(sales);
+  }
+  log('Completed removing listings from sites');
 
   //output a pick list
-  console.log(chalk.cyan('All Sales:'));
+  log('All Sales:');
 
   console.log(
     chalkTable(
@@ -235,9 +235,11 @@ try {
     ),
   );
 
-  // for (const site of openSalesSites) {
-  //   await open(site);
-  // }
+  showSpinner('launching', 'Launching all sales sites');
+  for (const site of openSalesSites) {
+    await open(site);
+  }
+  finishSpinner('launching', 'Launching all sales sites');
   finishSpinner('proc');
 } finally {
   await shutdown();
