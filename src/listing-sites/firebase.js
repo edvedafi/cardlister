@@ -114,7 +114,7 @@ export async function updateSport(db) {
   }
 }
 
-export function mergeFirebaseResult(card, match) {
+export async function mergeFirebaseResult(card, match) {
   let updatedCard = { ...card };
   //this looks stupid, but firebase returns empty strings, which will overwrite good data.
   if (match) {
@@ -148,6 +148,16 @@ export function mergeFirebaseResult(card, match) {
     if (match.bin) {
       updatedCard.bin = match.bin;
     }
+  }
+  if (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
+    console.log(chalk.red('Missing some required data. Please confirm for card:'), updatedCard.title);
+    updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
+    updatedCard.year = await ask('What year is this card?', updatedCard.year);
+    updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
+    updatedCard.setName = await ask('What set is this card?', updatedCard.setName);
+    updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
+    updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
+    updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
   }
   return updatedCard;
 }
@@ -251,8 +261,11 @@ export async function matchOldStyle(db, card) {
   }
 
   //if we never found a match just return the original card
-  if (!match) {
-    console.log(chalk.red('Could not find listing in firebase: '), updatedCard.title);
+  if (!match || !updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
+    console.log(
+      chalk.red(match ? 'Some information is unknown for' : 'Could not find listing in firebase for'),
+      updatedCard.title,
+    );
     updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
     updatedCard.year = await ask('What year is this card?', updatedCard.year);
     updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);

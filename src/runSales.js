@@ -212,9 +212,14 @@ try {
   }
   log('Completed removing listings from sites');
 
+  showSpinner('launching', 'Launching all sales sites');
+  for (const site of openSalesSites) {
+    await open(site);
+  }
+  finishSpinner('launching', 'Launching all sales sites');
+
   //output a pick list
   log('All Sales:');
-
   console.log(
     chalkTable(
       {
@@ -234,13 +239,6 @@ try {
       buildTableData(groupedCards),
     ),
   );
-
-  showSpinner('launching', 'Launching all sales sites');
-  for (const site of openSalesSites) {
-    await open(site);
-  }
-  finishSpinner('launching', 'Launching all sales sites');
-  finishSpinner('proc');
 } finally {
   await shutdown();
 }
