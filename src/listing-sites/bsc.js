@@ -13,7 +13,10 @@ import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
 
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('bsc', chalk.hex('#e5e5e5'));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'bsc',
+  chalk.hex('#e5e5e5'),
+);
 
 const userWaitForButton = (driver) => async (text) => {
   const waitForElement = useWaitForElement(driver);
@@ -448,15 +451,22 @@ export const uploadToBuySportsCardsOldUI = async (groupedCards) => {
 };
 
 export async function saveBulk(listings) {
+  showSpinner('saveBulk', 'Saving Bulk Upload');
+  let count = 0;
   await pRetry(
     async () => {
+      count++;
+      if (count > 1) {
+        updateSpinner('saveBulk', `Retrying Save Bulk Upload ${count} of 5`);
+      }
       const results = await put('seller/bulk-upload', {
         sellerId: 'cf987f7871',
         listings,
       });
       if (results.result === 'Saved!') {
-        // console.log('removed', key);
+        finishSpinner('saveBulk');
       } else {
+        errorSpinner('saveBulk', `Failed to save bulk upload ${results}`);
         throw new Error('Failed to remove cards');
       }
     },
@@ -478,10 +488,16 @@ export async function getBuySportsCardsSales() {
     status: ['READY_TO_SHIP', 'PARTIALLY_REFUNDED_READY_TO_SHIP'],
   });
 
+  showSpinner('sales', `Found ${history.results?.length} sales on BuySportsCards`);
   for (const order of history.results) {
+    updateSpinner('sales-details', 'Getting order details');
     const orderDetails = await get(`seller/order/${order.orderId}`);
 
     for (const item of orderDetails.orderItems) {
+      updateSpinner(
+        'sales-details',
+        `Creating Card ${item.card.setName} ${item.card.variantName} #${item.card.cardNo} ${item.card.players}`,
+      );
       const card = {
         cardNumber: item.card.cardNo,
         year: item.card.year,
@@ -504,12 +520,12 @@ export async function getBuySportsCardsSales() {
       } else if (item.card.variant === 'Insert') {
         card.insert = item.card.variantName;
       }
-
+      finishSpinner('sales-details', card.title);
       sales.push(card);
     }
   }
 
-  finishSpinner('sales', `Found ${chalk.green(sales.length)} cards sold on BuySportsCards`);
+  finishSpinner('sales', `Found ${sales.length} cards sold on BuySportsCards`);
   return sales;
 }
 
@@ -546,15 +562,17 @@ async function getAllListings(setData) {
   };
 
   try {
+    showSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
     allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
 
     // console.log('first listings', allPossibleListings);
     if (!allPossibleListings.results || allPossibleListings.results.length === 0) {
+      errorSpinner('get-listings', `No listings found for ${JSON.stringify(filters)}`);
       throw new Error('No listings found');
     }
   } catch (e) {
-    // console.log(e);
-    console.log(chalk.red('Error getting listings for'), setData);
+    errorSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
+    const spinners = pauseSpinners();
     filters = {
       sport: [setData.sport],
     };
@@ -593,12 +611,17 @@ async function getAllListings(setData) {
       filters.variant = ['base'];
     }
 
+    resumeSpinners(spinners);
+    showSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
+
     if (filters.variantName === 'None') {
       console.log(chalk.red('Could not find a match for'), setData);
     } else {
       allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
     }
   }
+
+  finishSpinner('get-listings');
   return { body, allPossibleListings };
 }
 
@@ -705,13 +728,18 @@ export async function uploadToBuySportsCards(cardsToUpload) {
 }
 
 const findListing = async (listings, card) => {
+  showSpinner('find-listing', `Finding listing for ${card.title}`);
   let found = false;
 
   //look for exact card number match
   let listing = listings.find((listing) => listing.card.cardNo === card.cardNumber);
   if (listing) {
-    found = true;
+    finishSpinner('find-listing');
+    return listing;
   }
+
+  errorSpinner('find-listing', `No Exact match for ${card.title}`);
+  const paused = pauseSpinners();
 
   //look for fuzzy card number match
   if (!found) {
@@ -748,20 +776,27 @@ const findListing = async (listings, card) => {
     }
   }
 
+  resumeSpinners(paused);
+
   return found ? listing : undefined;
 };
 
 export async function removeWithAPI(cardsToRemove) {
+  showSpinner('remove-details', 'Login');
   await login();
   const notRemoved = [];
+  showSpinner('remove-details', `Removing ${Object.keys(cardsToRemove).length} sets`);
   for (const key in cardsToRemove) {
+    showSpinner(`remove-key-${key}`, `Removing ${key}`);
+    showSpinner(`remove-key-${key}-details`, `Removing ${key}`);
     const setData = await parseKey(key, true);
-    console.log('Removing: ', key);
 
     let listings;
     if (setData.bscFilters) {
+      updateSpinner(`remove-key-${key}-details`, `Getting exact results `);
       listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
     } else {
+      updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
       let { body, allPossibleListings } = await getAllListings(setData);
       listings = allPossibleListings.results;
       if (listings?.length === 0) {
@@ -772,7 +807,9 @@ export async function removeWithAPI(cardsToRemove) {
 
     if (listings && listings.length > 0) {
       let updated = 0;
+      updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
       for (const card of cardsToRemove[key]) {
+        showSpinner(`remove-card-${card.title}`, `Removing ${card.title}`);
         const listing = await findListing(listings, card);
         if (listing) {
           let newQuantity = listing.availableQuantity + card.quantity;
@@ -781,29 +818,35 @@ export async function removeWithAPI(cardsToRemove) {
           }
           listing.availableQuantity = newQuantity;
           updated++;
+          finishSpinner(`remove-card-${card.title}`, `Setting quantity of ${card.title} to ${newQuantity}`);
         } else {
           card.error = 'No match in set';
           notRemoved.push(card);
+          errorSpinner(`remove-card-${card.title}`, `No match for ${card.title}`);
         }
       }
 
       if (updated > 0) {
         try {
+          updateSpinner(`remove-key-${key}-details`, `Saving updates`);
           await saveBulk(listings);
-          console.log(chalk.green('Removed'), chalk.green(updated), chalk.green('cards from BSC'));
+          finishSpinner(`remove-key-${key}-details`);
+          finishSpinner(`remove-key-${key}`);
         } catch (e) {
-          console.log(chalk.red('Failed to remove cards from BSC'));
           notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: e.message })));
+          finishSpinner(`remove-key-${key}-details`);
+          errorSpinner(`remove-key-${key}`, `Failed to remove cards for set ${key}`);
         }
       }
     } else {
-      console.log(chalk.red('Could not find any listings for'), setData);
-      console.log('allPossibleListings', allPossibleListings);
       notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: 'No Set Found' })));
+      finishSpinner(`remove-key-${key}-details`);
+      errorSpinner(`remove-key-${key}`, `Could not find any listings for ${key}`);
     }
   }
+
   if (notRemoved.length > 0) {
-    console.log(chalk.magenta('Unable to remove all cards from BuySportsCards'));
+    errorSpinner('remove-details', 'Failed to remove all cards from BuySportsCards');
     console.log(
       chalkTable(
         {
@@ -818,12 +861,12 @@ export async function removeWithAPI(cardsToRemove) {
       ),
     );
   } else {
-    console.log(chalk.green('All cards removed from BSC'));
+    finishSpinner('remove-details');
   }
 }
 
 export async function removeFromBuySportsCards(cardsToRemove) {
-  console.log(chalk.magenta('BSC Starting Removal'));
+  showSpinner('remove', 'BSC Starting Removal');
   await removeWithAPI(
     Object.keys(cardsToRemove).reduce((result, key) => {
       const group = cardsToRemove[key]
@@ -838,5 +881,5 @@ export async function removeFromBuySportsCards(cardsToRemove) {
       return result;
     }, {}),
   );
-  console.log(chalk.magenta('BSC Completed Removal'));
+  finishSpinner('remove', 'BSC Removal Complete');
 }

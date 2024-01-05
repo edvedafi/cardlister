@@ -22,7 +22,7 @@ export const useSpinners = (processName, color) => ({
   },
   finishSpinner: (name, message) => {
     if (message) {
-      getSpinners().succeed(`${processName}-${name}`, { text: color(`${name} - ${message}`) });
+      getSpinners().succeed(`${processName}-${name}`, { text: color(`${message}`) });
       return message;
     } else {
       const s = getSpinners().remove(`${processName}-${name}`);
@@ -30,7 +30,7 @@ export const useSpinners = (processName, color) => ({
     }
   },
   errorSpinner: (name, message) => getSpinners().fail(`${processName}-${name}`, { text: color(message) }),
-  pauseSpinners: (spinnersToPause) => {
+  pauseSpinners: () => {
     const spinners = getSpinners();
     const paused = [];
 
