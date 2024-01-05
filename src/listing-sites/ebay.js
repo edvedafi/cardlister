@@ -7,7 +7,7 @@ import eBayApi from 'ebay-api';
 import { manufactures, sets } from '../utils/data.js';
 
 const log = (...params) => console.log(chalk.hex('#E53238')(...params));
-const { showSpinner, finishSpinner, errorSpinner } = useSpinners('ebay', chalk.hex('#E53238'));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('ebay', chalk.hex('#E53238'));
 
 const defaultValues = {
   action: 'Add',
@@ -707,7 +707,7 @@ export const ebayAPIUpload = async (allCards) => {
             const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
             offerId = offer.offerId;
           } catch (e) {
-            const error = e.meta?.res?.data.errors[0];
+            const error = e.meta.meta?.res?.data.errors[0];
             if (error?.errorId === 25002) {
               offerId = error.parameters[0].value;
             } else {
@@ -845,138 +845,174 @@ export const getEbaySales = async () => {
 };
 
 export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
+  showSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Login to eBay`);
   const ebay = await loginEbayAPI();
+  updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Getting Item Details`);
   const item = await ebay.trading.GetItem({ ItemID: itemNumber });
   const updatedQuantity = parseInt(item.Item.Quantity) - parseInt(quantity);
   const result = { title, quantity, updatedQuantity, removed: false };
   if (updatedQuantity <= 0) {
     try {
+      updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Ending the Item`);
       await ebay.trading.EndFixedPriceItem({ ItemID: itemNumber, EndingReason: 'NotAvailable' });
-      console.log(chalk.green(`Successfully ended ${title} on ebay`));
       result.removed = true;
     } catch (e) {
-      if (e.meta.Errors.ErrorCode === 1047) {
-        console.log(chalk.green(`${itemNumber} | ${title} has already been ended on ebay`));
+      if (e.meta?.Errors?.ErrorCode === 1047) {
+        updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Was already ended on Ebay`);
         result.removed = true;
       } else {
         result.removed = false;
-        result.error = e.meta.Errors.ErrorCode;
+        updateSpinner(
+          `ebay-card-${itemNumber}-details`,
+          `${itemNumber}: Failed to remove ${e.meta?.Errors?.ErrorCode || e.message}`,
+        );
+        result.error = e.meta?.Errors?.ErrorCode || e.message;
       }
     }
   } else {
     try {
+      updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Setting quantity to ${updatedQuantity}`);
       await ebay.trading.ReviseInventoryStatus({
         InventoryStatus: {
           ItemID: itemNumber,
           Quantity: updatedQuantity,
         },
       });
-      console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+      updateSpinner(
+        `ebay-card-${itemNumber}-details`,
+        `${itemNumber}: Successfully set quantity to ${updatedQuantity}`,
+      );
       result.removed = true;
     } catch (e) {
-      console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
+      updateSpinner(
+        `ebay-card-${itemNumber}-details`,
+        `${itemNumber}: Failed to quantity to ${updatedQuantity}. ${e.meta?.Errors?.ErrorCode || e.message}`,
+      );
       result.error = e.meta.Errors.ErrorCode;
     }
   }
+  finishSpinner(`ebay-card-${itemNumber}-details`);
   return result;
 };
+
 export const removeFromEbayBySKU = async (sku, quantity, title) => {
+  showSpinner(`ebay-card-${sku}-details`, `${sku}: Login to eBay`);
   const ebay = await loginEbayAPI();
   const result = { title, quantity, removed: false };
-  console.log('trying to get offers for ', sku);
   try {
+    updateSpinner(`ebay-card-${sku}-details`, `${sku}: Fetch all offers`);
     const offers = await ebay.sell.inventory.getOffers({ sku });
     const item = offers.offers[0];
     const updatedQuantity = parseInt(item.availableQuantity) - parseInt(quantity);
     result.updatedQuantity = updatedQuantity;
     if (updatedQuantity <= 0) {
       try {
+        updateSpinner(`ebay-card-${sku}-details`, `${sku}: No more inventory; end item`);
         await ebay.sell.inventory.deleteOffer(item.offerId);
-        console.log(chalk.green(`Successfully ended ${title} on ebay`));
+        updateSpinner(`ebay-card-${sku}-details`, `${sku}: Successfully Ended Item`);
         result.removed = true;
       } catch (e) {
         if (e.meta.Errors.ErrorCode === 1047) {
-          console.log(chalk.green(`${sku} | ${title} has already been ended on ebay`));
+          updateSpinner(`ebay-card-${sku}-details`, `${sku}: Item was already ended`);
           result.removed = true;
         } else {
           result.removed = false;
-          result.error = e.meta.Errors.ErrorCode;
+          result.error = e.meta?.Errors?.ErrorCode || e.message;
+          updateSpinner(
+            `ebay-card-${sku}-details`,
+            `${sku}: Failed to remove: ${e.meta?.Errors?.ErrorCode || e.message}`,
+          );
         }
       }
     } else {
       try {
+        updateSpinner(`ebay-card-${sku}-details`, `${sku}: Setting remaining quantity to ${updatedQuantity}`);
         await ebay.sell.inventory.updateOffer(item.offerId, { ...item, availableQuantity: updatedQuantity });
-        console.log(chalk.green(`Successfully reduced quantity of ${title} to ${updatedQuantity} on ebay`));
+        updateSpinner(`ebay-card-${sku}-details`, `${sku}: Successfully set remaining quantity to ${updatedQuantity}`);
         result.removed = true;
       } catch (e) {
+        updateSpinner(
+          `ebay-card-${sku}-details`,
+          `${sku}: Failed to reduce quantity ${e?.meta?.Errors?.ErrorCode || e?.message}`,
+        );
         console.error(chalk.red(`Failed to reduce quantity of ${title} on ebay`));
-        result.error = e.meta.Errors.ErrorCode;
+        result.error = e?.meta?.Errors?.ErrorCode || e?.message;
       }
     }
   } catch (e) {
-    result.error = e.meta.Errors.ErrorCode;
+    updateSpinner(`ebay-card-${sku}-details`, `${sku}: Failed to update ${e?.meta?.Errors?.ErrorCode || e?.message}`);
+    result.error = e?.meta?.Errors?.ErrorCode || e?.message;
   }
+  finishSpinner(`ebay-card-${sku}-details`);
   return result;
 };
 
 export const removeFromEbay = async (cards = [], db) => {
+  showSpinner('ebay', 'Removing Cards from eBay');
+  showSpinner('ebay-details', 'Removing Cards from eBay');
   let toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
-  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from ebay'));
+  updateSpinner('ebay', `Removing ${chalk.green(toRemove.length)} cards from eBay`);
   const notRemoved = [];
   const removed = [];
 
   if (toRemove.length > 0) {
+    updateSpinner('ebay-details', 'Sorting Cards by SKU');
     const removals = [];
     for (const card of toRemove) {
+      showSpinner(`ebay-card-${card.title}`, `${card.title}: Checking for Item Number or SKU`);
       if (card.ItemID) {
+        updateSpinner(`ebay-card-${card.title}`, `${card.title}: Removing by Item Number`);
         removals.push(await removeFromEbayItemNumber(card.ItemID, card.quantity, card.title));
       } else if (card.sku) {
+        updateSpinner(`ebay-card-${card.title}`, `${card.title}: Removing by SKU`);
         removals.push(await removeFromEbayBySKU(card.sku, card.quantity, card.title));
       } else {
         notRemoved.push({ ...card, remaining: '?', error: 'No Item Number or SKU' });
+        errorSpinner(
+          `ebay-card-${card.title}`,
+          `${card.title}: No Item Number or SKU ${card.quantity > 1 ? `(x${card.quantity})` : ''}`,
+        );
       }
     }
 
+    updateSpinner('ebay-details', 'Running Removals');
     const results = await Promise.all(removals);
     results.forEach((result) => {
       if (result.removed) {
         removed.push(result);
+        finishSpinner(`ebay-card-${result.title}`, `${result.title}`);
       } else {
         notRemoved.push(result);
+        errorSpinner(
+          `ebay-card-${result.title}`,
+          `${result.title}: Failed to remove. ${result.error} ${result.quantity > 1 ? `(x${result.quantity})` : ''}`,
+        );
       }
     });
 
+    finishSpinner('ebay-details');
     if (removed.length === toRemove.length && toRemove.length === 0) {
-      console.log(
-        chalk.magenta('Successfully removed all'),
-        chalk.green(removed.length),
-        chalk.magenta('cards from ebay'),
-      );
+      finishSpinner('ebay', `Removed all ${chalk.green(removed.length)} cards from ebay`);
     } else {
-      console.log(
-        chalk.magenta('Only removed'),
-        chalk.red(removed.length),
-        chalk.magenta('of'),
-        chalk.red(toRemove.length),
-        chalk.magenta('cards from ebay'),
-      );
-      console.log(
-        chalkTable(
-          {
-            leftPad: 2,
-            columns: [
-              { field: 'title', name: 'Title' },
-              { field: 'quantity', name: 'Sold' },
-              { field: 'updatedQuantity', name: 'Remaining' },
-              { field: 'error', name: 'Error' },
-            ],
-          },
-          notRemoved,
-        ),
-      );
+      // console.log(
+      //   chalkTable(
+      //     {
+      //       leftPad: 2,
+      //       columns: [
+      //         { field: 'title', name: 'Title' },
+      //         { field: 'quantity', name: 'Sold' },
+      //         { field: 'updatedQuantity', name: 'Remaining' },
+      //         { field: 'error', name: 'Error' },
+      //       ],
+      //     },
+      //     notRemoved,
+      //   ),
+      // );
+      finishSpinner('ebay', `Removed ${chalk.red(removed.length)} of ${chalk.red(toRemove.length)} cards from ebay`);
     }
   } else {
-    console.log(chalk.magenta('No cards to remove from ebay'));
+    finishSpinner('ebay-details');
+    finishSpinner('ebay', 'No cards to remove from ebay');
   }
 };
 

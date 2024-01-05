@@ -163,9 +163,12 @@ export async function mergeFirebaseResult(card, match) {
 }
 
 export async function matchOldStyle(db, card) {
+  showSpinner(`old-${card.title}`, `Getting listing info from Firebase for ${card.title} via old style`);
+  showSpinner(`old-${card.title}-details`, `Getting listing info from Firebase for ${card.title} via old style`);
   let updatedCard = { ...card };
 
   //now try a fairly specific search
+  updateSpinner(`old-${card.title}-details`, `Set up collection query`);
   let query = db.collection('OldSales').where('year', '==', updatedCard.year);
   if (updatedCard.sport) {
     query = query.where('sport', '==', titleCase(updatedCard.sport));
@@ -177,6 +180,7 @@ export async function matchOldStyle(db, card) {
     possibleCards.push(doc.data());
   });
 
+  updateSpinner(`old-${card.title}-details`, `Try to find match on everything`);
   let match = possibleCards.find(
     (c) =>
       updatedCard.cardNumber === c.cardNumber &&
@@ -186,9 +190,12 @@ export async function matchOldStyle(db, card) {
       updatedCard.parallel === c.parallel,
   );
   if (match) {
+    finishSpinner(`old-${card.title}-details`);
+    finishSpinner(`old-${card.title}`, `Found exact listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
+  updateSpinner(`old-${card.title}-details`, `Try to match on card numbers with letters removed`);
   //remove non-digits from the number and search again
   match = possibleCards.find(
     (c) =>
@@ -199,10 +206,12 @@ export async function matchOldStyle(db, card) {
       updatedCard.parallel === c.parallel,
   );
   if (match) {
+    finishSpinner(`old-${card.title}-details`);
+    finishSpinner(`old-${card.title}`, `Found fuzzy number listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  //do some weird stuff for 2021 absolute that was entered in a strange way early on
+  updateSpinner(`old-${card.title}-details`, `Try to match 2021 Absolute that has unique data`);
   const searchSet =
     updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
   match = possibleCards.find(
@@ -212,12 +221,13 @@ export async function matchOldStyle(db, card) {
       (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
       (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
   );
-
   if (match) {
+    finishSpinner(`old-${card.title}-details`);
+    finishSpinner(`old-${card.title}`, `Found 2021 absolute listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  //do some chronicles magic
+  updateSpinner(`old-${card.title}-details`, `Try to match Chronicles`);
   if (updatedCard.setName === 'Chronicles') {
     match = possibleCards.find(
       (c) =>
@@ -237,35 +247,36 @@ export async function matchOldStyle(db, card) {
         c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
     );
     if (match) {
+      finishSpinner(`old-${card.title}-details`);
+      finishSpinner(`old-${card.title}`, `Found Chronicles listing in firebase for ${card.title}`);
       return mergeFirebaseResult(updatedCard, match);
     }
   }
 
-  //try to at least find the group sales info
+  updateSpinner(`old-${card.title}-details`, `Try to find the matching sales group even if we don't have the card`);
   const collection = db.collection('SalesGroups');
   if (card.bin) {
     const queryResults = await collection.doc(card.bin).get();
     if (queryResults.exists) {
+      finishSpinner(`old-${card.title}-details`);
+      finishSpinner(`old-${card.title}`, `Found sales group by bin in firebase for ${card.title}`);
       return mergeFirebaseResult(updatedCard, queryResults.data());
     }
   }
 
-  //try to do an exact query on skuPrefix
+  updateSpinner(`old-${card.title}-details`, `Try to find the matching sales group via exact skuPrefix match`);
   const skuPrefix = getSkuPrefix(card);
   const skuQuery = collection.where('skuPrefix', '==', skuPrefix);
-  console.log('Search for skuPrefix', skuPrefix);
   const skuQueryResults = await skuQuery.get();
-  console.log(skuQueryResults.size);
   if (skuQueryResults.size === 1) {
+    finishSpinner(`old-${card.title}-details`);
+    finishSpinner(`old-${card.title}`, `Found sales group by skuPrefix in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
   }
 
-  //if we never found a match just return the original card
   if (!match || !updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
-    console.log(
-      chalk.red(match ? 'Some information is unknown for' : 'Could not find listing in firebase for'),
-      updatedCard.title,
-    );
+    finishSpinner(`old-${card.title}-details`);
+    errorSpinner(`old-${card.title}`, `Could not find listing in firebase for ${card.title}`);
     updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
     updatedCard.year = await ask('What year is this card?', updatedCard.year);
     updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
@@ -273,6 +284,9 @@ export async function matchOldStyle(db, card) {
     updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
     updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
     updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
+  } else {
+    finishSpinner(`old-${card.title}-details`);
+    finishSpinner(`old-${card.title}`, `Found listing in firebase for ${card.title}`);
   }
   return updatedCard;
 }
@@ -501,18 +515,24 @@ export async function getGroup(info, isTemp) {
 }
 
 export async function getGroupByBin(bin) {
+  showSpinner('getGroupByBin', `Getting group by bin ${bin}`);
   if (_cachedGroups[bin]) {
+    finishSpinner('getGroupByBin');
     return _cachedGroups[bin];
   } else {
     const db = getFirestore();
+    updateSpinner('getGroupByBin', `Getting group by bin ${bin} - Fetching from Firebase`);
     const group = await db.collection('SalesGroups').doc(bin).get();
     _cachedGroups[bin] = group.data();
+    finishSpinner('getGroupByBin');
     return group.data();
   }
 }
 export async function updateGroup(group) {
+  showSpinner('updateGroup', `Updating group ${group.bin}`);
   _cachedGroups[group.bin] = group;
   const db = getFirestore();
   // console.log('updating group', group);
   await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
+  finishSpinner('updateGroup');
 }

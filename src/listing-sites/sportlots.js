@@ -9,8 +9,11 @@ import { getGroupByBin, updateGroup } from './firebase.js';
 import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
 
-const log = (...params) => console.log(chalk.blue(...params));
-const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sportlots', chalk.blue);
+const log = (...params) => console.log(chalk.blueBright(...params));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'sportlots',
+  chalk.blueBright,
+);
 
 const brands = {
   bowman: 'Bowman',
@@ -34,62 +37,75 @@ const conditions = ['NM', 'EX/NM', 'EX', 'VG', 'GOOD'];
 const useClickSubmit =
   (waitForElement) =>
   async (text = undefined) => {
+    showSpinner('clickSubmit', 'Looking for Submit button');
     const submitButton = text
       ? await waitForElement(By.xpath(`//input[(@type = 'submit' or @type = 'Submit') and @value='${text}']`))
       : await waitForElement(By.xpath("//input[@type = 'submit' or @type = 'Submit']"));
+    updateSpinner('clickSubmit', 'Submitting');
     await submitButton.click();
+    finishSpinner('clickSubmit');
   };
 
 const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField) => async (setInfo) => {
+  showSpinner('selectBrand', 'Selecting Brand');
   const waitForElement = useWaitForElement(driver);
   const clickSubmit = useClickSubmit(waitForElement);
   const setSelectValue = useSetSelectValue(driver);
 
+  updateSpinner('selectBrand', `Navigating to Inventory ${inventoryURL}`);
   await driver.get(`https://sportlots.com/inven/dealbin/${inventoryURL}.tpl`);
 
   let found = false;
 
   try {
-    await setSelectValue(sportField, { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()]);
-    console.log('setInfo.sportlots?.year', setInfo.sportlots?.year);
-    console.log('setting year to', setInfo.sportlots?.year || setInfo.year);
+    const sport = { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()];
+    updateSpinner('selectBrand', `Setting Sport to ${sport}`);
+    await setSelectValue(sportField, sport);
+    updateSpinner('selectBrand', `Setting Year to ${setInfo.sportlots?.year || setInfo.year}`);
     await setSelectValue(yearField, setInfo.sportlots?.year || setInfo.year);
-    await setSelectValue(
-      brandField,
+    const brand =
       setInfo.sportlots?.manufacture ||
-        brands[setInfo.setName?.toLowerCase()] ||
-        brands[setInfo.manufacture?.toLowerCase()] ||
-        'All Brands',
-    );
+      brands[setInfo.setName?.toLowerCase()] ||
+      brands[setInfo.manufacture?.toLowerCase()] ||
+      'All Brands';
+    updateSpinner('selectBrand', `Setting brand to ${brand}`);
+    await setSelectValue(brandField, brand);
     found = true;
   } catch (e) {
+    updateSpinner('selectBrand', `Setting brand to All Brands`);
     await setSelectValue(brandField, 'All Brands');
   }
 
   await clickSubmit();
+  finishSpinner('selectBrand');
   return found;
 };
 
 const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
+  showSpinner('selectSet', `${setInfo.skuPrefix}: Selecting Set`);
+  const spinner = (message) => updateSpinner('selectSet', `${setInfo.skuPrefix}: ${message}`);
   const selectSet = async (setInfoForRun) => {
-    console.log('search for set', setInfoForRun);
+    // console.log('search for set', setInfoForRun);
     const setName = `${setInfoForRun.setName} ${setInfoForRun.insert || ''} ${setInfoForRun.parallel || ''}`
       .replace('  ', ' ')
       .trim();
+    spinner('selectSet', `Searching for [${setName}]`);
     const sport = { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()];
 
-    const selectDonrus = async () => {
-      console.log('search for special', setInfoForRun);
+    spinner('selectSet', `Searching for ${setInfoForRun.year} ${setName} in ${sport}`);
+    const selectDonruss = async () => {
       if (setInfoForRun.setName.startsWith('Donruss')) {
         const donrussManufactured = {
           ...setInfoForRun,
           manufacture: 'Donruss',
           setName: setInfoForRun.setName.replace('Donruss', '').trim(),
         };
+
+        spinner('selectSet', `Searching with Donruss Manufacture`);
         await selectBrand(donrussManufactured);
         return await selectSet(donrussManufactured);
       } else {
-        // console.log(`Please select [${setInfo.manufacture} ${setName}]`);
+        errorSpinner('selectSet', `Could not find ${setInfo.skuPrefix}`);
         setInfoForRun.found = false;
         return setInfoForRun;
       }
@@ -97,16 +113,22 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
     try {
       let found = false;
       await driver.sleep(500);
-      console.log(`Searching for [${setName}]`);
+      // console.log(`Searching for [${setName}]`);
       const rows = await driver.findElements(By.xpath(`//*${caseInsensitive(setName)}`));
+      spinner('selectSet', `Found ${rows.length} rows`);
       for (let row of rows) {
-        const fullSetText = await row.getText();
+        let fullSetText;
+        try {
+          const link = await row.findElement(By.xpath(`.//a`));
+          fullSetText = await link.getText();
+        } catch (e) {
+          fullSetText = await row.getText();
+        }
         // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
         // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
-        const regex = new RegExp(
-          `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport})?$`,
-        );
-        // console.log('Testing: ' + fullSetText + ' against ' + regex);
+        const pattern = `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport}| ${sport.toLowerCase()})?$`;
+        const regex = new RegExp(pattern);
+        spinner(`Testing: ${fullSetText.toLowerCase()} against ${pattern}`);
         if (regex.test(fullSetText.toLowerCase())) {
           // console.log('Found: ' + fullSetText);
           foundAction && (await foundAction(fullSetText, row));
@@ -115,14 +137,15 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
       }
 
       if (!found) {
-        return await selectDonrus();
+        return await selectDonruss();
       } else {
         setInfoForRun.found = true;
+        finishSpinner('selectSet');
         return setInfoForRun;
       }
     } catch (e) {
       // console.log(e);
-      return await selectDonrus();
+      return await selectDonruss();
     }
   };
 
@@ -131,31 +154,35 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
 
 let _driver;
 async function login() {
-  // console.log('before', _driver);
   if (!_driver) {
-    // console.log('logging in');
+    showSpinner('login', 'Logging into SportLots');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
     await _driver.get('https://sportlots.com/cust/custbin/login.tpl?urlval=/index.tpl&qs=');
     const waitForElement = useWaitForElement(_driver);
 
+    updateSpinner('login', 'Looking for username field');
     const signInButton = await waitForElement(By.xpath("//input[@name = 'email_val']"));
     await signInButton.sendKeys(process.env.SPORTLOTS_ID);
 
+    updateSpinner('login', 'Looking for password field');
     const passwordField = await waitForElement(By.xpath("//input[@name = 'psswd']"));
     await passwordField.sendKeys(process.env.SPORTLOTS_PASS);
 
+    updateSpinner('login', 'Submitting login request');
     await useClickSubmit(waitForElement)();
+    finishSpinner('login');
   }
-  // console.log('after', _driver);
   return _driver;
 }
 
 export async function shutdownSportLots() {
+  showSpinner('shutdown', 'Shutting down SportLots');
   if (_driver) {
     const d = _driver;
     _driver = undefined;
     await d.quit();
   }
+  finishSpinner('shutdown', 'Sportlots shutdown complete');
 }
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
@@ -446,7 +473,7 @@ export async function getSalesSportLots() {
   return cards;
 }
 export async function removeFromSportLots(groupedCards) {
-  console.log(chalk.magenta('Removing Cards from SportLots Listings'));
+  showSpinner('remove', 'Removing Cards from SportLots Listings');
 
   const toRemove = {};
   let removed = 0;
@@ -459,8 +486,13 @@ export async function removeFromSportLots(groupedCards) {
   });
 
   if (Object.keys(toRemove).length === 0) {
-    console.log(chalk.magenta('No cards to remove from SportLots'));
+    finishSpinner('remove', 'No cards to remove from SportLots');
     return;
+  } else {
+    updateSpinner(
+      'remove',
+      `Removing ${Object.values(toRemove).reduce((acc, val) => acc + val.length, 0)} cards from SportLots`,
+    );
   }
 
   const driver = await login();
@@ -472,37 +504,48 @@ export async function removeFromSportLots(groupedCards) {
   const selectSet = useSelectSet(driver, selectBrand);
 
   for (const key in toRemove) {
-    // console.log('key', key);
+    showSpinner(`remove-${key}`, `Removing ${toRemove[key]?.length} cards from [${key}]`);
     let setInfo = await getGroupByBin(key);
-    console.log(`Removing ${chalk.green(toRemove[key]?.length)} cards from ${chalk.cyan(setInfo.skuPrefix)}`);
+    updateSpinner(`remove-${key}`, `Removing ${toRemove[key]?.length} cards from [${setInfo.skuPrefix}]`);
+    showSpinner(`remove-${key}-details`, `Removing ${toRemove[key]?.length} cards from [${setInfo.skuPrefix}]`);
     let found = false;
     if (setInfo.sportlots?.id) {
+      updateSpinner(`remove-${key}-details`, `Navigating direct to set ${setInfo.sportlots.id}`);
       await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
       found = true;
     } else {
+      updateSpinner(`remove-${key}-details`, `Searching for set ${setInfo.skuPrefix}`);
       await selectBrand(setInfo);
 
       await waitForElement(By.xpath("//*[contains(normalize-space(), 'Dealer Inventory Summary')]"));
       setInfo = await selectSet(setInfo, async (fullSetText, row) => {
         await row.click();
       });
-
       found = setInfo.found;
     }
 
     const updateInventoryHeader = By.xpath('//h2/*[contains(text(), "Update Inventory")]');
     try {
+      updateSpinner(`remove-${key}-details`, `Waiting for update inventory`);
       await driver.findElement(updateInventoryHeader);
       found = true;
-      console.log('found update inventory');
+      if (!setInfo.sportlots?.id) {
+        const url = await driver.getCurrentUrl();
+        setInfo.sportlots = setInfo.sportlots || {};
+        setInfo.sportlots.id = url.match(/Set_id=(\d+)/)?.[1];
+        if (setInfo.sportlots.id) {
+          await updateGroup(setInfo);
+        } else {
+          throw new Error(`Could not find set id for ${setInfo.skuPrefix} in ${url}`);
+        }
+      }
+      updateSpinner(`remove-${key}-details`, `Found the Update Inventory Page`);
     } catch (e) {
+      const pausedSpinners = pauseSpinners(['remove', `remove-${key}`, `remove-${key}-details`]);
       const find = new Promise((resolve) => {
         let askFail, waitFail;
-
         const askPromise = confirm({
-          message: `Does this set exist on SportLots? ${chalk.red(
-            key,
-          )}. Please select the proper filters and hit enter or say No`,
+          message: `Does this set exist on SportLots? ${chalk.red(key)}. Please select the proper filters or say No`,
         });
 
         askPromise
@@ -542,90 +585,95 @@ export async function removeFromSportLots(groupedCards) {
           });
       });
       found = await find;
+      resumeSpinners(pausedSpinners);
     }
 
     if (found) {
+      updateSpinner(`remove-${key}-details`, `Found set; removing items`);
       if (!setInfo.sportlots?.id) {
+        updateSpinner(`remove-${key}-details`, `Adding Set to Firebase`);
         const slInfo = setInfo.sportlots || {};
         const url = await driver.getCurrentUrl();
         slInfo.bin = url.match(/Set_id=(\d+)/)?.[1];
         setInfo.sportlots = slInfo;
         await updateGroup(setInfo);
+        updateSpinner(`remove-${key}-details`, `Removing items`);
       }
 
       for (const card of toRemove[key]) {
-        // console.log('    Attempting to remove', card.title);
+        showSpinner(`remove-card-${card.cardNumber}`, `${card.title}`);
         //find a td that contains card.cardNumber
         let tdWithName;
         try {
+          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Looking for ${card.cardNumber}`);
           tdWithName = await driver.findElement(By.xpath(`//td[contains(text(), ' ${card.cardNumber} ')]`));
         } catch (e) {
           // remove all non-numeric characters from the card number and try again
           const cardNumber = card.cardNumber.replace(/\D/g, '');
-
-          console.log('*** looking for ', `//td[contains(text(), ' ${cardNumber} ')]`);
+          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Trying card Number ${card.cardNumber}`);
           try {
             tdWithName = await driver.findElement(By.xpath(`//td[contains(text(), ' ${cardNumber} ')]`));
           } catch (e) {
-            console.log('could not find element', e);
+            errorSpinner(`remove-card-${card.cardNumber}`, `Could not find card ${card.title}`);
           }
         }
         if (tdWithName) {
+          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Looking for parent row`);
           const row = await tdWithName.findElement(By.xpath('..'));
           //set the row background to yellow
           await driver.executeScript("arguments[0].style.backgroundColor = 'yellow';", row);
+          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Looking current quantity`);
           let cardNumberTextBox = await row.findElement(By.xpath(`./td/input[starts-with(@name, 'qty')]`));
           const currentQuantity = await cardNumberTextBox.getAttribute('value');
           let newQuantity = parseInt(currentQuantity) - parseInt(card.quantity);
           if (newQuantity < 0) {
             newQuantity = 0;
           }
+
+          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Updating quantity to: ${newQuantity}`);
           await cardNumberTextBox.clear();
           await cardNumberTextBox.sendKeys(newQuantity);
           removed++;
-          console.log(`Removed card ${chalk.green(card.title)}`);
+          finishSpinner(`remove-card-${card.cardNumber}`, `${card.title} now has ${newQuantity} cards remaining`);
         } else {
-          await ask(
-            `Could not find card ${chalk.red(card.title)} in SportLots. Please reduce quantity by ${chalk.red(
-              card.quantity,
-            )} and Press any key to continue...`,
-          );
+          errorSpinner(`remove-card-${card.cardNumber}`, `Could not find card ${card.title}`);
+          const paused = pauseSpinners(['remove', `remove-${key}`, `remove-${key}-details`]);
+          await ask(`Please reduce quantity by ${chalk.red(card.quantity)} and Press any key to continue...`);
+          resumeSpinners(paused);
         }
       }
+      updateSpinner(`remove-${key}-details`, `Submitting changes`);
       await clickSubmit('Change Dealer Values');
+      finishSpinner(`remove-${key}-details`);
+      finishSpinner(`remove-${key}`);
     } else {
-      console.log(`Could not find ${chalk.red(key)} on SportLots`);
-      await ask('Press any key to continue...');
+      finishSpinner(`remove-${key}-details`);
+      finishSpinner(`remove-${key}`);
+      // errorSpinner(`remove-${key}`, `Could not find ${setInfo.skuPrefix} on SportLots`);
     }
   }
-
-  await clickSubmit();
+  //
+  // await clickSubmit();
 
   const expected = Object.values(toRemove).reduce((acc, val) => acc + val.length, 0);
   if (removed === expected) {
-    console.log(chalk.magenta('Successfully removed all'), chalk.green(removed), chalk.magenta('cards from SportLots'));
+    finishSpinner('remove', `Successfully removed all ${removed} cards from SportLots`);
   } else {
-    console.log(
-      chalk.magenta('Only removed'),
-      chalk.red(removed),
-      chalk.magenta('of'),
-      chalk.red(expected),
-      chalk.magenta('cards from SportLots'),
-    );
-    console.log(
-      chalkTable(
-        {
-          leftPad: 2,
-          columns: [
-            { field: 'title', name: 'Title' },
-            { field: 'quantity', name: 'Sold' },
-            { field: 'updatedQuantity', name: 'Remaining' },
-            { field: 'error', name: 'Error' },
-          ],
-        },
-        notRemoved,
-      ),
-    );
+    errorSpinner('remove', `Only removed ${removed} of ${expected} cards from SportLots`);
+    // console.log(
+    //   chalkTable(
+    //     {
+    //       leftPad: 2,
+    //       columns: [
+    //         { field: 'title', name: 'Title' },
+    //         { field: 'quantity', name: 'Sold' },
+    //         { field: 'updatedQuantity', name: 'Remaining' },
+    //         { field: 'error', name: 'Error' },
+    //       ],
+    //     },
+    //     notRemoved,
+    //   ),
+    // );
   }
 }
 
