@@ -6,8 +6,15 @@ import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
 import open from 'open';
 import chalk from 'chalk';
 import chalkTable from 'chalk-table';
+import { useSpinners } from '../utils/spinners.js';
+
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'shopify',
+  chalk.hex('#12D39D'),
+);
 
 const login = async (isRest = false) => {
+  showSpinner('login', 'Logging into Shopify');
   const shopifyConfig = {
     apiKey: process.env.SHOPIFY_API_KEY,
     apiSecretKey: process.env.SHOPIFY_API_SECRET,
@@ -28,13 +35,17 @@ const login = async (isRest = false) => {
   });
   const session = shopify.session.customAppSession(process.env.SHOPIFY_URL);
 
-  return isRest ? [shopify, session] : new shopify.clients.Graphql({ session });
+  const rtn = isRest ? [shopify, session] : new shopify.clients.Graphql({ session });
+  finishSpinner('login');
+  return rtn;
 };
 
 async function uploadToShopify(data) {
+  showSpinner('upload', `Uploading ${Object.values(data).length} cards to Shopify`);
   const client = await login();
   await Promise.all(
     Object.values(data).map(async (card) => {
+      showSpinner(`upload-${card.title}`, `Uploading ${card.title} to Shopify`);
       const query = `mutation {
       productCreate(
         input: {
@@ -102,18 +113,15 @@ async function uploadToShopify(data) {
         });
 
         if (simpleSave.body.data.productCreate.userErrors.length > 0) {
-          console.log('Failed to save to Shopify - userErrors');
-          throw simpleSave.body.data.productCreate.userErrors;
+          throw new Error(simpleSave?.body?.data?.productCreate?.userErrors);
         }
-
-        // console.log(JSON.stringify(simpleSave.body, null, 2));
+        finishSpinner(`upload-${card.title}`, `${card.title} Uploaded`);
       } catch (e) {
-        console.log('Failed to save to Shopify');
-        console.log(e);
-        console.log('query: ', query);
+        errorSpinner(`upload-${card.title}`, `Failed to upload ${card.title} to Shopify`);
       }
     }),
   );
+  finishSpinner('upload', `Uploaded ${Object.values(data).length} cards to Shopify`);
 }
 
 const getTags = (card) => {
@@ -222,12 +230,15 @@ const getCollections = (card) => {
 };
 
 export async function removeFromShopify(cards) {
+  showSpinner('remove', 'Removing cards from Shopify');
   let toRemove = cards.filter((card) => !card.platform.startsWith('Shop: '));
-  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from Shopify'));
+  updateSpinner('remove', `Removing ${toRemove.length} cards from Shopify`);
   const client = await login();
   const notRemoved = [];
 
   for (const card of toRemove) {
+    showSpinner(`remove-${card.title}`, `Removing ${card.title} from Shopify`);
+    showSpinner(`remove-${card.title}-details`, `Removing ${card.title} from Shopify`);
     const query = `query {
           products(query: "${card.title}", first: 1) {            
             edges {
@@ -260,12 +271,11 @@ export async function removeFromShopify(cards) {
         }`;
 
     try {
+      updateSpinner(`remove-${card.title}-details`, `Looking up product`);
       const productResults = await client.query({ data: query });
-      // console.log(JSON.stringify(productResults.body, null, 2));
 
       const inventoryItem = productResults.body.data.products.edges[0].node.variants.edges[0].node.inventoryItem;
       if (!inventoryItem) {
-        // console.log(JSON.stringify(productResults.body, null, 2));
         throw new Error('No inventory item found');
       }
 
@@ -298,40 +308,25 @@ export async function removeFromShopify(cards) {
       }`;
 
       try {
-        const updateResult = await client.query({ data: { query: allInOneUpdate } });
-        // console.log('success!', JSON.stringify(updateResult.body, null, 2));
+        updateSpinner(`remove-${card.title}-details`, `Updating product`);
+        await client.query({ data: { query: allInOneUpdate } });
+        finishSpinner(`remove-${card.title}-details`);
       } catch (e) {
-        card.error = `Could not update inventory: ${e.message}`;
-        notRemoved.push(card);
-        // console.error('Failed to update inventory');
-        // console.error(e);
-        // console.error(JSON.stringify(e.response.errors, null, 2));
-        // console.log(allInOneUpdate);
+        throw new Error(`Could not update inventory: ${e.message}`);
       }
+      finishSpinner(`remove-${card.title}`, `Removed ${card.title}`);
     } catch (e) {
-      card.error = `Could not find product: ${e.message}`;
+      finishSpinner(`remove-${card.title}-details`);
+      card.error = e.message;
       notRemoved.push(card);
-      // console.error('Failed to get product from Shopify for ');
-      // console.error(e);
-      // console.error('query: ', query);
-      // throw e;
+      errorSpinner(`remove-${card.title}`, `Failed to remove ${card.title}`);
     }
   }
 
   if (notRemoved.length === 0) {
-    console.log(
-      chalk.magenta('Successfully removed all'),
-      chalk.green(toRemove.length),
-      chalk.magenta('cards from Shopify'),
-    );
+    finishSpinner('remove', `Removed ${toRemove.length} cards from Shopify`);
   } else {
-    console.log(
-      chalk.magenta('Only removed'),
-      chalk.red(toRemove.length - notRemoved.length),
-      chalk.magenta('of'),
-      chalk.red(toRemove.length),
-      chalk.magenta('cards from Shopify'),
-    );
+    errorSpinner('remove', `Removed ${toRemove.length - notRemoved.length} of ${toRemove.length} cards from Shopify`);
     console.log(
       chalkTable(
         {
