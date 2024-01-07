@@ -10,12 +10,6 @@ import fs from 'fs-extra';
 const output_directory = 'output/';
 const MAX_IMAGE_SIZE = 10 * 1000 * 1000; // slightly under 10MB
 
-let storage;
-
-export const initializeStorage = (app) => {
-  storage = getStorage(app);
-};
-
 function getOutputFile(cardData) {
   const outputLocation = `${output_directory}${cardData.directory}`;
   const outputFile = `${outputLocation}${cardData.filename}`;
@@ -94,16 +88,4 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
 
     return outputFile;
   }
-};
-
-// upload file to firebase storage
-export const processImageFile = async (outputFile, filename) => {
-  let promise;
-  try {
-    promise = storage.bucket().upload(outputFile, { destination: filename });
-  } catch (e) {
-    console.error(`Error uploading ${outputFile}`, e);
-    process.exit(1);
-  }
-  return promise;
 };

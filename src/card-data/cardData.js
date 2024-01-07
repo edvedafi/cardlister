@@ -3,6 +3,14 @@ import { findLeague, getTeamSelections, sports } from '../utils/teams.js';
 import { graders, isNo, isYes } from '../utils/data.js';
 import fs from 'fs-extra';
 import { getGroup } from '../listing-sites/firebase.js';
+import chalk from 'chalk';
+import { useSpinners } from '../utils/spinners.js';
+
+const log = (...params) => console.log(chalk.white(...params));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'trim',
+  chalk.white,
+);
 
 //Set up the card name and track with previous for front/back situations
 let answerFile;
@@ -39,7 +47,6 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
             }, {});
       saveData.setData = answerInput.setData;
       saveData.bulk = answerInput.bulk;
-      // console.log("saveData", saveData);
     }
   } catch (e) {
     console.log(e);
@@ -91,11 +98,11 @@ export const getSetData = async () => {
     saveData.setData.printRun = await ask('Print Run', saveData.setData.printRun);
     saveData.setData.autographed = await ask('Autograph', saveData.setData.autographed);
 
-    saveData.setData.graded = await ask('Graded', saveData.setData.graded);
+    saveData.setData.graded = await ask('Graded', saveData.setData.graded || false);
 
     saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
     saveData.setData.price = await ask('Default Price', saveData.setData.price || 0.99);
-    saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer || 0.01);
+    // saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer || 0.01);
     saveData.setData.bscPrice = await ask('BSC Price', saveData.setData.bscPrice || 0.25);
     saveData.setData.slPrice = await ask('SportLots Price', saveData.setData.slPrice || 0.18);
     saveData.setData.bin = (await getGroup(saveData.setData)).bin;
@@ -286,8 +293,6 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     price: 0.99,
     graded: false,
     autographed: false,
-    // grade: "Not Graded",
-    // grader: "Not Graded",
     ...defaults,
   };
   let output = {
@@ -379,14 +384,14 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   output.cardName = await getCardName(output);
 
   await askFor('Price', 'price', { allowUpdates: true });
-  if (output.price === '0.99' || output.price === 0.99) {
-    output.autoOffer = '0.01';
-  } else if (output.price === '1.99' || output.price < 2.5) {
-    output.autoOffer = '1';
-  } else {
-    await askFor('Auto Accept Offer', 'autoOffer', { allowUpdates: true });
-    // await askFor('Minimum Offer', 'minOffer');
-  }
+  // if (output.price === '0.99' || output.price === 0.99) {
+  //   output.autoOffer = '0.01';
+  // } else if (output.price === '1.99' || output.price < 2.5) {
+  //   output.autoOffer = '1';
+  // } else {
+  //   await askFor('Auto Accept Offer', 'autoOffer', { allowUpdates: true });
+  //   // await askFor('Minimum Offer', 'minOffer');
+  // }
 
   //inserts, parallels or cards worth more than $1 default to 10% of the Ebay price otherwise drop it to a quarter
   if (output.insert || output.parallel || output.price > 1) {
@@ -436,7 +441,7 @@ export const getCardData = async (allCards, imageDefaults) => {
     });
 
     console.log('Card Info: ', output);
-    while (!(await confirm('Proceed with card?'))) {
+    while (!(await confirm('Proceed with card?', true))) {
       output = await getNewCardData(cardNumber, output, true);
       console.log('Card Info: ', output);
     }
@@ -619,9 +624,9 @@ export const getLotData = async (imageDefaults, allCards) => {
     await askFor('Width (in)', 'width');
     await askFor('Depth (in)', 'depth');
     await askFor('Price', 'price');
-    if (output.price !== 5 && output.price !== '5') {
-      await askFor('Auto Accept Offer', 'autoOffer');
-    }
+    // if (output.price !== 5 && output.price !== '5') {
+    //   await askFor('Auto Accept Offer', 'autoOffer');
+    // }
   }
 
   const playerKey = output.player.replace(/\s/g, '_');

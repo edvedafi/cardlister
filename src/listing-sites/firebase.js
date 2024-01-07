@@ -1,4 +1,4 @@
-import { getFirestore } from '../utils/firebase.js';
+import { getFirestore, getStorage } from '../utils/firebase.js';
 import chalk from 'chalk';
 import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
@@ -372,6 +372,13 @@ const getSkuPrefix = (setInfo) =>
  * @param {string} info.setName - The name of the sales group.
  * @param {string} [info.insert] - The insert of the sales group (optional).
  * @param {string} [info.parallel] - The parallel of the sales group (optional).
+ * @param {string} [info.league] - The league of the sales group (optional).
+ * @param {number} [info.bin] - The bin of the sales group (optional).
+ * @param {number} [info.bscPrice] - The bscPrice of the sales group (optional).
+ * @param {number} [info.slPrice] - The slPrice of the sales group (optional).
+ * @param {number} [info.price] - The price of the sales group (optional).
+ * @param {string} [info.skuPrefix] - The skuPrefix of the sales group (optional).
+ *
  * @returns {Promise<{
  *   sport: string,
  *   year: string,
@@ -475,7 +482,13 @@ export async function getGroupByBin(bin) {
   } else {
     const db = getFirestore();
     updateSpinner('getGroupByBin', `Getting group by bin ${bin} - Fetching from Firebase`);
-    const group = await db.collection('SalesGroups').doc(bin).get();
+    let group;
+    try {
+      group = await db.collection('SalesGroups').doc(`${bin}`).get();
+    } catch (e) {
+      console.log('getGroupByBin', `Failed to get group by bin ${bin}: ${e.message}`);
+      throw e;
+    }
     _cachedGroups[bin] = group.data();
     finishSpinner('getGroupByBin');
     return group.data();
@@ -489,3 +502,17 @@ export async function updateGroup(group) {
   await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
   finishSpinner('updateGroup');
 }
+
+// upload file to firebase storage
+export const processImageFile = async (outputFile, filename) => {
+  showSpinner(`upload-${filename}`, `Uploading ${filename} to Firebase`);
+  let promise;
+  try {
+    promise = getStorage().bucket().upload(outputFile, { destination: filename });
+  } catch (e) {
+    errorSpinner(`upload-${filename}`, `Failed to upload ${filename} to Firebase: ${e.message}`);
+    throw e;
+  }
+  finishSpinner(`upload-${filename}`, `Uploaded ${filename} to Firebase`);
+  return promise;
+};

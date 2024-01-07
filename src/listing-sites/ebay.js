@@ -105,7 +105,7 @@ async function writeEbayFile(data) {
       { id: 'format', title: '*Format' },
       { id: 'duration', title: '*Duration' },
       { id: 'price', title: '*StartPrice' },
-      { id: 'autoOffer', title: 'BestOfferAutoAcceptPrice' },
+      // { id: 'autoOffer', title: 'BestOfferAutoAcceptPrice' },
       { id: 'minOffer', title: 'MinimumBestOfferPrice' },
       { id: 'returns', title: '*ReturnsAcceptedOption' },
       { id: 'returnPolicy', title: 'ReturnProfileName' },

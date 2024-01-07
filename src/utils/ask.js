@@ -3,12 +3,14 @@ import { select, confirm as confirmPrompt, input } from '@inquirer/prompts';
 import { isNo, isYes } from './data.js';
 import filterSelectPrompt from './filterSelectPrompt.js';
 import chalkTable from 'chalk-table';
+import { pauseSpinners, resumeSpinners } from './spinners.js';
 
 export const ask = async (
   questionText,
   defaultAnswer = undefined,
   { maxLength, selectOptions, isYN, cancellable = false } = {},
 ) => {
+  pauseSpinners();
   if (typeof defaultAnswer === 'boolean' || isYes(defaultAnswer) || isNo(defaultAnswer)) {
     isYN = true;
   }
@@ -62,11 +64,11 @@ export const ask = async (
     }
   }
 
-  // console.log(`Answer: ${answer}`);
+  resumeSpinners();
   return answer;
 };
 
-export const confirm = (questionText, defaultAnswer) => {
+export const confirm = (questionText, defaultAnswer = false) => {
   return ask(questionText, defaultAnswer, { isYN: true, cancellable: true });
 };
 

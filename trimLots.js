@@ -1,13 +1,13 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config();
 
-import { loadTeams } from "./src/utils/teams.js";
-import { initializeStorage } from "./src/image-processing/imageProcessor.js";
-import { initializeAnswers } from "./src/card-data/cardData.js";
-import "zx/globals";
-import { getFiles, getInputs } from "./src/utils/inputs.js";
-import initializeFirebase from "./src/utils/firebase.js";
-import processLots from "./src/lots.js";
+import { loadTeams } from './src/utils/teams.js';
+import { initializeAnswers } from './src/card-data/cardData.js';
+import 'zx/globals';
+import { getFiles, getInputs } from './src/utils/inputs.js';
+import initializeFirebase from './src/utils/firebase.js';
+import { initializeStorage } from './src/listing-sites/firebase.js';
+import processLots from './src/lots.js';
 
 $.verbose = false;
 

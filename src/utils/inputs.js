@@ -1,8 +1,17 @@
 import { ask } from './ask.js';
 import { ensureDir } from 'fs-extra/esm';
 import unzip from 'decompress';
+import chalk from 'chalk';
+import { useSpinners } from './spinners.js';
+
+const log = (...params) => console.log(chalk.cyan(...params));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'trim',
+  chalk.cyan,
+);
 
 export async function getInputs() {
+  showSpinner('inputs', 'Getting Input Information');
   if (process.argv.length > 2) {
     // console.log(process.argv[2]);
     const zipFile = process.argv[2];
@@ -16,13 +25,13 @@ export async function getInputs() {
         .replace(/[\s()]/g, '_')}/`;
       await ensureDir(dir);
       await unzip(zipFile, dir);
-      console.log(`Input Directory: ${dir}`);
+      finishSpinner('inputs', `Input Directory: ${dir}`);
       return dir;
     } else if (zipFile.indexOf('input') > -1) {
-      console.log(`Input Directory: ${zipFile}`);
+      finishSpinner('inputs', `Input Directory: ${zipFile}`);
       return zipFile;
     } else {
-      console.log(`Input Directory: input/${zipFile}/`);
+      finishSpinner('inputs', `Input Directory: input/${zipFile}/`);
       return `input/${zipFile}/`;
     }
   } else {
@@ -31,6 +40,7 @@ export async function getInputs() {
 }
 
 export const getInputDirectory = async () => {
+  const spinners = pauseSpinners();
   const directories = fs.readdirSync('input', { withFileTypes: true });
   const inputDirectories = ['input', 'bulk', ...directories.filter((dir) => dir.isDirectory()).map((dir) => dir.name)];
   let input_directory = await ask('Input Directory', undefined, { selectOptions: inputDirectories });
@@ -53,36 +63,25 @@ export const getInputDirectory = async () => {
   } else {
     input_directory = `input/${input_directory}`;
   }
-  console.log(`Input Directory: ${input_directory}`);
+  resumeSpinners(spinners);
+  finishSpinner('inputs', `Input Directory: ${input_directory}`);
+
   return input_directory;
 };
 
 export const getFiles = async (inputDirectory) => {
+  showSpinner('inputs', 'Getting Files');
+  let files = [];
   try {
     const lsOutput = await $`ls ${inputDirectory}PXL*.jpg`;
-    return lsOutput
+    files = lsOutput
       .toString()
       .split('\n')
       .filter((image) => image !== '');
+    finishSpinner('inputs', `Found ${files.length} Files`);
   } catch (e) {
-    return [];
+    files = [];
+    errorSpinner('inputs', `No Files Found`);
   }
-};
-
-export const setEnvValue = (key, value) => {
-  // read file from hdd & split if from a linebreak to a array
-  const ENV_VARS = fs.readFileSync('./.env', 'utf8').split(os.EOL);
-
-  // find the env we want based on the key
-  const target = ENV_VARS.indexOf(
-    ENV_VARS.find((line) => {
-      return line.match(new RegExp(key));
-    }),
-  );
-
-  // replace the key/value with the new value
-  ENV_VARS.splice(target, 1, `${key}=${value}`);
-
-  // write everything back to the file system
-  fs.writeFileSync('./.env', ENV_VARS.join(os.EOL));
+  return files;
 };

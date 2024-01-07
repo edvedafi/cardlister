@@ -9,6 +9,32 @@ const getSpinners = () => {
   return spinners;
 };
 
+let _paused = [];
+
+export const pauseSpinners = () => {
+  const spinners = getSpinners();
+
+  Object.keys(spinners.spinners).forEach((spinner) => {
+    const s = spinners.pick(spinner);
+    if (s.status !== 'fail' && s.status !== 'succeed') {
+      _paused.push({ name: spinner, spinner: s });
+      spinners.remove(spinner);
+    }
+  });
+
+  spinners.stopAll();
+  return _paused;
+};
+
+export const resumeSpinners = (pausedSpinners = _paused) => {
+  console.log('RESUME SPINNERS');
+  pausedSpinners.forEach((spinner) => {
+    getSpinners().remove(spinner.name);
+    getSpinners().add(spinner.name, { ...spinner.spinner });
+  });
+  _paused = [];
+};
+
 export const useSpinners = (processName, color) => ({
   showSpinner: (name, message) =>
     getSpinners().add(`${processName}-${name}`, { text: color.inverse(`${name} - ${message}`) }),
@@ -21,33 +47,22 @@ export const useSpinners = (processName, color) => ({
     }
   },
   finishSpinner: (name, message) => {
+    const s = getSpinners().pick(`${processName}-${name}`);
     if (message) {
+      if (!s) {
+        getSpinners().add(`${processName}-${name}`, { text: color(`${message}`) });
+      }
       getSpinners().succeed(`${processName}-${name}`, { text: color(`${message}`) });
       return message;
     } else {
-      const s = getSpinners().remove(`${processName}-${name}`);
-      return s?.text;
+      if (s) {
+        getSpinners().remove(`${processName}-${name}`);
+        return s?.text;
+      }
+      return message;
     }
   },
   errorSpinner: (name, message) => getSpinners().fail(`${processName}-${name}`, { text: color(message) }),
-  pauseSpinners: () => {
-    const spinners = getSpinners();
-    const paused = [];
-
-    Object.keys(spinners.spinners).forEach((spinner) => {
-      const s = spinners.pick(spinner);
-      if (s.status !== 'fail' && s.status !== 'succeed') {
-        paused.push({ name: spinner, spinner: s });
-        spinners.remove(spinner);
-      }
-    });
-
-    spinners.stopAll();
-    return paused;
-  },
-  resumeSpinners: (pausedSpinners) =>
-    pausedSpinners.forEach((spinner) => {
-      getSpinners().remove(spinner.name);
-      getSpinners().add(spinner.name, { ...spinner.spinner });
-    }),
+  pauseSpinners: pauseSpinners,
+  resumeSpinners: resumeSpinners,
 });

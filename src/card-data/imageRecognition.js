@@ -3,6 +3,15 @@ import { isTeam, sports } from '../utils/teams.js';
 import { inserts, manufactures, sets, titleCase } from '../utils/data.js';
 import { HfInference } from '@huggingface/inference';
 import dotenv from 'dotenv';
+import chalk from 'chalk';
+import { useSpinners } from '../utils/spinners.js';
+
+const color = chalk.hex('#f4d02e');
+const log = (...params) => console.log(color(...params));
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'firebase',
+  color,
+);
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -21,14 +30,16 @@ const detectionFeatures = [
 ];
 
 async function getTextFromImage(front, back = undefined, setData = {}) {
+  showSpinner(`image-recognition-${front}`, `Image Recognition ${front}`);
+  const spin = (message) => updateSpinner(`image-recognition-${front}`, `Image Recognition ${front}: ${message}`);
+
   let defaults = { ...setData };
   defaults.raw = [front, back];
 
-  //console.log('Processing: ', defaults.raw);
-
-  // Creates a client
+  spin('Loading Google Vision');
   const client = new vision.ImageAnnotatorClient();
 
+  spin(`Running Vision API on ${front}`);
   const [frontResult] = await client.annotateImage({
     image: {
       source: {
@@ -43,6 +54,7 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
     },
   });
 
+  spin(`Running Vision API on ${back}`);
   const [backResult] = back
     ? await client.annotateImage({
         image: {
@@ -54,6 +66,7 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
       })
     : [];
 
+  spin(`Gathering Crop Hints`);
   defaults = {
     ...defaults,
     crop: await getCropHints(client, front),
@@ -84,7 +97,6 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
    *  lowerCase: The word in lower case
    */
   let searchParagraphs = [];
-  // Performs label detection on the image file
   const addLabelsToSearch = (labelAnnotations, isFront) => {
     if (labelAnnotations) {
       searchParagraphs.concat(
@@ -103,7 +115,9 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
       );
     }
   };
+  spin(`Adding Labels for ${front}`);
   addLabelsToSearch(frontResult.labelAnnotations, true);
+  spin(`Adding Labels for ${back}`);
   addLabelsToSearch(backResult?.labelAnnotations, false);
 
   const addLogosToSearch = (logoAnnotations, isFront) => {
@@ -124,7 +138,9 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
       );
     }
   };
+  spin(`Adding Logos for ${front}`);
   addLogosToSearch(frontResult.logoAnnotations, true);
+  spin(`Adding Logos for ${back}`);
   addLogosToSearch(backResult?.logoAnnotations, false);
 
   const addSearch = async (textResult, isFront) => {
@@ -150,49 +166,46 @@ async function getTextFromImage(front, back = undefined, setData = {}) {
           );
         }),
       );
-      // console.log('blocks:', blocks)
       searchParagraphs = searchParagraphs.concat(blocks.reduce((acc, val) => acc.concat(val), []));
     }
   };
-  // console.log(frontResult.fullTextAnnotation)
+  spin('Adding the full text of the card to the searchable data');
   await Promise.all([addSearch(frontResult, true), addSearch(backResult, false)]);
 
-  defaults = await extractData(searchParagraphs, defaults, setData);
+  defaults = await extractData(searchParagraphs, defaults, setData, spin);
 
-  // console.log(defaults);
-  // await ask('Continue?');
+  finishSpinner(`image-recognition-${front}`, `Image Recognition ${front} converted to ${JSON.stringify(defaults)}`);
 
   return defaults;
 }
 
-export const extractData = async (searchParagraphs, defaults, setData) => {
-  // console.log('extractData', searchParagraphs);
+export const extractData = async (searchParagraphs, defaults, setData, spin) => {
   let result = { ...defaults };
-  // Sort the search paragraphs by confidence
+  spin('Sorting Searchable Data');
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence);
 
-  //let's see if the card has the standard panini info
+  spin('Checking for Panini Match');
   result = {
     ...result,
     ...paniniMatch(searchParagraphs, setData),
   };
 
-  //Run NLP on the entire document
+  spin('Running NLP');
   result = {
     ...result,
-    ...(await runNLP(searchParagraphs, setData)),
+    ...(await runNLP(searchParagraphs, setData, spin)),
   };
 
-  //first pass only check for near exact matches
+  spin('First pass only check for near exact matches');
   result = await runFirstPass(searchParagraphs, result, setData);
 
-  //second pass, lets check things that are a little less exact
+  spin('Second pass, lets check things that are a little less exact');
   result = await runSecondPass(searchParagraphs, result, setData);
 
-  //third pass, lets get really fuzzy
+  spin('Third pass, lets get really fuzzy');
   result = await fuzzyMatch(searchParagraphs, result, setData);
 
-  //clean up some data
+  spin('Clean Up data');
   if (result.cardNumber) {
     result.cardNumber = result.cardNumber.replaceAll(' ', '');
   }
@@ -212,20 +225,22 @@ const getCropHints = async (client, image) => {
 
 export let callNLP = async (text) => {
   try {
-    // console.log('calling NLP', text);
     return await hf.tokenClassification({
       model: 'dslim/bert-base-NER-uncased',
       inputs: text,
     });
   } catch (e) {
+    pauseSpinners();
     console.error(e);
     process.exit(1);
   }
 };
-export const runNLP = async (text, setData) => {
+export const runNLP = async (text, setData, spin) => {
   if (setData.player) {
+    spin('Skipping NLP because player is already set');
     return { player: setData.player };
   } else {
+    spin('Searching for a player name');
     const countWords = (word) => {
       if (word) {
         const search = word.toLowerCase();
@@ -237,16 +252,17 @@ export const runNLP = async (text, setData) => {
     const wordCount = (name) => name.split(' ').length;
     const results = {};
     const textBlock = text.map((block) => block.word).join('. ');
-    // console.log('nlp input: ', textBlock);
+    spin('Calling NLP engine');
     const segments = await callNLP(textBlock);
-    // console.log('segments', segments);
+    spin('Filtering results for PER type');
     const persons = segments.filter((segment) => segment.entity_group === 'PER');
-    // console.log('persons', persons)
-    // await ask('Continue?');
+    spin(`Found ${persons.length} PER type results`);
 
     if (persons.length === 1) {
       results.player = titleCase(persons[0].word);
+      spin(`Found player ${results.player}`);
     } else if (persons.length > 1) {
+      spin(`Found ${persons.length} PER type results, filtering for names`);
       const names = persons
         //replace # with wildcard regex search for letters only of the text input
         .map((person) => {
@@ -298,7 +314,7 @@ export const runNLP = async (text, setData) => {
         //remove any team names
         .filter((name) => !isTeam(name));
 
-      // console.log('selecting persons from: ', names)
+      spin(`Checking ${names.length} names for a match`);
       if (names[0]?.includes(' ')) {
         results.player = titleCase(names[0]);
       } else if (names[1]?.includes(' ')) {
@@ -331,6 +347,7 @@ export const runNLP = async (text, setData) => {
         }
       }
     }
+    spin(`Found player ${results.player}`);
 
     return results;
   }
