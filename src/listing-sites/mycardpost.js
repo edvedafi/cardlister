@@ -4,8 +4,14 @@ import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
 import chalkTable from 'chalk-table';
+import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
+
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'mcp',
+  chalk.hex('#ffc107'),
+);
 
 let _driver;
 const login = async () => {
@@ -28,11 +34,13 @@ const login = async () => {
 };
 
 export async function shutdownMyCardPost() {
+  showSpinner('shutdown', 'Shutting down My Card Post');
   if (_driver) {
     const d = _driver;
     _driver = undefined;
     await d.quit();
   }
+  finishSpinner('shutdown', 'My Card Post shutdown complete');
 }
 
 export const uploadToMyCardPost = async (cardsToUpload) => {

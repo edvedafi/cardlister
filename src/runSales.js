@@ -2,24 +2,16 @@ import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
 import dotenv from 'dotenv';
 import 'zx/globals';
 import { createGroups } from './listing-sites/uploads.js';
-import chalk, { foregroundColorNames } from 'chalk';
+import chalk from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
 import { removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
-import {
-  getFileSales,
-  getGroup,
-  getListingInfo,
-  getNextCounter,
-  shutdownFirebase,
-  updateSport,
-  uploadOldListings,
-} from './listing-sites/firebase.js';
+import { getFileSales, getGroupByBin, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import initializeFirebase from './utils/firebase.js';
-import { getTeamSelections, loadTeams } from './utils/teams.js';
+import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import { ask } from './utils/ask.js';
 import open from 'open';
@@ -28,7 +20,10 @@ import { useSpinners } from './utils/spinners.js';
 const args = minimist(process.argv.slice(2));
 
 const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sales', chalk.cyan);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'sales',
+  chalk.cyan,
+);
 
 $.verbose = false;
 
@@ -50,7 +45,8 @@ const shutdown = async () => {
   });
 });
 
-function buildTableData(groupedCards) {
+async function buildTableData(groupedCards) {
+  showSpinner('buildTableData', 'Building table data');
   const divider = {
     sport: '--------',
     year: '----',
@@ -107,33 +103,31 @@ function buildTableData(groupedCards) {
         chalk.bgWhiteBright,
       ][Object.keys(orderColors).length];
     }
-    // console.log(`order ${orderId} is color ${orderColors[orderId]}`);
     return orderColors[orderId];
   };
-  Object.keys(groupedCards)
-    .sort((k1, k2) => {
-      const [sport1, year1, manufacture1, setName1, insert1, parallel1] = k1.split('|');
-      const [sport2, year2, manufacture2, setName2, insert2, parallel2] = k2.split('|');
-      if (sport1 !== sport2) {
-        return sport1 < sport2 ? -1 : 1;
-      } else if (year1 !== year2) {
-        return year1 < year2 ? -1 : 1;
-      } else if (manufacture1 !== manufacture2) {
-        return manufacture1 < manufacture2 ? -1 : 1;
-      } else if (setName1 !== setName2) {
-        return setName1 < setName2 ? -1 : 1;
-      } else if (insert1 !== insert2) {
-        return insert1 < insert2 ? -1 : 1;
-      } else if (parallel1 !== parallel2) {
-        return parallel1 < parallel2 ? -1 : 1;
+  log(Object.keys(groupedCards));
+  (await Promise.all(Object.keys(groupedCards).map((bin) => getGroupByBin(bin))))
+    .sort((group1, group2) => {
+      if (group2.sport.toLowerCase() !== group1.sport.toLowerCase()) {
+        return group2.sport.toLowerCase() < group1.sport.toLowerCase() ? -1 : 1;
+      } else if (group2.year !== group1.year) {
+        return group2.year < group1.year ? -1 : 1;
+      } else if (group2.manufacture !== group1.manufacture) {
+        return group2.manufacture < group1.manufacture ? -1 : 1;
+      } else if (group2.setName !== group1.setName) {
+        return group2.setName < group1.setName ? -1 : 1;
+      } else if (group2.insert !== group1.insert) {
+        return group2.insert < group1.insert ? -1 : 1;
+      } else if (group2.parallel !== group1.parallel) {
+        return group2.parallel < group1.parallel ? -1 : 1;
       } else {
         return 0;
       }
     })
-    .forEach((key, i) => {
+    .forEach(({ bin }, i) => {
       if (i > 0) displayCards.push(divider);
       displayCards.push(
-        ...groupedCards[key]
+        ...groupedCards[bin]
           .sort((c1, c2) => {
             const cardNumber1 = Number.parseInt(c1.cardNumber);
             const cardNumber2 = Number.parseInt(c2.cardNumber);
@@ -156,6 +150,7 @@ function buildTableData(groupedCards) {
       );
       color = color === chalk.magenta ? chalk.blueBright : chalk.magenta;
     });
+  finishSpinner('buildTableData');
   return displayCards;
 }
 
@@ -165,14 +160,14 @@ try {
   await loadTeams(firebase);
 
   //gather sales
-  log('Running sales processing');
+  showSpinner('top-level', 'Running sales processing');
   showSpinner('gathering', 'Gathering sales from sites');
   const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
 
   //prep listings to remove
-  log('Updating sales with listing info');
+  showSpinner('sales-info', 'Updating sales with listing info');
   const openSalesSites = [];
 
   const sales = await getListingInfo(db, rawSales);
@@ -190,27 +185,28 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
-  log('Completed adding listing info to cards');
+  finishSpinner('sales-info', 'Completed adding listing info to cards');
 
   //remove listings from sites
-  log('Remove listings from sites');
-
-  if (!args.r || (await ask('Remove from Ebay?', true))) {
-    await removeFromEbay(sales, db);
-  }
-  if (!args.r || (await ask('Remove from Sportlots?', true))) {
-    await removeFromSportLots(groupedCards);
-  }
-  if (!args.r || (await ask('Remove from Buy Sports Cards?', true))) {
-    await removeFromBuySportsCards(groupedCards);
-  }
-  if (!args.r || (await ask('Remove from Shopify?', true))) {
-    await removeFromShopify(sales);
-  }
-  if (!args.r || (await ask('Remove from My Card Post?', true))) {
-    await removeFromMyCardPost(sales);
-  }
-  log('Completed removing listings from sites');
+  showSpinner('remove-all', 'Remove listings from sites');
+  const removeListings = async (site, remove) => {
+    let paused;
+    let proceed = true;
+    if (args.r) {
+      paused = pauseSpinners();
+      proceed = await ask(`Remove from ${site}?`, true);
+      resumeSpinners(paused);
+    }
+    if (proceed) {
+      await remove();
+    }
+  };
+  await removeListings('Ebay', () => removeFromEbay(sales, db));
+  await removeListings('Sportlots', () => removeFromSportLots(groupedCards));
+  await removeListings('Buy Sports Cards', () => removeFromBuySportsCards(groupedCards));
+  await removeListings('Shopify', () => removeFromShopify(sales));
+  await removeListings('My Card Post', () => removeFromMyCardPost(sales));
+  finishSpinner('remove-all', 'Completed removing listings from sites');
 
   showSpinner('launching', 'Launching all sales sites');
   for (const site of openSalesSites) {
@@ -225,7 +221,7 @@ try {
       {
         leftPad: 2,
         columns: [
-          { field: 'sport', name: chalk.cyan('Sport') },
+          { field: 'sport', name: 'Sport' },
           { field: 'year', name: 'Year' },
           { field: 'setName', name: 'Set' },
           { field: 'parallel', name: chalk.green('Parallel') },
@@ -236,9 +232,10 @@ try {
           { field: 'platform', name: 'Sold On' },
         ],
       },
-      buildTableData(groupedCards),
+      await buildTableData(groupedCards),
     ),
   );
+  finishSpinner('top-level', 'Completed sales processing');
 } finally {
   await shutdown();
 }

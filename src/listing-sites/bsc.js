@@ -169,11 +169,13 @@ async function postImage(path, imagePath) {
   }
 }
 export async function shutdownBuySportsCards() {
+  showSpinner('shutdown', 'Shutting down BSC');
   if (_driver) {
     const d = _driver;
     _driver = undefined;
     await d.quit();
   }
+  finishSpinner('shutdown', 'BSC shutdown complete');
 }
 
 const useWaitForPageToLoad =

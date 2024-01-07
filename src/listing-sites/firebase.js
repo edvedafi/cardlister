@@ -7,114 +7,60 @@ import { findLeague, findTeamInString, sports } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
 
-const color = chalk.yellow;
+const color = chalk.hex('#ffc107');
 const log = (...params) => console.log(color(...params));
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', color);
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+  'firebase',
+  color,
+);
 
 export async function uploadToFirebase(allCards) {
-  console.log(chalk.magenta('Firebase Starting Upload'));
+  showSpinner('upload', 'Firebase Starting Upload');
   const db = getFirestore();
   const collection = db.collection('CardSales');
   let count = 0;
   for (const card of Object.values(allCards)) {
-    await collection.doc(card.sku).set({
-      sport: card.sport,
-      quantity: card.quantity,
-      price: card.price,
-      bscPrice: card.bscPrice,
-      slPrice: card.slPrice,
-      title: card.title,
-      year: card.year,
-      setName: card.setName,
-      parallel: card.parallel,
-      insert: card.insert,
-      cardNumber: card.cardNumber,
-      graded: card.graded,
-      key: card.key,
-      player: card.player,
-      team: card.team,
-      printRun: card.printRun,
-      league: card.league,
-      features: card.features,
-      longTitle: card.longTitle,
-      cardName: card.cardName,
-      sku: card.sku,
-      bin: card.bin,
-    });
-    count++;
+    showSpinner(card.sku, `Uploading ${card.title}`);
+    try {
+      await collection.doc(card.sku).set({
+        sport: card.sport,
+        quantity: card.quantity,
+        price: card.price,
+        bscPrice: card.bscPrice,
+        slPrice: card.slPrice,
+        title: card.title,
+        year: card.year,
+        setName: card.setName,
+        parallel: card.parallel,
+        insert: card.insert,
+        cardNumber: card.cardNumber,
+        graded: card.graded,
+        key: card.key,
+        player: card.player,
+        team: card.team,
+        printRun: card.printRun,
+        league: card.league,
+        features: card.features,
+        longTitle: card.longTitle,
+        cardName: card.cardName,
+        sku: card.sku,
+        bin: card.bin,
+      });
+      count++;
+      finishSpinner(card.sku, `Uploaded ${card.title}`);
+    } catch (e) {
+      errorSpinner(card.sku, `Failed to upload ${card.title}: ${e.message}`);
+    }
   }
   if (count === allCards.length) {
-    console.log(chalk.magenta('Successfully added'), chalk.green(count), chalk.magenta('cards to Firebase'));
+    finishSpinner('upload', `Successfully added ${count} cards to Firebase`);
   } else {
-    console.log(
-      chalk.magenta('Only added'),
-      chalk.red(count),
-      chalk.magenta('of'),
-      chalk.red(allCards.length),
-      chalk.magenta('cards to Firebase'),
-    );
-  }
-}
-
-export async function uploadOldListings() {
-  console.log(chalk.magenta('Firebase Starting Upload'));
-  const db = getFirestore();
-  const oldListings = [];
-
-  let finishReadingCsv;
-  const readCsv = new Promise((resolve, reject) => {
-    finishReadingCsv = resolve;
-  });
-
-  const csv = fs.readFileSync('oldListings.csv', { encoding: 'utf-8' }).split('\n');
-  let idIndex = 0;
-  let quantityIndex = 0;
-  let titleIndex = 0;
-  for (const line of csv) {
-    const cvsLine = line.split(',');
-    if (cvsLine[0].trim() === 'id') {
-      quantityIndex = cvsLine.indexOf('Available quantity');
-      titleIndex = cvsLine.indexOf('Title');
-    } else if (cvsLine[idIndex] && cvsLine[idIndex].trim().length > 0) {
-      const card = {
-        ItemID: cvsLine[idIndex].trim(),
-        quantity: parseInt(cvsLine[quantityIndex].replace("'", '').replace('"', '').trim()),
-        Title: cvsLine[titleIndex].trim(),
-        ...reverseTitle(cvsLine[titleIndex].trim()),
-      };
-      if (card.cardNumber && card.cardNumber.length > 0) {
-        oldListings.push(card);
-      } else {
-        console.log('skipping', chalk.red(card.Title));
-      }
-    }
-  }
-
-  const collection = db.collection('OldSales');
-
-  for (const card of oldListings) {
-    console.log('adding', card);
-    await collection.doc(card.ItemID).set(card);
-  }
-}
-
-export async function updateSport(db) {
-  const listings = [];
-  const query = db.collection('OldSales').where('sport', '!=', 'Football');
-  const queryResults = await query.get();
-  const collection = db.collection('OldSales');
-  queryResults.forEach((doc) => {
-    listings.push(doc.data());
-  });
-
-  for (const listing of listings) {
-    if (await ask(`Should ${chalk.bold(chalk.cyan(listing.Title))} be football?`, false)) {
-      await collection.doc(listing.ItemID).set({ sport: 'Football' }, { merge: true });
-    }
+    errorSpinner('upload', `Only added ${count} of ${allCards.length} cards to Firebase`);
   }
 }
 
 export async function mergeFirebaseResult(card, match) {
+  showSpinner('merge', `Merging card data with firebase data`);
   let updatedCard = { ...card };
   //this looks stupid, but firebase returns empty strings, which will overwrite good data.
   if (match) {
@@ -150,7 +96,8 @@ export async function mergeFirebaseResult(card, match) {
     }
   }
   if (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
-    console.log(chalk.red('Missing some required data. Please confirm for card:'), updatedCard.title);
+    errorSpinner('merge', `Missing some required data. Please confirm for card: ${updatedCard.title}`);
+    const spinners = pauseSpinners();
     updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
     updatedCard.year = await ask('What year is this card?', updatedCard.year);
     updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
@@ -158,6 +105,9 @@ export async function mergeFirebaseResult(card, match) {
     updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
     updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
     updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
+    resumeSpinners(spinners);
+  } else {
+    finishSpinner('merge', `Merged card data with firebase data`);
   }
   return updatedCard;
 }
@@ -191,7 +141,7 @@ export async function matchOldStyle(db, card) {
   );
   if (match) {
     finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found exact listing in firebase for ${card.title}`);
+    finishSpinner(`old-${card.title}`, `Found exact listing for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
@@ -211,7 +161,7 @@ export async function matchOldStyle(db, card) {
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to match 2021 Absolute that has unique data`);
+  updateSpinner(`old-${card.title}-details`, `Try to match with lower case set name`);
   const searchSet =
     updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
   match = possibleCards.find(
@@ -223,7 +173,7 @@ export async function matchOldStyle(db, card) {
   );
   if (match) {
     finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found 2021 absolute listing in firebase for ${card.title}`);
+    finishSpinner(`old-${card.title}`, `Found lower case set name listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
@@ -292,7 +242,7 @@ export async function matchOldStyle(db, card) {
 }
 
 export async function getListingInfo(db, cards) {
-  log('Getting listing info from Firebase'); //once oldMatch goes away can use spinner
+  showSpinner('getListingInfo', 'Getting listing info from Firebase'); //once oldMatch goes away can use spinner
   // showSpinner('firebase', 'Getting listing info from Firebase');
   const removals = [];
   for (let card of cards) {
@@ -318,8 +268,7 @@ export async function getListingInfo(db, cards) {
       }
     }
   }
-  log('Finished getting listing info from Firebase'); //once oldMatch goes away can use spinner
-  // finishSpinner('firebase', 'Getting listing info from Firebase');
+  finishSpinner('getListingInfo', 'Getting listing info from Firebase');
   return removals;
 }
 
@@ -373,6 +322,7 @@ let _cachedNumbers;
  * @returns {Promise<number>} The next number in the sequence
  */
 export async function getNextCounter(collectionType) {
+  showSpinner('getNextCounter', `Getting next counter for ${collectionType}`);
   const doc = await getFirestore().collection('counters').doc('Sales');
   if (!_cachedNumbers) {
     const result = await doc.get();
@@ -387,16 +337,20 @@ export async function getNextCounter(collectionType) {
 
   await doc.set(_cachedNumbers);
 
-  return ++_cachedNumbers[collectionType];
+  const next = ++_cachedNumbers[collectionType];
+  finishSpinner('getNextCounter');
+  return next;
 }
 
 /**
  * Save the current counter values to Firebase
  */
 export async function shutdownFirebase() {
+  showSpinner('shutdown', 'Shutting down Firebase');
   if (_cachedNumbers) {
     await getFirestore().collection('counters').doc('Sales').update(_cachedNumbers);
   }
+  finishSpinner('shutdown', 'Firebase shutdown complete');
 }
 
 const _cachedGroups = {};
@@ -418,7 +372,6 @@ const getSkuPrefix = (setInfo) =>
  * @param {string} info.setName - The name of the sales group.
  * @param {string} [info.insert] - The insert of the sales group (optional).
  * @param {string} [info.parallel] - The parallel of the sales group (optional).
- * @param {boolean} [isTemp] - Should only be temp if the group is being created from an old listing that was sold
  * @returns {Promise<{
  *   sport: string,
  *   year: string,
@@ -430,87 +383,87 @@ const getSkuPrefix = (setInfo) =>
  *   bin: number
  * }>} - A promise that resolves to the retrieved sales group or newly saved sales group.
  */
-export async function getGroup(info, isTemp) {
-  if (isTemp) {
-    if (!_cachedGroups[isTemp]) {
-      if (info.bin) {
-        const db = getFirestore();
-        const collection = db.collection('SalesGroups');
-        const queryResults = await collection.doc(info.bin).get();
-        if (queryResults.exists) {
-          _cachedGroups[isTemp] = await queryResults.data();
-        }
-      } else {
-        _cachedGroups[isTemp] = {
-          sport: info.sport?.toLowerCase(),
-          year: info.year?.toLowerCase(),
-          manufacture: info.manufacture?.toLowerCase(),
-          setName: info.setName?.toLowerCase(),
-          insert: info.insert?.toLowerCase(),
-          parallel: info.parallel?.toLowerCase(),
-          skuPrefix: isTemp,
-          bin: isTemp,
-        };
-      }
-    }
-    return _cachedGroups[isTemp];
-  } else {
-    const db = getFirestore();
-    const collection = db.collection('SalesGroups');
-    const setInfo = {
-      sport: info.sport.toLowerCase(),
-      year: info.year.toLowerCase(),
-      manufacture: info.manufacture.toLowerCase(),
-      setName: info.setName.toLowerCase(),
-      insert: info.insert?.toLowerCase() || null,
-      parallel: info.parallel?.toLowerCase() || null,
-    };
-    const query = collection
-      .where('keys.sport', '==', setInfo.sport)
-      .where('keys.year', '==', setInfo.year)
-      .where('keys.manufacture', '==', setInfo.manufacture)
-      .where('keys.setName', '==', setInfo.setName)
-      .where('keys.insert', '==', setInfo.insert)
-      .where('keys.parallel', '==', setInfo.parallel);
-    const queryResults = await query.get();
+export async function getGroup(info) {
+  showSpinner('getGroup', `Getting group for ${info.bin || info.skuPrefix}`);
+  showSpinner('getGroup-details', `Getting group for ${info.bin || info.skuPrefix}`);
 
-    if (queryResults.size === 0) {
-      const group = {
-        sport: info.sport,
-        year: info.year,
-        manufacture: info.manufacture,
-        setName: info.setName,
-        insert: info.insert,
-        parallel: info.parallel,
-        league: info.league || findLeague(info.sport) || 'Other',
-        skuPrefix: getSkuPrefix(setInfo),
-        bin: await getNextCounter('Group'),
-        bscPrice: info.bscPrice || 0.25,
-        slPrice: info.slPrice || 0.18,
-        price: info.price || 0.99,
-        keys: setInfo,
-      };
-      await collection.doc(`${group.bin}`).set(group);
-      _cachedGroups[group.bin] = group;
+  if (info.bin) {
+    updateSpinner('getGroup-details', `Getting group by bin ${info.bin}`);
+    const group = await getGroupByBin(info.bin);
+    if (group) {
+      finishSpinner('getGroup-details');
+      finishSpinner('getGroup');
       return group;
-    } else if (queryResults.size === 1) {
-      _cachedGroups[queryResults.docs[0].id] = queryResults.docs[0].data();
-      return queryResults.docs[0].data();
-    } else {
-      const choices = [];
-      queryResults.forEach((doc) => {
-        const g = doc.data();
-        choices.push({
-          name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
-          value: g,
-          description: `${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
-        });
-      });
-      console.log('Trying to find:', setInfo);
-      const response = await ask('Which group is correct?', undefined, { selectOptions: choices });
-      _cachedGroups[response.bin] = response;
-      return response;
     }
+  }
+
+  updateSpinner('getGroup-details', `Querying Firebase for group`);
+  const db = getFirestore();
+  const collection = db.collection('SalesGroups');
+  const setInfo = {
+    sport: info.sport.toLowerCase(),
+    year: info.year.toLowerCase(),
+    manufacture: info.manufacture.toLowerCase(),
+    setName: info.setName.toLowerCase(),
+    insert: info.insert?.toLowerCase() || null,
+    parallel: info.parallel?.toLowerCase() || null,
+  };
+  const query = collection
+    .where('keys.sport', '==', setInfo.sport)
+    .where('keys.year', '==', setInfo.year)
+    .where('keys.manufacture', '==', setInfo.manufacture)
+    .where('keys.setName', '==', setInfo.setName)
+    .where('keys.insert', '==', setInfo.insert)
+    .where('keys.parallel', '==', setInfo.parallel);
+  const queryResults = await query.get();
+
+  if (queryResults.size === 0) {
+    updateSpinner('getGroup-details', `No group found, creating new group`);
+    const group = {
+      sport: info.sport,
+      year: info.year,
+      manufacture: info.manufacture,
+      setName: info.setName,
+      insert: info.insert,
+      parallel: info.parallel,
+      league: info.league || findLeague(info.sport) || 'Other',
+      skuPrefix: getSkuPrefix(setInfo),
+      bin: await getNextCounter('Group'),
+      bscPrice: info.bscPrice || 0.25,
+      slPrice: info.slPrice || 0.18,
+      price: info.price || 0.99,
+      keys: setInfo,
+    };
+    await collection.doc(`${group.bin}`).set(group);
+    _cachedGroups[group.bin] = group;
+    finishSpinner('getGroup-details');
+    finishSpinner('getGroup');
+    return group;
+  } else if (queryResults.size === 1) {
+    finishSpinner('getGroup-details');
+    finishSpinner('getGroup');
+    _cachedGroups[queryResults.docs[0].id] = queryResults.docs[0].data();
+    return queryResults.docs[0].data();
+  } else {
+    errorSpinner(
+      'getGroup-details',
+      `Found multiple groups for ${info.sport} ${info.year} ${info.setName} insert:${info.insert} parallel:${info.parallel}`,
+    );
+    const choices = [];
+    queryResults.forEach((doc) => {
+      const g = doc.data();
+      choices.push({
+        name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
+        value: g,
+        description: `${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+      });
+    });
+    const paused = pauseSpinners();
+    const response = await ask('Which group is correct?', undefined, { selectOptions: choices });
+    _cachedGroups[response.bin] = response;
+    resumeSpinners(paused);
+    finishSpinner('getGroup');
+    return response;
   }
 }
 
