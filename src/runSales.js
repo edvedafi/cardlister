@@ -13,9 +13,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 import initializeFirebase from './utils/firebase.js';
 import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
-import { ask } from './utils/ask.js';
 import open from 'open';
 import { useSpinners } from './utils/spinners.js';
+import { getMySlabSales } from './listing-sites/myslabs.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -162,7 +162,13 @@ try {
   //gather sales
   showSpinner('top-level', 'Running sales processing');
   showSpinner('gathering', 'Gathering sales from sites');
-  const results = await Promise.all([getFileSales(), getEbaySales(), getBuySportsCardsSales(), getSalesSportLots()]);
+  const results = await Promise.all([
+    getMySlabSales(),
+    getFileSales(),
+    getEbaySales(),
+    getBuySportsCardsSales(),
+    getSalesSportLots(),
+  ]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
 
@@ -216,6 +222,7 @@ try {
 
   //output a pick list
   log('All Sales:');
+  finishSpinner('top-level', 'Completed sales processing');
   console.log(
     chalkTable(
       {
@@ -235,7 +242,10 @@ try {
       await buildTableData(groupedCards),
     ),
   );
-  finishSpinner('top-level', 'Completed sales processing');
+} catch (e) {
+  errorSpinner('top-level', 'Failed to run sales processing');
+  pauseSpinners();
+  throw e;
 } finally {
   await shutdown();
 }

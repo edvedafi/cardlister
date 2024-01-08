@@ -13,6 +13,7 @@ import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
 
+const color = chalk.hex('#D43A1C')
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
   'bsc',
   chalk.hex('#e5e5e5'),

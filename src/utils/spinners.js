@@ -27,7 +27,6 @@ export const pauseSpinners = () => {
 };
 
 export const resumeSpinners = (pausedSpinners = _paused) => {
-  console.log('RESUME SPINNERS');
   pausedSpinners.forEach((spinner) => {
     getSpinners().remove(spinner.name);
     getSpinners().add(spinner.name, { ...spinner.spinner });

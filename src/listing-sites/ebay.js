@@ -1,13 +1,20 @@
 //write a function that takes in a file path and an array of objects that will be written as a csv to the file
 import { createObjectCsvWriter } from 'csv-writer';
-import { isNo, isYes } from '../utils/data.js';
+import { isNo, isYes, manufactures, sets } from '../utils/data.js';
 import { gradeIds, graderIds } from './ebayConstants.js';
 import open from 'open';
 import eBayApi from 'ebay-api';
-import { manufactures, sets } from '../utils/data.js';
+import { Browser, Builder, By } from 'selenium-webdriver';
+import { ask } from '../utils/ask.js';
+import chalk from 'chalk';
+import { useWaitForElement } from './uploads.js';
+import express from 'express';
+import fs from 'fs-extra';
+import { useSpinners } from '../utils/spinners.js';
 
-const log = (...params) => console.log(chalk.hex('#E53238')(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('ebay', chalk.hex('#E53238'));
+const color = chalk.hex('#84AF29');
+const log = (...params) => console.log(color(...params));
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('ebay', color);
 
 const defaultValues = {
   action: 'Add',
@@ -159,15 +166,6 @@ async function writeEbayFile(data) {
   }
   console.log(chalk.magenta('Ebay Completed Upload'));
 }
-
-import { Builder, Browser, By } from 'selenium-webdriver';
-import { ask } from '../utils/ask.js';
-import chalk from 'chalk';
-import { useWaitForElement } from './uploads.js';
-import express from 'express';
-import fs from 'fs-extra';
-import chalkTable from 'chalk-table';
-import { useSpinners } from '../utils/spinners.js';
 
 export const uploadEbayFile = async () => {
   let driver;
@@ -994,20 +992,6 @@ export const removeFromEbay = async (cards = [], db) => {
     if (removed.length === toRemove.length && toRemove.length === 0) {
       finishSpinner('ebay', `Removed all ${chalk.green(removed.length)} cards from ebay`);
     } else {
-      // console.log(
-      //   chalkTable(
-      //     {
-      //       leftPad: 2,
-      //       columns: [
-      //         { field: 'title', name: 'Title' },
-      //         { field: 'quantity', name: 'Sold' },
-      //         { field: 'updatedQuantity', name: 'Remaining' },
-      //         { field: 'error', name: 'Error' },
-      //       ],
-      //     },
-      //     notRemoved,
-      //   ),
-      // );
       finishSpinner('ebay', `Removed ${chalk.red(removed.length)} of ${chalk.red(toRemove.length)} cards from ebay`);
     }
   } else {
