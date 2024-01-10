@@ -5,18 +5,18 @@ import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeRead
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
-import pRetry, { AbortError } from 'p-retry';
+import pRetry from 'p-retry';
 import FormData from 'form-data';
-import { getGroup, getGroupByBin, updateGroup } from './firebase.js';
+import { getGroupByBin, updateGroup } from './firebase.js';
 import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
 
-const color = chalk.hex('#D43A1C')
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+const color = chalk.hex('#e5e5e5');
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
   'bsc',
-  chalk.hex('#e5e5e5'),
+  color,
 );
 
 const userWaitForButton = (driver) => async (text) => {
@@ -132,6 +132,7 @@ const fetchJson = async (path, method = 'GET', body) => {
 const get = fetchJson;
 const put = async (path, body) => fetchJson(path, 'PUT', body);
 const post = async (path, body) => fetchJson(path, 'POST', body);
+
 async function postImage(path, imagePath) {
   const formData = new FormData();
 
@@ -169,6 +170,7 @@ async function postImage(path, imagePath) {
     throw e;
   }
 }
+
 export async function shutdownBuySportsCards() {
   showSpinner('shutdown', 'Shutting down BSC');
   if (_driver) {
@@ -510,6 +512,7 @@ export async function getBuySportsCardsSales() {
         quantity: item.orderQuantity,
         platform: `BSC: ${order.buyer.username}`,
         title: `${item.card.setName} ${item.card.variantName} #${item.card.cardNo} ${item.card.players}`,
+        sku: item.sellerSku,
       };
 
       const manufacturer = manufactures.find((m) => card.title.toLowerCase().includes(m.toLowerCase()));
@@ -629,15 +632,24 @@ async function getAllListings(setData) {
 }
 
 export async function uploadToBuySportsCards(cardsToUpload) {
+  showSpinner('upload', 'Uploading to BSC');
   await login();
   const notAdded = [];
   for (const key in cardsToUpload) {
+    showSpinner(`upload-${key}`, `Uploading set ${key}`);
     const setData = await getGroupByBin(key);
     if (setData) {
+      showSpinner(
+        `upload-${key}`,
+        `Uploading set ${setData.year} ${setData.setName} ${setData.insert || ''} ${setData.parallel || ''}`,
+      );
+      showSpinner(`upload-${key}-details`, 'looking for set');
       let listings = {};
       if (setData.bscFilters) {
+        updateSpinner(`upload-${key}-details`, `Fetching listings for ${JSON.stringify(setData.bscFilters)}`);
         listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
       } else {
+        updateSpinner(`upload-${key}-details`, 'Searching for set for the first time');
         let { body, allPossibleListings } = await getAllListings(setData);
         listings = allPossibleListings.results;
         setData.bscFilters = body;
@@ -647,86 +659,84 @@ export async function uploadToBuySportsCards(cardsToUpload) {
       if (listings && listings.length > 0) {
         const updates = [];
         let updated = 0;
+        showSpinner(`upload-${key}-details`, 'Adding Cards');
         for (const listing of listings) {
           const card = cardsToUpload[key].find((card) => listing.card.cardNo === card.cardNumber);
           if (card) {
-            const newListing = {
-              ...listing,
-              availableQuantity: listing.availableQuantity + card.quantity,
-              price: card.bscPrice,
-              sellerSku: card.sku || card.bin,
-            };
-            if (card.directory) {
-              if (card.frontImage) {
-                newListing.sellerImgFront = (
-                  await postImage(
-                    'common/card/undefined/product/undefined/attachment',
-                    `output/${card.directory}${card.frontImage}`,
-                  )
-                ).objectKey;
-                newListing.imageChanged = true;
+            showSpinner(`upload-${card.sku}`, `Uploading ${card.title}`);
+            try {
+              const newListing = {
+                ...listing,
+                availableQuantity: listing.availableQuantity + card.quantity,
+                price: card.bscPrice,
+                sellerSku: card.sku || card.bin,
+              };
+              if (card.directory) {
+                if (card.frontImage) {
+                  updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Front Image)`);
+                  newListing.sellerImgFront = (
+                    await postImage(
+                      'common/card/undefined/product/undefined/attachment',
+                      `output/${card.directory}${card.frontImage}`,
+                    )
+                  ).objectKey;
+                  newListing.imageChanged = true;
+                }
+                if (card.backImage) {
+                  updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Back Image)`);
+                  newListing.sellerImgBack = (
+                    await postImage(
+                      'common/card/undefined/product/undefined/attachment',
+                      `output/${card.directory}${card.backImage}`,
+                    )
+                  ).objectKey;
+                  newListing.imageChanged = true;
+                }
               }
-              if (card.backImage) {
-                newListing.sellerImgBack = (
-                  await postImage(
-                    'common/card/undefined/product/undefined/attachment',
-                    `output/${card.directory}${card.backImage}`,
-                  )
-                ).objectKey;
-                newListing.imageChanged = true;
-              }
+              finishSpinner(`upload-${card.sku}`, `Added ${card.title}`);
+              updates.push(newListing);
+              updated++;
+            } catch {
+              errorSpinner(`upload-${card.sku}`, `Error adding ${card.title}: ${e.message}`);
             }
-            updates.push(newListing);
-            updated++;
           } else if (listing.availableQuantity > 0) {
             updates.push(listing);
           }
         }
 
         if (updated > 0) {
+          showSpinner(`upload-${key}-details`, 'Uploading Results');
           if (updated < cardsToUpload[key].length) {
-            notAdded.push(
-              ...cardsToUpload[key].filter(
-                (card) => !updates.find((listing) => listing.card.cardNo === card.cardNumber),
-              ),
+            const nonUpdated = cardsToUpload[key].filter(
+              (card) => !updates.find((listing) => listing.card.cardNo === card.cardNumber),
             );
+            nonUpdated.forEach((card) => errorSpinner(`upload-${card.sku}`, `Failed to add ${card.title}`));
+            notAdded.push(...nonUpdated);
           }
           try {
             await saveBulk(updates);
-            console.log(chalk.green('Added'), chalk.green(updates.length), chalk.green('cards to BSC'));
+            finishSpinner(`upload-${key}-details`, `Added ${updates.length} cards to ${key}`);
           } catch (e) {
-            console.log(chalk.red('Bulk API Failed more than limit'));
+            errorSpinner(`upload-${key}-details`, `Failed to add cards to ${key}: ${e.message}`);
             notAdded.push(...cardsToUpload[key]);
           }
         }
       } else {
-        console.log('Could not find any listings for', setData);
+        errorSpinner(`upload-${key}-details`, `Could not find set ${key}`);
         notAdded.push(...cardsToUpload[key]);
       }
     } else {
-      console.log('Could not find setData for ', key);
+      errorSpinner(`upload-${key}-details`, `Could not find set data for ${key}`);
       notAdded.push(...cardsToUpload[key]);
     }
+
+    finishSpinner(`upload-${key}`);
   }
 
   if (notAdded.length > 0) {
-    console.log(chalk.magenta('Could not add all cards to BSC. See below for details'));
-    console.log(
-      chalkTable(
-        {
-          leftPad: 2,
-          columns: [
-            { field: 'title', name: 'Title' },
-            { field: 'quantity', name: 'Quantity' },
-            // { field: 'error', name: 'Error' },
-          ],
-        },
-        notAdded,
-        0,
-      ),
-    );
+    errorSpinner('upload', 'Failed to add all cards to BSC');
   } else {
-    console.log(chalk.magenta('All cards added to BSC'));
+    finishSpinner('upload', 'All cards added to BSC');
   }
 }
 

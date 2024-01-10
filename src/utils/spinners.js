@@ -10,20 +10,33 @@ const getSpinners = () => {
 };
 
 let _paused = [];
+let _pausedFinishes = [];
+let _pausedErrors = [];
+let isPaused = false;
+
+export const showSpinner = (spinnerName, message) => {
+  getSpinners().add(spinnerName, { text: message });
+  if (isPaused) {
+    _paused.push({ name: spinnerName, spinner: getSpinners().pick(spinnerName) });
+    pauseSpinners();
+  }
+};
 
 export const pauseSpinners = () => {
   const spinners = getSpinners();
-
+  const paused = [];
   Object.keys(spinners.spinners).forEach((spinner) => {
     const s = spinners.pick(spinner);
     if (s.status !== 'fail' && s.status !== 'succeed') {
       _paused.push({ name: spinner, spinner: s });
+      paused.push({ name: spinner, spinner: s });
       spinners.remove(spinner);
     }
   });
 
   spinners.stopAll();
-  return _paused;
+  isPaused = true;
+  return paused;
 };
 
 export const resumeSpinners = (pausedSpinners = _paused) => {
@@ -32,36 +45,73 @@ export const resumeSpinners = (pausedSpinners = _paused) => {
     getSpinners().add(spinner.name, { ...spinner.spinner });
   });
   _paused = [];
+  _pausedFinishes.forEach((finish) => finishSpinner(finish.name, finish.message));
+  _pausedFinishes = [];
+  _pausedErrors.forEach((error) => errorSpinner(error.name, error.message));
+  _pausedErrors = [];
+  isPaused = false;
+};
+
+export const finishSpinner = (spinnerName, message) => {
+  const s = getSpinners().pick(spinnerName);
+  if (isPaused) {
+    _paused = _paused.filter((s) => s.name !== spinnerName);
+    if (message) {
+      _pausedFinishes.push({ name: spinnerName, message });
+    }
+  } else if (message) {
+    if (!s) {
+      getSpinners().add(spinnerName, { text: message });
+    }
+    getSpinners().succeed(spinnerName, { text: message });
+  } else {
+    if (s) {
+      getSpinners().remove(spinnerName);
+      return s?.text;
+    }
+  }
+  return message;
+};
+
+export const errorSpinner = (spinnerName, message) => {
+  if (isPaused) {
+    _paused = _paused.filter((s) => s.name !== spinnerName);
+    _pausedErrors.push({ name: spinnerName, message: message });
+  } else {
+    if (!getSpinners().pick(spinnerName)) {
+      getSpinners().add(spinnerName, { text: message });
+    }
+    getSpinners().fail(spinnerName, { text: message });
+  }
 };
 
 export const useSpinners = (processName, color) => ({
-  showSpinner: (name, message) =>
-    getSpinners().add(`${processName}-${name}`, { text: color.inverse(`${name} - ${message}`) }),
+  showSpinner: (name, message) => showSpinner(`${processName}-${name}`, color.inverse(`${message}`)),
   updateSpinner: (name, message) => {
     const spinnerName = `${processName}-${name}`;
-    if (getSpinners().pick(spinnerName)) {
-      getSpinners().update(spinnerName, { text: color.inverse(message) });
+    const spinner = getSpinners().pick(spinnerName);
+    if (spinner) {
+      if (isPaused) {
+        const pausedSpinner = _paused.find((s) => s.name === spinnerName);
+        if (pausedSpinner) {
+          pausedSpinner.text = color.inverse(`${message}`);
+        } else {
+          showSpinner(spinnerName, color.inverse(`${message}`));
+        }
+      } else {
+        getSpinners().update(spinnerName, { text: color.inverse(message) });
+      }
     } else {
-      getSpinners().add(spinnerName, { text: color.inverse(message) });
+      showSpinner(spinnerName, color.inverse(`${message}`));
     }
   },
-  finishSpinner: (name, message) => {
-    const s = getSpinners().pick(`${processName}-${name}`);
-    if (message) {
-      if (!s) {
-        getSpinners().add(`${processName}-${name}`, { text: color(`${message}`) });
-      }
-      getSpinners().succeed(`${processName}-${name}`, { text: color(`${message}`) });
-      return message;
-    } else {
-      if (s) {
-        getSpinners().remove(`${processName}-${name}`);
-        return s?.text;
-      }
-      return message;
-    }
-  },
-  errorSpinner: (name, message) => getSpinners().fail(`${processName}-${name}`, { text: color(message) }),
+  finishSpinner: (name, message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
+  errorSpinner: (name, message) => errorSpinner(`${processName}-${name}`, color(`${message}`)),
   pauseSpinners: pauseSpinners,
   resumeSpinners: resumeSpinners,
+  log: (...args) => {
+    const paused = pauseSpinners();
+    console.log(...args.map((arg) => (typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2)))));
+    resumeSpinners(paused);
+  },
 });

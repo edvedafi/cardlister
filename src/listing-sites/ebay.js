@@ -13,8 +13,7 @@ import fs from 'fs-extra';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.hex('#84AF29');
-const log = (...params) => console.log(color(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('ebay', color);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('ebay', color);
 
 const defaultValues = {
   action: 'Add',
@@ -619,14 +618,16 @@ const createOfferForCard = (card) => ({
 
 let cachedLocation;
 export const getLocation = async (eBay) => {
+  showSpinner('location', 'Getting Location');
   if (cachedLocation) {
+    finishSpinner('location');
     return cachedLocation;
   } else {
     let location;
     try {
       location = await eBay.sell.inventory.getInventoryLocation('CardLister');
     } catch (e) {
-      //this is "location not found" error
+      showSpinner('location', 'No Location Found, Creating');
       if (e.meta?.errorId === 25804) {
         location = await eBay.sell.inventory.createInventoryLocation('CardLister', {
           location: {
@@ -676,20 +677,20 @@ export const getLocation = async (eBay) => {
           // ],
         });
       }
+      showSpinner('location', 'Created new location');
       location = await eBay.sell.inventory.getInventoryLocation('CardLister');
     }
     cachedLocation = location;
+    finishSpinner('location');
     return location;
   }
 };
 
 export const ebayAPIUpload = async (allCards) => {
+  showSpinner('sales', 'Uploading Cards');
   const eBay = await loginEbayAPI();
-  // await getOrders(api);
-  console.log(
-    'allCards',
-    Object.values(allCards).map((card) => card.sku),
-  );
+  updateSpinner('sales', `Uploading: ${Object.values(allCards).map((card) => card.sku)}`);
+  let count = 0;
 
   //don't need to do anything with location but do need to ensure it exists
   await getLocation(eBay);
@@ -699,38 +700,35 @@ export const ebayAPIUpload = async (allCards) => {
       // .filter((c) => c.sku !== '5|FS-1')
       .map(async (card) => {
         try {
+          showSpinner(card.sku, `Uploading ${card.title} (Inventory)`);
           await eBay.sell.inventory.createOrReplaceInventoryItem(card.sku, convertCardToInventory(card));
           let offerId;
+          const offer = createOfferForCard(card);
           try {
-            const offer = await eBay.sell.inventory.createOffer(createOfferForCard(card));
-            offerId = offer.offerId;
+            updateSpinner(card.sku, `Uploading ${card.title} (Offer)`);
+            const response = await eBay.sell.inventory.createOffer(offer);
+            offerId = response.offerId;
           } catch (e) {
-            const error = e.meta.meta?.res?.data.errors[0];
+            const error = e.meta?.res?.data.errors[0];
             if (error?.errorId === 25002) {
               offerId = error.parameters[0].value;
-            } else {
-              throw e;
+              updateSpinner(card.sku, `Uploading ${card.title} (Updating Offer)`);
+              await eBay.sell.inventory.updateOffer(offerId, offer);
             }
           }
+          updateSpinner(card.sku, `Uploading ${card.title} (Publish)`);
           await eBay.sell.inventory.publishOffer(offerId);
+          finishSpinner(card.sku, `Uploaded ${card.title}`);
+          count++;
         } catch (e) {
-          console.log('inventoryItem error', e);
           if (e.meta?.res?.data) {
-            console.log('inventoryItem error info', JSON.stringify(e.meta?.res?.data, null, 2));
-          } else {
-            console.log('inventoryItem error', e);
+            log('InventoryItem error info', e.meta?.res?.data);
           }
-          console.log('Attempted to upload card', card);
-          console.log(
-            `Should have generated inventory item with id ${card.sku}`,
-            JSON.stringify(convertCardToInventory(card), null, 2),
-          );
-          console.log(`Should have generated offer with id ${card.sku}`, createOfferForCard(card));
-          console.log('request', e.meta.req);
-          console.error('Failed to upload card', chalk.red(card.title));
+          errorSpinner(card.sku, `Failed Uploading ${card.title} (${e.message})`);
         }
       }),
   );
+  finishSpinner('sales', `Uploaded ${chalk.green(count)} cards to ebay`);
 };
 
 export const reverseTitle = (title) => {
@@ -818,10 +816,10 @@ export const getEbaySales = async () => {
   const cards = [];
   response.orders.forEach((order) => {
     if (order.orderFulfillmentStatus === 'FULFILLED') {
-      console.log(`Order already fulfilled for ${order.buyer.username}`);
+      // console.log(`Order already fulfilled for ${order.buyer.username}`);
     } else {
-      // console.log('order', order);
       order.lineItems.forEach((lineItem) => {
+        showSpinner(lineItem.sku, `Getting details for ${lineItem.title}`);
         const card = {
           platform: `ebay: ${order.buyer.username}`,
           ...reverseTitle(lineItem.title),
@@ -832,12 +830,14 @@ export const getEbaySales = async () => {
           card.sku = lineItem.sku;
         }
         if (card.cardNumber) {
+          finishSpinner(lineItem.sku, `Sold ${card.title} x${card.quantity}`);
           cards.push(card);
+        } else {
+          errorSpinner(lineItem.sku, `Failed to parse ${card.title}`);
         }
       });
     }
   });
-
   finishSpinner('sales', `Found ${chalk.green(cards.length)} cards sold on ebay`);
   return cards;
 };

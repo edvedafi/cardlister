@@ -1,15 +1,13 @@
 import { getFirestore, getStorage } from '../utils/firebase.js';
 import chalk from 'chalk';
-import { reverseTitle } from './ebay.js';
 import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
-import { findLeague, findTeamInString, sports } from '../utils/teams.js';
+import { findLeague, sports } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.hex('#ffc107');
-const log = (...params) => console.log(color(...params));
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
   'firebase',
   color,
 );
@@ -95,7 +93,10 @@ export async function mergeFirebaseResult(card, match) {
       updatedCard.bin = match.bin;
     }
   }
-  if (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
+  if (
+    (!updatedCard.bin || !updatedCard.sku) &&
+    (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName)
+  ) {
     errorSpinner('merge', `Missing some required data. Please confirm for card: ${updatedCard.title}`);
     const spinners = pauseSpinners();
     updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
@@ -250,7 +251,7 @@ export async function getListingInfo(db, cards) {
       showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
       const doc = await db.collection('CardSales').doc(card.sku).get();
       if (doc.exists) {
-        removals.push({ ...card, ...doc.data() });
+        removals.push(await mergeFirebaseResult(card, doc.data()));
         finishSpinner(card.sku, card.sku);
       } else {
         const match = await matchOldStyle(db, card);
@@ -431,8 +432,8 @@ export async function getGroup(info) {
       year: info.year,
       manufacture: info.manufacture,
       setName: info.setName,
-      insert: info.insert,
-      parallel: info.parallel,
+      insert: info.insert || null,
+      parallel: info.parallel || null,
       league: info.league || findLeague(info.sport) || 'Other',
       skuPrefix: getSkuPrefix(setInfo),
       bin: await getNextCounter('Group'),
@@ -494,6 +495,7 @@ export async function getGroupByBin(bin) {
     return group.data();
   }
 }
+
 export async function updateGroup(group) {
   showSpinner('updateGroup', `Updating group ${group.bin}`);
   _cachedGroups[group.bin] = group;

@@ -1,12 +1,11 @@
 import { manufactures, sets } from '../utils/data.js';
-import { Browser, Builder, By, until, Select } from 'selenium-webdriver';
+import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
 import { caseInsensitive, useSetSelectValue, useWaitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
-import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
 
 const log = (...params) => console.log(chalk.blueBright(...params));
@@ -153,6 +152,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
 };
 
 let _driver;
+
 async function login() {
   if (!_driver) {
     showSpinner('login', 'Logging into SportLots');
@@ -446,20 +446,22 @@ export async function getSalesSportLots() {
         const quantity = await select.getAttribute('value');
         const titleDiv = await driver.executeScript('return arguments[0].nextElementSibling;', row);
         const title = await titleDiv.getText();
+        showSpinner(`sales-${orderNumberText}-${title}`, `Found ${title} in order ${orderNumberText}`);
         const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
         let bin = await binDiv.getText();
-        if (bin === '5|FS-') {
-          bin = '36';
+        if (bin === 'N/A') {
+          errorSpinner(`sales-${orderNumberText}-${title}`, `${title} had an N/A bin`);
+        } else {
+          const cardFromTitle = convertTitleToCard(title);
+          cards.push({
+            platform: `SportLots: ${orderNumberText}`,
+            title,
+            quantity,
+            ...cardFromTitle,
+            ...convertBinNumber(bin, cardFromTitle.cardNumber),
+          });
+          finishSpinner(`sales-${orderNumberText}-${title}`, `${title} x${quantity} sold.`);
         }
-
-        const cardFromTitle = convertTitleToCard(title);
-        cards.push({
-          platform: `SportLots: ${orderNumberText}`,
-          title,
-          quantity,
-          ...cardFromTitle,
-          ...convertBinNumber(bin, cardFromTitle.cardNumber),
-        });
       }
     }
   };
@@ -472,6 +474,7 @@ export async function getSalesSportLots() {
   finishSpinner('sales', `Found ${chalk.green(cards.length)} cards sold on SportLots`);
   return cards;
 }
+
 export async function removeFromSportLots(groupedCards) {
   showSpinner('remove', 'Removing Cards from SportLots Listings');
 
@@ -524,7 +527,7 @@ export async function removeFromSportLots(groupedCards) {
       found = setInfo.found;
     }
 
-    const updateInventoryHeader = By.xpath('//h2/*[contains(text(), "Update Inventory")]');
+    const updateInventoryHeader = By.xpath('//form[@action="/inven/dealbin/updpct.tpl"]');
     try {
       updateSpinner(`remove-${key}-details`, `Waiting for update inventory`);
       await driver.findElement(updateInventoryHeader);

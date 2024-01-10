@@ -16,6 +16,7 @@ import minimist from 'minimist';
 import open from 'open';
 import { useSpinners } from './utils/spinners.js';
 import { getMySlabSales } from './listing-sites/myslabs.js';
+import { ask } from './utils/ask.js';
 
 const args = minimist(process.argv.slice(2));
 

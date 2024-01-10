@@ -1,4 +1,4 @@
-import { ask, confirm } from '../utils/ask.js';
+import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections, sports } from '../utils/teams.js';
 import { graders, isNo, isYes } from '../utils/data.js';
 import fs from 'fs-extra';
@@ -6,11 +6,7 @@ import { getGroup } from '../listing-sites/firebase.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
-const log = (...params) => console.log(chalk.white(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'trim',
-  chalk.white,
-);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('trim', chalk.white);
 
 //Set up the card name and track with previous for front/back situations
 let answerFile;
@@ -282,7 +278,12 @@ export async function addCardData(text, output, propName, defaultValues, options
     }
   } else {
     const defaultValue = defaultValues[propName] ? defaultValues[propName].display || defaultValues[propName] : '';
+
     output[propName] = await ask(text, defaultValue, options);
+    if (output[propName] !== defaultValue && ['manufacture', 'setName', 'insert', 'parallel'].includes(propName)) {
+      output.sku = undefined;
+      output.bin = undefined;
+    }
   }
 }
 
@@ -305,7 +306,8 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     pics: [],
   };
 
-  const askFor = async (text, propName, options) => await addCardData(text, output, propName, defaultValues, options);
+  const askFor = async (text, propName = text.toLowerCase(), options = { allowUpdates: resetAll }) =>
+    await addCardData(text, output, propName, defaultValues, options);
 
   let skipShipping = await ask('Use Set Info?', true, { allowUpdates: resetAll });
 
@@ -327,9 +329,9 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   } else {
     await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
     await askFor('Set Name', 'setName', { allowUpdates: resetAll });
-    await askFor('Parallel', 'parallel', { allowUpdates: skipShipping || resetAll });
-    await askFor('Insert', 'insert', { allowUpdates: skipShipping || resetAll });
-    await askFor('Features (RC, etc)', 'features', { allowUpdates: skipShipping || resetAll });
+    await askFor('Parallel', 'parallel', { allowUpdates: true });
+    await askFor('Insert', 'insert', { allowUpdates: true });
+    await askFor('Features (RC, etc)', 'features', { allowUpdates: true });
     await askFor('Print Run', 'printRun', { allowUpdates: skipShipping || resetAll });
     await askFor('Autographed', 'autographed', { allowUpdates: skipShipping || resetAll });
     if (isYes(output.autographed)) {
@@ -384,14 +386,6 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   output.cardName = await getCardName(output);
 
   await askFor('Price', 'price', { allowUpdates: true });
-  // if (output.price === '0.99' || output.price === 0.99) {
-  //   output.autoOffer = '0.01';
-  // } else if (output.price === '1.99' || output.price < 2.5) {
-  //   output.autoOffer = '1';
-  // } else {
-  //   await askFor('Auto Accept Offer', 'autoOffer', { allowUpdates: true });
-  //   // await askFor('Minimum Offer', 'minOffer');
-  // }
 
   //inserts, parallels or cards worth more than $1 default to 10% of the Ebay price otherwise drop it to a quarter
   if (output.insert || output.parallel || output.price > 1) {
@@ -440,10 +434,10 @@ export const getCardData = async (allCards, imageDefaults) => {
       ...output,
     });
 
-    console.log('Card Info: ', output);
-    while (!(await confirm('Proceed with card?', true))) {
+    log('Card Info: ', output);
+    while (!(await ask('Proceed with card?', true))) {
       output = await getNewCardData(cardNumber, output, true);
-      console.log('Card Info: ', output);
+      log('Card Info: ', output);
     }
   }
 

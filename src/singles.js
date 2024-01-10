@@ -32,6 +32,7 @@ const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, 
   'singles',
   chalk.cyan,
 );
+
 async function processSingles(savedAnswers, setData, files) {
   showSpinner('singles', 'Processing Singles');
   const overrideImages = savedAnswers.metadata.reprocessImages;
@@ -165,10 +166,12 @@ const processPair = async (front, back, imageDefaults, allCards, overrideImages)
   const spinners = pauseSpinners();
   try {
     if (!cardDataExistsForRawImage(front, allCards)) {
+      pauseSpinners();
       console.log(await terminalImage.file(front, { height: 25 }));
       if (back) {
         console.log(await terminalImage.file(back, { height: 25 }));
       }
+      resumeSpinners();
       await addCardData('Card Number', imageDefaults, 'cardNumber', imageDefaults);
       const oldCard = allCards[imageDefaults.sku];
       if (oldCard) {

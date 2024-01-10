@@ -6,6 +6,7 @@
     "install_4.5.5_cuda": "build-opencv --version 4.5.5 --flags=\"-DWITH_CUDA=ON -DWITH_CUDNN=ON -DOPENCV_DNN_CUDA=ON -DCUDA_FAST_MATH=ON\" build",
     "do-install": "build-opencv build",
     "login": "gcloud auth application-default login; gcloud auth application-default set-quota-project hofdb-2038e",
+    "compile": "swiftc src/image-processing/CardCropper.swift; swiftc src/image-processing/CardCropper.rotate.swift",
     "install-python-deps": "pip3 install -r python.requirements.txt",
     "install-spacy-models": "python3 -m spacy download en_core_web_md",
     "start": "yarn start:singles",
@@ -16,7 +17,8 @@
     "sales": "ts-node src/runSales.js",
     "test": "jest --watch",
     "tunnel": "ngrok http 3000",
-    "testselect": "ts-node src/testselect.js"
+    "testselect": "ts-node src/testselect.js",
+    "postinstall": "yarn login; yarn compile"
   },
   "dependencies": {
     "@babel/preset-env": "^7.21.5",

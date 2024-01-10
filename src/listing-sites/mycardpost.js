@@ -1,6 +1,6 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
-import { Browser, Builder, By, until } from 'selenium-webdriver';
+import { Browser, Builder, By } from 'selenium-webdriver';
 import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
 import chalkTable from 'chalk-table';
@@ -16,19 +16,24 @@ const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, 
 let _driver;
 const login = async () => {
   if (!_driver) {
+    showSpinner('login', 'Login');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
     await _driver.get('https://mycardpost.com/login');
 
     const waitForElement = useWaitForElement(_driver);
 
+    updateSpinner('login', 'Login - Email');
     const emailInput = await waitForElement(inputByPlaceholder('Email *'));
     await emailInput.sendKeys(process.env.MCP_EMAIL);
+    updateSpinner('login', 'Login - Password');
     const passwordInput = await waitForElement(inputByPlaceholder('Password *'));
     await passwordInput.sendKeys(process.env.MCP_PASSWORD);
 
+    updateSpinner('login', 'Login - Submit');
     const nextButton = await waitForElement(buttonByText('Login'));
     await nextButton.click();
     await waitForElement(By.xpath(`//h2[text()='edvedafi']`));
+    finishSpinner('login');
   }
   return _driver;
 };
@@ -44,7 +49,7 @@ export async function shutdownMyCardPost() {
 }
 
 export const uploadToMyCardPost = async (cardsToUpload) => {
-  console.log(chalk.magenta('MyCardPost Starting Upload'));
+  showSpinner('upload', 'Uploading to My Card Post');
   let driver;
   let totalCardsAdded = 0;
 
@@ -54,28 +59,37 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
     const waitForElement = useWaitForElement(driver);
 
     //iterate over cardsToUpload values
+    updateSpinner('upload', `Uploading ${Object.values(cardsToUpload).length} cards to My Card Post`);
+    await driver.get('https://mycardpost.com/add-card');
     for (let card of Object.values(cardsToUpload)) {
-      await driver.get('https://mycardpost.com/add-card');
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title}`);
+
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Finding Form)`);
       const form = await waitForElement(By.xpath('//form[@action="https://mycardpost.com/add-card"]')); // Replace with the actual form identifier
       const formElement = (locator) => form.findElement(locator);
 
-      // console.log('card: ', card.cardNumber);
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Looking for Front Image button)`);
       const frontImageUploadButton = await formElement(By.id('front_image'));
-      // console.log('found front button');
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Uploading Front Image)`);
       await frontImageUploadButton.sendKeys(frontImage(card));
-      // console.log('front image uploaded');
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Looking for Back Image button)`);
       const backImageUploadButton = await formElement(By.id('back_image'));
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Uploading Back Image)`);
       await backImageUploadButton.sendKeys(backImage(card));
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Title)`);
       const titleInput = await formElement(By.xpath(`//textarea[@name='name']`));
       await titleInput.sendKeys(card.title);
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Price)`);
       const priceInput = await formElement(By.xpath(`//input[@name='price']`));
       await priceInput.sendKeys(card.price < 1 ? 1 : card.price);
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Sport)`);
       const categorySelect = await formElement(By.xpath(`//select[@name='sport']`));
       await categorySelect.sendKeys(card.sport);
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Teams)`);
       const teamInput = await formElement(By.xpath(`//span[@role='textbox' and @data-placeholder='Type something']`));
       if (card.team && card.team.length > 0) {
         for (let team of card.team) {
@@ -86,17 +100,23 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
         await teamInput.sendKeys('Green Bay Packers');
       }
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Card Type)`);
       const typeSelect = await formElement(By.id('card_type'));
       if (card.graded) {
+        showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Graded)`);
         await typeSelect.sendKeys('Graded');
+        showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Grader)`);
         const graderSelect = await formElement(By.id('professional_grader'));
         await graderSelect.sendKeys(card.grader);
+        showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Grade)`);
         const gradeSelect = await formElement(By.id('grade'));
         await gradeSelect.sendKeys(card.grade);
       } else {
+        showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Raw)`);
         await typeSelect.sendKeys('Raw');
       }
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Attributes)`);
       const attributesInput = await formElement(By.id('attribute_name'));
       if (card.features?.indexOf('RC') > -1) {
         await attributesInput.sendKeys('Rookie');
@@ -143,15 +163,17 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
         await attributesInput.sendKeys('Jersey Numbered');
       }
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Description)`);
       const descriptionInput = await formElement(By.xpath(`//textarea[@name='details']`));
       await descriptionInput.sendKeys(`${card.longTitle}\n\nSKU: ${card.sku}`);
-      //
-      // const submitButton = await waitForElement(By.xpath(`//button[@type='submit']`));
-      // await submitButton.click();
+
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Ensure previous toast is gone)`);
 
       // Submit the form using JavaScript
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Submit)`);
       await driver.executeScript('arguments[0].submit();', form);
 
+      showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Toast)`);
       const resultToast = await waitForElement(By.css('.toast-message'));
 
       if (resultToast) {
@@ -159,17 +181,23 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
         // console.log('resultText: ', resultText);
         if (resultText.indexOf('Successful') > -1) {
           totalCardsAdded++;
-          console.log('Added Card:', chalk.green(card.title));
+          finishSpinner(`upload-${card.sku}`, `${card.title}`);
         } else {
-          console.log(chalk.red('Error uploading card: ', card));
+          errorSpinner(`upload-${card.sku}`, `${card.title} (${resultText})`);
           await ask('Please fix and press enter to continue');
         }
       }
     }
+    if (totalCardsAdded === Object.values(cardsToUpload).length) {
+      finishSpinner('upload', `Uploaded ${totalCardsAdded} cards to My Card Post`);
+    } else {
+      errorSpinner(
+        'upload',
+        `Uploaded ${totalCardsAdded} of ${Object.values(cardsToUpload).length} cards to My Card Post`,
+      );
+    }
   } catch (e) {
-    console.log(chalk.red('Error in MyCardPost upload: '), e);
-  } finally {
-    console.log(chalk.magenta('MyCardPost Upload COMPLETE! Added ', chalk.green(totalCardsAdded), ' cards'));
+    errorSpinner('upload', `Error uploading to My Card Post ${e.message}`);
   }
 };
 

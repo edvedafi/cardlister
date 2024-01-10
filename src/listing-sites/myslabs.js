@@ -4,15 +4,10 @@ import axios from 'axios';
 import { manufactures, sets } from '../utils/data.js';
 
 const color = chalk.hex('#275467');
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
   'myslabs',
   color,
 );
-const log = (...params) => {
-  pauseSpinners();
-  console.log(color(...params));
-  resumeSpinners();
-};
 
 let _api;
 
@@ -138,18 +133,24 @@ export function convertSalesToCards(sales) {
   showSpinner('convertSalesToCards', 'Converting sales to cards');
   const cards = [];
   sales.forEach((sale) => {
-    const card = {
-      platform: 'MySlabs',
-      title: sale.title,
-      quantity: 1,
-    };
-    if (sale.external_id) {
-      cards.push({ ...card, sku: sale.external_id });
+    showSpinner('convertCard', `Converting ${sale.title}`);
+    if (new Date(sale.sold_date) < new Date(sale.updated_date)) {
+      finishSpinner('convertCard');
     } else {
-      cards.push({
-        ...card,
-        ...reverseTitle(sale.title),
-      });
+      const card = {
+        platform: 'MySlabs',
+        title: sale.title,
+        quantity: 1,
+      };
+      if (sale.external_id) {
+        cards.push({ ...card, sku: sale.external_id });
+      } else {
+        cards.push({
+          ...card,
+          ...reverseTitle(sale.title),
+        });
+      }
+      finishSpinner('convertCard', `Sold: ${sale.title}`);
     }
   });
   finishSpinner('convertSalesToCards');
