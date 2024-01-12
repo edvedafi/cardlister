@@ -736,7 +736,7 @@ export const reverseTitle = (title) => {
   const yearIdx = title.match(/\D*-?\D+/)?.index;
   let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
   const card = {
-    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
+    cardNumber: title.match(/#(.*\w+)/)?.[1].replaceAll(' ', ''),
     year: title.split(' ')[0],
     parallel: '',
     insert: '',
@@ -812,30 +812,36 @@ export const getEbaySales = async () => {
   const response = await eBay.sell.fulfillment.getOrders({
     filter: 'orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}',
   });
-  // console.log(response);
   const cards = [];
   response.orders.forEach((order) => {
+    showSpinner('order', `Checking order for ${order.buyer.username}`);
     if (order.orderFulfillmentStatus === 'FULFILLED') {
-      // console.log(`Order already fulfilled for ${order.buyer.username}`);
+      errorSpinner('order', `Order for ${order.buyer.username} already fulfilled`);
     } else {
       order.lineItems.forEach((lineItem) => {
-        showSpinner(lineItem.sku, `Getting details for ${lineItem.title}`);
-        const card = {
+        showSpinner(lineItem.title, `Getting details for ${lineItem.title}`);
+        let card = {
           platform: `ebay: ${order.buyer.username}`,
-          ...reverseTitle(lineItem.title),
           title: lineItem.title,
           quantity: lineItem.quantity,
         };
-        if (lineItem.sku) {
-          card.sku = lineItem.sku;
-        }
-        if (card.cardNumber) {
-          finishSpinner(lineItem.sku, `Sold ${card.title} x${card.quantity}`);
+        try {
+          if (lineItem.sku) {
+            card.sku = lineItem.sku;
+            finishSpinner(lineItem.title, `Sold ${card.title} x${card.quantity}`);
+          } else {
+            card = { ...card, ...reverseTitle(lineItem.title) };
+            if (!card.cardNumber) {
+              throw new Error(`Failed to parse Card Data`);
+            }
+          }
           cards.push(card);
-        } else {
-          errorSpinner(lineItem.sku, `Failed to parse ${card.title}`);
+          finishSpinner(lineItem.title, `Sold ${card.title} x${card.quantity}`);
+        } catch (e) {
+          errorSpinner(lineItem.title, `${card.title} | ${e.message}`);
         }
       });
+      finishSpinner('order');
     }
   });
   finishSpinner('sales', `Found ${chalk.green(cards.length)} cards sold on ebay`);

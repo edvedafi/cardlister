@@ -580,7 +580,7 @@ async function getAllListings(setData) {
     errorSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
     const spinners = pauseSpinners();
     filters = {
-      sport: [setData.sport],
+      sport: [setData.sport.toLowerCase()],
     };
     const getNextFilter = async (text, filterType) => {
       const filterOptions = await post('search/bulk-upload/filters', { filters });
