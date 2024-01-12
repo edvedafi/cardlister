@@ -3,7 +3,6 @@ import { isNo, isYes, titleCase } from '../utils/data.js';
 import '@shopify/shopify-api/adapters/node';
 import { shopifyApi } from '@shopify/shopify-api';
 import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
-import open from 'open';
 import chalk from 'chalk';
 import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
@@ -51,7 +50,7 @@ async function uploadToShopify(data) {
         input: {
           descriptionHtml: "${getDescription(card)}",
           handle: "${getHandle(card)}",
-          images: [${card.pics.split('|').map(
+          images: [${card.pics.map(
             (image, index) => `{
               altText: "${
                 index === 0

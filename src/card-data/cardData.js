@@ -33,7 +33,7 @@ export const initializeAnswers = async (inputDirectory, readExact = false) => {
             .map((card) => ({
               ...card,
               //clear out the pics property because it is appended to every run
-              pics: saveData.metadata.reprocessImages ? '' : card.pics,
+              pics: saveData.metadata.reprocessImages ? [] : card.pics,
               //reset the count to 0 if we want to reuse the existing images
               count: saveData.metadata.reprocessImages ? 0 : card.count,
             }))
@@ -451,8 +451,9 @@ export const getCardData = async (allCards, imageDefaults) => {
     output.backImage = output.filename;
   }
 
-  const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
-  output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
+  output.pics.push(
+    `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`,
+  );
 
   allCards[output.sku] = output;
   saveAnswers(allCards);
@@ -636,8 +637,9 @@ export const getLotData = async (imageDefaults, allCards) => {
   output.filename = `${output.key}.jpg`;
   output.title = await getLotTitle(output);
 
-  const imgURL = `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`;
-  output.pics = output.pics.length > 0 ? `${output.pics} | ${imgURL}` : `${imgURL}`;
+  output.pics.push(
+    `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${output.filename}?alt=media`,
+  );
 
   output.description = `${output.longTitle}<br><br>Typically these lots contain base cards, lower end RCs, and lower end inserts. You are not necessarily getting the exact cards pictured as I have multiple lots for every player and just list with quantities. If you are interested in the player and want to ensure you get specifically one or more of the cards pictured please message me so that I can ensure you get those cards.<br><br>Please note I try to make these lots are all unique cards, but sometimes I am not perfect at that.`;
 

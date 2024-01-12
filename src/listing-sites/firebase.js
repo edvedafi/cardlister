@@ -57,6 +57,18 @@ export async function uploadToFirebase(allCards) {
   }
 }
 
+export async function updateFirebaseListing(card) {
+  showSpinner(card.sku, `Updating ${card.sku}`);
+  const db = getFirestore();
+  const collection = db.collection('CardSales');
+  try {
+    await collection.doc(card.sku).update(card);
+    finishSpinner(card.sku);
+  } catch (e) {
+    errorSpinner(card.sku, `Failed to update ${card.title}: ${e.message}`);
+  }
+}
+
 export async function mergeFirebaseResult(card, match) {
   showSpinner('merge', `Merging card data with firebase data`);
   let updatedCard = { ...card };
@@ -507,14 +519,17 @@ export async function updateGroup(group) {
 
 // upload file to firebase storage
 export const processImageFile = async (outputFile, filename) => {
-  showSpinner(`upload-${filename}`, `Uploading ${filename} to Firebase`);
-  let promise;
+  showSpinner(`upload-${filename}`, `Uploading ${filename}`);
   try {
-    promise = getStorage().bucket().upload(outputFile, { destination: filename });
+    const r = await getStorage()
+      .bucket()
+      .upload(outputFile, {
+        destination: filename,
+        onUploadProgress: (e) => updateSpinner(`upload-${filename}`, `Uploading ${filename} ${JSON.stringify(e)}`),
+      });
+    finishSpinner(`upload-${filename}`, `Uploaded ${filename} to Firebase ${JSON.stringify(r)}`);
   } catch (e) {
     errorSpinner(`upload-${filename}`, `Failed to upload ${filename} to Firebase: ${e.message}`);
     throw e;
   }
-  finishSpinner(`upload-${filename}`, `Uploaded ${filename} to Firebase`);
-  return promise;
 };

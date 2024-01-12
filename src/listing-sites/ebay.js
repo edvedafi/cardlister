@@ -475,7 +475,7 @@ export const convertCardToInventory = (card) => ({
     description: card.description || `${card.longTitle}<br><br>${defaultValues.shippingInfo}`,
     // ean: ['string'],
     // epid: 'string',
-    imageUrls: card.pics.split('|'), //TODO: fix the input value to be an array
+    imageUrls: card.pics,
     // isbn: ['string'],
     mpn: card.setName,
     // subtitle: 'string',

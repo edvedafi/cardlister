@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 import axios from 'axios';
-import { manufactures, sets } from '../utils/data.js';
+import { updateFirebaseListing } from './firebase.js';
 
 const color = chalk.hex('#275467');
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
@@ -10,6 +10,83 @@ const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, 
 );
 
 let _api;
+
+export async function getMySlabSales() {
+  showSpinner('sales', 'Getting sales from MySlabs');
+  let sales = [];
+
+  try {
+    await login();
+    const apiResults = await fetchSales();
+    sales = convertSalesToCards(apiResults);
+    finishSpinner('sales', `Found ${sales.length} cards sold on MySlabs`);
+    return sales;
+  } catch (e) {
+    errorSpinner('sales', 'Failed to get sales from MySlabs');
+    throw e;
+  }
+}
+
+export async function uploadToMySlabs(cards) {
+  showSpinner('Uploading', 'Uploading to My Slabs');
+  let count = 0;
+  const api = await login();
+  await Promise.all(
+    Object.values(cards)
+      .filter((card) => parseFloat(card.price) > 9.98)
+      .map(async (card) => {
+        try {
+          showSpinner(`upload-${card.sku}`, card.title);
+          updateSpinner(`upload-${card.sku}`, `${card.title} (Posting)`);
+          const slabResponse = await api.post('/slabs', buildCard(card));
+          if (slabResponse.status === 201) {
+            updateSpinner(`upload-${card.sku}`, `${card.title} (Firebase)`);
+            await updateFirebaseListing({ sku: card.sku, myslabs: slabResponse.data.id });
+            finishSpinner(`upload-${card.sku}`, card.title);
+          } else {
+            errorSpinner(
+              `upload-${card.sku}`,
+              `${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`,
+            );
+          }
+        } catch (e) {
+          errorSpinner(`upload-${card.sku}`, `${card.title} | ${e.message} ${JSON.stringify(e.response.data)}`);
+        }
+      }),
+  );
+  finishSpinner('Uploading', `Uploaded ${count}`);
+}
+
+export function buildCard(card) {
+  const slab = {
+    title: card.title,
+    price: card.price,
+    description: card.longTitle,
+    category: card.sport.toUpperCase(),
+    year: 1900,
+    for_sale: true,
+    allow_offer: true,
+    minimum_offer: 0,
+    external_id: card.sku,
+  };
+
+  if (card.pics.length > 0) {
+    slab.slab_image_1 = card.pics[0];
+  }
+  if (card.pics.length > 1) {
+    slab.slab_image_2 = card.pics[1];
+  }
+  if (card.graded) {
+    slab.publish_type = 'SLABBED_CARD';
+    slab.card_type = card.grader;
+    slab.grade = card.grade;
+  } else {
+    slab.publish_type = 'RAW_CARD_SINGLE';
+    slab.condition = 'MYSLABS_B';
+  }
+
+  return slab;
+}
 
 export async function login() {
   showSpinner('login', 'Logging into MySlabs');
@@ -57,78 +134,6 @@ export async function fetchSales() {
   }
 }
 
-export const reverseTitle = (title) => {
-  const cardNumberIndex = title.indexOf('#');
-  const yearIdx = title.match(/\D*-?\D+/)?.index;
-  let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
-  const card = {
-    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
-    year: title.split(' ')[0],
-    parallel: '',
-    insert: '',
-    // setName: setName.join('|'),
-    // manufacture: 'Panini',
-    setName: setInfo,
-    // sport: 'Football',
-  };
-
-  const manufacture = manufactures.find((m) => setInfo.toLowerCase().indexOf(m) > -1);
-  if (manufacture) {
-    if (manufacture === 'score') {
-      card.manufacture = 'Panini';
-    } else {
-      card.manufacture = setInfo.slice(setInfo.toLowerCase().indexOf(manufacture), manufacture.length);
-      setInfo = setInfo.replace(card.manufacture, '').trim();
-      card.setName = setInfo;
-    }
-  }
-
-  const set = sets.find((s) => setInfo.toLowerCase().indexOf(s) > -1);
-  if (set) {
-    card.setName = setInfo.slice(setInfo.toLowerCase().indexOf(set), set.length);
-    setInfo = setInfo.replace(card.setName, '').trim();
-    if (!card.manufacture) {
-      const paniniSearch = `panini ${card.setName.toLowerCase()}`;
-      if (sets.find((s) => s === paniniSearch)) {
-        card.manufacture = 'Panini';
-      } else {
-        const toppsSearch = `topps ${card.setName.toLowerCase()}`;
-        if (sets.find((s) => s === toppsSearch)) {
-          card.manufacture = 'Topps';
-        }
-      }
-    }
-  }
-
-  const insertIndex = setInfo.toLowerCase().indexOf('insert');
-  if (insertIndex > -1) {
-    card.insert = setInfo.slice(0, insertIndex).trim();
-    setInfo = setInfo.replace(card.insert, '').trim();
-    setInfo = setInfo.replace('Insert', '').trim();
-  }
-
-  const parallelIndex = setInfo.toLowerCase().indexOf('parallel');
-  if (parallelIndex > -1) {
-    card.parallel = setInfo.slice(0, parallelIndex).trim();
-    setInfo = setInfo.replace(card.parallel, '').trim();
-    setInfo = setInfo.replace('Parallel', '').trim();
-  }
-
-  if (setInfo.length > 0) {
-    if (!card.insert) {
-      card.insert = setInfo;
-    } else if (!card.parallel) {
-      card.parallel = setInfo;
-    } else {
-      console.log('No Field left to put the remaining SetInfo', setInfo, 'for', card);
-    }
-  }
-
-  // console.log('card', card);
-
-  return card;
-};
-
 export function convertSalesToCards(sales) {
   showSpinner('convertSalesToCards', 'Converting sales to cards');
   const cards = [];
@@ -137,38 +142,15 @@ export function convertSalesToCards(sales) {
     if (new Date(sale.sold_date) < new Date(sale.updated_date)) {
       finishSpinner('convertCard');
     } else {
-      const card = {
+      cards.push({
         platform: 'MySlabs',
         title: sale.title,
         quantity: 1,
-      };
-      if (sale.external_id) {
-        cards.push({ ...card, sku: sale.external_id });
-      } else {
-        cards.push({
-          ...card,
-          ...reverseTitle(sale.title),
-        });
-      }
+        sku: sale.external_id,
+      });
       finishSpinner('convertCard', `Sold: ${sale.title}`);
     }
   });
   finishSpinner('convertSalesToCards');
   return cards;
-}
-
-export async function getMySlabSales() {
-  showSpinner('sales', 'Getting sales from MySlabs');
-  let sales = [];
-
-  try {
-    await login();
-    const apiResults = await fetchSales();
-    sales = convertSalesToCards(apiResults);
-    finishSpinner('sales', `Found ${sales.length} cards sold on MySlabs`);
-    return sales;
-  } catch (e) {
-    errorSpinner('sales', 'Failed to get sales from MySlabs');
-    throw e;
-  }
 }
