@@ -27,7 +27,6 @@ const queueImageFiles = new Queue({
   concurrency: 3,
 });
 
-const log = (...params) => console.log(chalk.cyan(...params));
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
   'singles',
   chalk.cyan,

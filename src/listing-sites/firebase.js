@@ -95,6 +95,9 @@ export async function mergeFirebaseResult(card, match) {
     if (match.manufacture) {
       updatedCard.manufacture = match.manufacture;
     }
+    if (match.cardNumber) {
+      updatedCard.cardNumber = match.cardNumber;
+    }
     if (match.ItemID) {
       updatedCard.ItemID = match.ItemID;
     }
@@ -103,6 +106,9 @@ export async function mergeFirebaseResult(card, match) {
     }
     if (match.bin) {
       updatedCard.bin = match.bin;
+    }
+    if (match.myslabs) {
+      updatedCard.myslabs = match.myslabs;
     }
   }
   if (
@@ -262,7 +268,7 @@ export async function getListingInfo(db, cards) {
     if (card.sku) {
       showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
       const doc = await db.collection('CardSales').doc(card.sku).get();
-      if (doc.exists) {
+      if (doc.data() && doc.data().sku) {
         removals.push(await mergeFirebaseResult(card, doc.data()));
         finishSpinner(card.sku, card.sku);
       } else {
@@ -312,15 +318,23 @@ export async function getFileSales() {
       .readFileSync('offline_sales.csv', { encoding: 'utf-8' })
       .split('\n')
       .map((line) => {
-        const words = line.split(',');
-        return {
-          ...convertTitleToCard(words[0]),
-          quantity: words[1],
-          platform: 'offline_sales',
-          sku: words[2],
-        };
+        if (line.indexOf(',') === -1) {
+          return {
+            quantity: 1,
+            platform: 'offline_sales',
+            sku: line,
+          };
+        } else {
+          const words = line.split(',');
+          return {
+            ...convertTitleToCard(words[0]),
+            quantity: words[1],
+            platform: 'offline_sales',
+            sku: words[2],
+          };
+        }
       })
-      .filter((card) => card.cardNumber);
+      .filter((card) => card.cardNumber || card.sku);
   }
   finishSpinner('getFileSales', `Found ${chalk.green(results.length)} offline sales`);
   return results;

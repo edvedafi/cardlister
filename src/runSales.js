@@ -1,12 +1,12 @@
-import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
+import { removeFromEbay } from './listing-sites/ebay.js';
 import dotenv from 'dotenv';
 import 'zx/globals';
 import { createGroups } from './listing-sites/uploads.js';
 import chalk from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
-import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
+import { removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
 import { removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
-import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
+import { removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import { getFileSales, getGroupByBin, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -15,7 +15,7 @@ import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import open from 'open';
 import { useSpinners } from './utils/spinners.js';
-import { getMySlabSales } from './listing-sites/myslabs.js';
+import { removeFromMySlabs } from './listing-sites/myslabs.js';
 import { ask } from './utils/ask.js';
 
 const args = minimist(process.argv.slice(2));
@@ -164,11 +164,11 @@ try {
   showSpinner('top-level', 'Running sales processing');
   showSpinner('gathering', 'Gathering sales from sites');
   const results = await Promise.all([
-    getMySlabSales(),
+    // getMySlabSales(),
     getFileSales(),
-    getEbaySales(),
-    getBuySportsCardsSales(),
-    getSalesSportLots(),
+    // getEbaySales(),
+    // getBuySportsCardsSales(),
+    // getSalesSportLots(),
   ]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
@@ -213,6 +213,7 @@ try {
   await removeListings('Buy Sports Cards', () => removeFromBuySportsCards(groupedCards));
   await removeListings('Shopify', () => removeFromShopify(sales));
   await removeListings('My Card Post', () => removeFromMyCardPost(sales));
+  await removeListings('MySlabs', () => removeFromMySlabs(sales));
   finishSpinner('remove-all', 'Completed removing listings from sites');
 
   showSpinner('launching', 'Launching all sales sites');

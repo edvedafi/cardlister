@@ -63,7 +63,7 @@ export function buildCard(card) {
     price: card.price,
     description: card.longTitle,
     category: card.sport.toUpperCase(),
-    year: 1900,
+    year: card.year,
     for_sale: true,
     allow_offer: true,
     minimum_offer: 0,
@@ -153,4 +153,39 @@ export function convertSalesToCards(sales) {
   });
   finishSpinner('convertSalesToCards');
   return cards;
+}
+
+export async function removeFromMySlabs(cards) {
+  showSpinner('removeFromMySlabs', 'Removing from My Slabs');
+  let count = 0;
+  const api = await login();
+
+  await Promise.all(
+    cards.map(async (card) => {
+      try {
+        showSpinner(`remove-${card.sku}`, card.title);
+        if (card.myslabs) {
+          updateSpinner(`remove-${card.sku}`, `${card.title} (Removing)`);
+          const slabResponse = await api.delete(`/slabs/${card.myslabs}`);
+          if (slabResponse.status === 204) {
+            updateSpinner(`remove-${card.sku}`, `${card.title} (Firebase)`);
+            await updateFirebaseListing({ sku: card.sku, myslabs: null });
+            count++;
+            finishSpinner(`remove-${card.sku}`, card.title);
+          } else {
+            errorSpinner(
+              `remove-${card.sku}`,
+              `${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`,
+            );
+          }
+        } else {
+          finishSpinner(`remove-${card.sku}`);
+        }
+      } catch (e) {
+        errorSpinner(`remove-${card.sku}`, `${card.title} | ${e.message} ${JSON.stringify(e.response?.data)}`);
+      }
+    }),
+  );
+
+  finishSpinner('removeFromMySlabs', `Removed ${count} cards from My Slabs`);
 }
