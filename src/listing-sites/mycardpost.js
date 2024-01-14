@@ -289,8 +289,8 @@ export async function getSalesFromMyCardPost() {
     const salesTable = await waitForElement(By.xpath('//div[@class="orders-blk " or @class="orders-blk"]'));
 
     if (salesTable) {
-      const classes = await salesTable.getAttribute('class');
-      if (classes.includes('orders-blk')) {
+      const trackingInfo = await salesTable.findElement(By.xpath('.//div[@class="tr-id"]'));
+      if (!trackingInfo) {
         spin('Get Order IDs');
         const orderIdDiv = await salesTable.findElement(By.xpath('.//div[@class="order-id"]'));
         const orderIdText = await orderIdDiv.getText();
