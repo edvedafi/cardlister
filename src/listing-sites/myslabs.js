@@ -18,7 +18,9 @@ export async function getMySlabSales() {
   try {
     await login();
     const apiResults = await fetchSales();
+    log('api', apiResults);
     sales = convertSalesToCards(apiResults);
+    log('sales', sales);
     finishSpinner('sales', `Found ${sales.length} cards sold on MySlabs`);
     return sales;
   } catch (e) {
@@ -161,30 +163,32 @@ export async function removeFromMySlabs(cards) {
   const api = await login();
 
   await Promise.all(
-    cards.map(async (card) => {
-      try {
-        showSpinner(`remove-${card.sku}`, card.title);
-        if (card.myslabs) {
-          updateSpinner(`remove-${card.sku}`, `${card.title} (Removing)`);
-          const slabResponse = await api.delete(`/slabs/${card.myslabs}`);
-          if (slabResponse.status === 204) {
-            updateSpinner(`remove-${card.sku}`, `${card.title} (Firebase)`);
-            await updateFirebaseListing({ sku: card.sku, myslabs: null });
-            count++;
-            finishSpinner(`remove-${card.sku}`, card.title);
+    cards
+      .filter((card) => card.platform.indexOf('MySlabs') === -1)
+      .map(async (card) => {
+        try {
+          showSpinner(`remove-${card.sku}`, card.title);
+          if (card.myslabs) {
+            updateSpinner(`remove-${card.sku}`, `${card.title} (Removing)`);
+            const slabResponse = await api.delete(`/slabs/${card.myslabs}`);
+            if (slabResponse.status === 204) {
+              updateSpinner(`remove-${card.sku}`, `${card.title} (Firebase)`);
+              await updateFirebaseListing({ sku: card.sku, myslabs: null });
+              count++;
+              finishSpinner(`remove-${card.sku}`, card.title);
+            } else {
+              errorSpinner(
+                `remove-${card.sku}`,
+                `${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`,
+              );
+            }
           } else {
-            errorSpinner(
-              `remove-${card.sku}`,
-              `${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`,
-            );
+            finishSpinner(`remove-${card.sku}`);
           }
-        } else {
-          finishSpinner(`remove-${card.sku}`);
+        } catch (e) {
+          errorSpinner(`remove-${card.sku}`, `${card.title} | ${e.message} ${JSON.stringify(e.response?.data)}`);
         }
-      } catch (e) {
-        errorSpinner(`remove-${card.sku}`, `${card.title} | ${e.message} ${JSON.stringify(e.response?.data)}`);
-      }
-    }),
+      }),
   );
 
   finishSpinner('removeFromMySlabs', `Removed ${count} cards from My Slabs`);

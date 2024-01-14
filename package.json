@@ -18,7 +18,8 @@
     "test": "jest --watch",
     "tunnel": "ngrok http 3000",
     "testselect": "ts-node src/testselect.js",
-    "postinstall": "yarn login; yarn compile"
+    "postinstall": "yarn login; yarn compile",
+    "start:functions": "firebase emulators:start --only functions"
   },
   "dependencies": {
     "@babel/preset-env": "^7.21.5",

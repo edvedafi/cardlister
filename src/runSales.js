@@ -14,17 +14,14 @@ import initializeFirebase from './utils/firebase.js';
 import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import open from 'open';
-import { useSpinners } from './utils/spinners.js';
+import { pauseSpinners, useSpinners } from './utils/spinners.js';
 import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
 import { ask } from './utils/ask.js';
 
 const args = minimist(process.argv.slice(2));
 
 const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'sales',
-  chalk.cyan,
-);
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sales', chalk.cyan);
 
 $.verbose = false;
 
@@ -192,17 +189,20 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
+  if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
+    openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
+  }
+  if (sales.find((sale) => sale.platform.indexOf('MySlabs') > -1)) {
+    openSalesSites.push('https://www.myslabs.com/account/history/sold/');
+  }
   finishSpinner('sales-info', 'Completed adding listing info to cards');
 
   //remove listings from sites
   showSpinner('remove-all', 'Remove listings from sites');
   const removeListings = async (site, remove) => {
-    let paused;
     let proceed = true;
     if (args.r) {
-      paused = pauseSpinners();
       proceed = await ask(`Remove from ${site}?`, true);
-      resumeSpinners(paused);
     }
     if (proceed) {
       await remove();
@@ -223,7 +223,6 @@ try {
   finishSpinner('launching', 'Launching all sales sites');
 
   //output a pick list
-  log('All Sales:');
   finishSpinner('top-level', 'Completed sales processing');
   console.log(
     chalkTable(

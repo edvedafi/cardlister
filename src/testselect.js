@@ -1,14 +1,12 @@
-import "zx/globals";
-import { prepareImageFile } from "./image-processing/imageProcessor.js";
+import dotenv from 'dotenv';
+import 'zx/globals';
+import minimist from 'minimist';
+import { getMySlabSales } from './listing-sites/myslabs.js';
 
-const cardData = {
-  directory: "",
-  filename: "not-as-large.jpg",
-  crop: {
-    left: 0,
-    top: 0,
-    width: 100,
-    height: 100,
-  },
-};
-await prepareImageFile("input/large.jpg", cardData, true);
+const args = minimist(process.argv.slice(2));
+
+$.verbose = false;
+
+dotenv.config();
+
+await getMySlabSales();

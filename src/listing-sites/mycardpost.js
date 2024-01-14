@@ -3,37 +3,45 @@ import dotenv from 'dotenv';
 import { Browser, Builder, By } from 'selenium-webdriver';
 import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
-import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
 
 dotenv.config();
 
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'mcp',
-  chalk.hex('#ffc107'),
-);
+const color = chalk.hex('#ffc107');
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('mcp', color);
 
 let _driver;
-const login = async () => {
-  if (!_driver) {
+const login = async (spin) => {
+  let finish;
+  if (!spin) {
     showSpinner('login', 'Login');
+    spin = (message) => updateSpinner(`login`, message);
+    finish = () => finishSpinner('login');
+  } else {
+    finish = false;
+  }
+
+  if (!_driver) {
+    spin('Login - Loading');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
     await _driver.get('https://mycardpost.com/login');
 
     const waitForElement = useWaitForElement(_driver);
 
-    updateSpinner('login', 'Login - Email');
+    spin('Login - Email');
     const emailInput = await waitForElement(inputByPlaceholder('Email *'));
     await emailInput.sendKeys(process.env.MCP_EMAIL);
-    updateSpinner('login', 'Login - Password');
+    spin('Login - Password');
     const passwordInput = await waitForElement(inputByPlaceholder('Password *'));
     await passwordInput.sendKeys(process.env.MCP_PASSWORD);
 
-    updateSpinner('login', 'Login - Submit');
+    spin('Login - Submit');
     const nextButton = await waitForElement(buttonByText('Login'));
     await nextButton.click();
     await waitForElement(By.xpath(`//h2[text()='edvedafi']`));
-    finishSpinner('login');
+    if (finish) {
+      finish();
+    }
   }
   return _driver;
 };
@@ -165,7 +173,7 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
 
       showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Description)`);
       const descriptionInput = await formElement(By.xpath(`//textarea[@name='details']`));
-      await descriptionInput.sendKeys(`${card.longTitle}\n\nSKU: ${card.sku}`);
+      await descriptionInput.sendKeys(`${card.longTitle}\n\n[SKU: ${card.sku}]`);
 
       showSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Ensure previous toast is gone)`);
 
@@ -202,67 +210,56 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
 };
 
 export async function removeFromMyCardPost(cards) {
+  showSpinner('remove', 'Removing from My Card Post');
   let toRemove = cards.filter((card) => !card.platform.startsWith('MCP: ') && !!card.sku);
   if (toRemove.length === 0) {
-    console.log(chalk.magenta('No cards to remove from MyCardPost'));
+    finishSpinner('remove', 'No cards to remove from MyCardPost');
     return;
   }
-  console.log(chalk.magenta('Attempting to remove'), toRemove.length, chalk.magenta('cards from MyCardPost'));
-  const driver = await login();
+  const spin = (message) => updateSpinner(`remove`, `Removing ${toRemove.length} cards from My Card Post (${message})`);
+
+  spin('Login');
+  const driver = await login(spin);
+
+  spin('Setup');
   const waitForElement = useWaitForElement(driver);
   const xpath = async (text) => waitForElement(By.xpath(text));
   const notRemoved = [];
   await driver.get('https://mycardpost.com/edvedafi');
-  const searchInput = await xpath(`//input[@placeholder='Search Cards']`);
 
+  spin('Removing');
   for (const card of toRemove) {
     try {
       if (card.sku) {
+        const spinCard = (message) => updateSpinner(card.sku, `Removing ${card.title} (${message})`);
+        spinCard('Searching');
+        const searchInput = await xpath(`//input[@placeholder='Search Cards']`);
         await searchInput.clear();
-        await searchInput.sendKeys(card.sku);
+        await searchInput.sendKeys(`[SKU: ${card.sku}]`);
+        spinCard('Waiting for just one card');
         await xpath('//h2[text()="All Cards (1)"]');
+        spinCard('Clicking Delete');
         const removeButton = await xpath('//a[text()="Delete"]');
         await removeButton.click();
+        spinCard('Confirming Delete');
         const yesButton = await waitForElement(By.id('delete-btn'));
         await yesButton.click();
+        spinCard('Waiting for no cards');
         await xpath('//h2[text()="All Cards (0)"]');
-      } else {
-        card.error = 'No SKU';
-        notRemoved.push(card);
+        finishSpinner(card.sku, card.title);
       }
     } catch (e) {
-      card.error = e.message;
+      errorSpinner(card.sku, `${card.title} (${e.message})`);
       notRemoved.push(card);
     }
   }
 
   if (notRemoved.length === 0) {
-    console.log(
-      chalk.magenta('Successfully removed all'),
-      chalk.green(toRemove.length),
-      chalk.magenta('cards from MyCardPost'),
-    );
+    finishSpinner('remove', `Successfully removed ${toRemove.length} cards from MyCardPost`);
   } else {
-    console.log(
-      chalk.magenta('Only removed'),
-      chalk.red(toRemove.length - notRemoved.length),
-      chalk.magenta('of'),
-      chalk.red(toRemove.length),
-      chalk.magenta('cards from MyCardPost'),
-    );
-    console.log(
-      chalkTable(
-        {
-          leftPad: 2,
-          columns: [
-            { field: 'title', name: 'Title' },
-            { field: 'quantity', name: 'Sold' },
-            { field: 'updatedQuantity', name: 'Remaining' },
-            { field: 'error', name: 'Error' },
-          ],
-        },
-        notRemoved,
-      ),
+    errorSpinner(
+      'remove',
+      `Only removed ${toRemove.length - notRemoved.length} of ${toRemove.length} cards from MyCardPost`,
     );
   }
 }

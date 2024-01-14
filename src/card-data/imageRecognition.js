@@ -7,11 +7,7 @@ import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.hex('#f4d02e');
-const log = (...params) => console.log(color(...params));
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'firebase',
-  color,
-);
+const { showSpinner, finishSpinner, updateSpinner } = useSpinners('firebase', color);
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -224,16 +220,10 @@ const getCropHints = async (client, image) => {
 };
 
 export let callNLP = async (text) => {
-  try {
-    return await hf.tokenClassification({
-      model: 'dslim/bert-base-NER-uncased',
-      inputs: text,
-    });
-  } catch (e) {
-    pauseSpinners();
-    console.error(e);
-    process.exit(1);
-  }
+  return await hf.tokenClassification({
+    model: 'dslim/bert-base-NER-uncased',
+    inputs: text,
+  });
 };
 export const runNLP = async (text, setData, spin) => {
   if (setData.player) {
@@ -280,7 +270,7 @@ export const runNLP = async (text, setData, spin) => {
           }
           return { ...person, word: finalWord || person.word };
         })
-        //remove any words that have a non alphabetic character, also all spaces, periods and hyphens
+        //remove any words that have a non-alphabetic character, also all spaces, periods and hyphens
         .filter((person) => person.word.match(/^[A-Za-z\s.\-']+$/))
         //names cannot start with a number or a symbol
         .filter((person) => !person.word.match(/^[^A-Za-z]/))

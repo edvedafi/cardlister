@@ -126,7 +126,7 @@ export async function mergeFirebaseResult(card, match) {
     updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
     resumeSpinners(spinners);
   } else {
-    finishSpinner('merge', `Merged card data with firebase data`);
+    finishSpinner('merge');
   }
   return updatedCard;
 }
@@ -535,12 +535,7 @@ export async function updateGroup(group) {
 export const processImageFile = async (outputFile, filename) => {
   showSpinner(`upload-${filename}`, `Uploading ${filename}`);
   try {
-    const r = await getStorage()
-      .bucket()
-      .upload(outputFile, {
-        destination: filename,
-        onUploadProgress: (e) => updateSpinner(`upload-${filename}`, `Uploading ${filename} ${JSON.stringify(e)}`),
-      });
+    const r = await getStorage().bucket().upload(outputFile, { destination: filename });
     finishSpinner(`upload-${filename}`, `Uploaded ${filename} to Firebase ${JSON.stringify(r)}`);
   } catch (e) {
     errorSpinner(`upload-${filename}`, `Failed to upload ${filename} to Firebase: ${e.message}`);

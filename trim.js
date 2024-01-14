@@ -1,6 +1,4 @@
 import dotenv from 'dotenv';
-dotenv.config();
-
 import { loadTeams } from './src/utils/teams.js';
 import { getSetData, initializeAnswers } from './src/card-data/cardData.js';
 import 'zx/globals';
@@ -13,6 +11,8 @@ import { shutdownFirebase } from './src/listing-sites/firebase.js';
 import { shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
 import chalk from 'chalk';
 import { useSpinners } from './src/utils/spinners.js';
+
+dotenv.config();
 
 $.verbose = false;
 
@@ -33,10 +33,7 @@ const shutdown = async () => {
 );
 
 const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'trim',
-  chalk.cyan,
-);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('trim', chalk.cyan);
 
 showSpinner('trim', 'Processing Singles');
 

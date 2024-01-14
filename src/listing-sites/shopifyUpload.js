@@ -4,7 +4,6 @@ import '@shopify/shopify-api/adapters/node';
 import { shopifyApi } from '@shopify/shopify-api';
 import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
 import chalk from 'chalk';
-import chalkTable from 'chalk-table';
 import { useSpinners } from '../utils/spinners.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
@@ -326,20 +325,6 @@ export async function removeFromShopify(cards) {
     finishSpinner('remove', `Removed ${toRemove.length} cards from Shopify`);
   } else {
     errorSpinner('remove', `Removed ${toRemove.length - notRemoved.length} of ${toRemove.length} cards from Shopify`);
-    console.log(
-      chalkTable(
-        {
-          leftPad: 2,
-          columns: [
-            { field: 'title', name: 'Title' },
-            { field: 'quantity', name: 'Sold' },
-            { field: 'updatedQuantity', name: 'Remaining' },
-            { field: 'error', name: 'Error' },
-          ],
-        },
-        notRemoved,
-      ),
-    );
   }
 }
 

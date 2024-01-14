@@ -5,10 +5,7 @@ import chalk from 'chalk';
 import { useSpinners } from './spinners.js';
 
 const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'trim',
-  chalk.cyan,
-);
+const { showSpinner, finishSpinner, errorSpinner } = useSpinners('trim', chalk.cyan);
 
 export async function getInputs() {
   showSpinner('inputs', 'Getting Input Information');
@@ -40,7 +37,6 @@ export async function getInputs() {
 }
 
 export const getInputDirectory = async () => {
-  const spinners = pauseSpinners();
   const directories = fs.readdirSync('input', { withFileTypes: true });
   const inputDirectories = ['input', 'bulk', ...directories.filter((dir) => dir.isDirectory()).map((dir) => dir.name)];
   let input_directory = await ask('Input Directory', undefined, { selectOptions: inputDirectories });
@@ -63,7 +59,6 @@ export const getInputDirectory = async () => {
   } else {
     input_directory = `input/${input_directory}`;
   }
-  resumeSpinners(spinners);
   finishSpinner('inputs', `Input Directory: ${input_directory}`);
 
   return input_directory;

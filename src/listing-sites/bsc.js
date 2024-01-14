@@ -1,8 +1,7 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
-import { Browser, Builder, By, Key, until } from 'selenium-webdriver';
-import { caseInsensitive, parseKey, useWaitForElement, useWaitForElementToBeReady } from './uploads.js';
-import { validateUploaded } from './validate.js';
+import { Browser, Builder, By, Key } from 'selenium-webdriver';
+import { caseInsensitive, parseKey, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
 import pRetry from 'p-retry';
@@ -14,10 +13,7 @@ import { useSpinners } from '../utils/spinners.js';
 dotenv.config();
 
 const color = chalk.hex('#e5e5e5');
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
-  'bsc',
-  color,
-);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('bsc', color);
 
 const userWaitForButton = (driver) => async (text) => {
   const waitForElement = useWaitForElement(driver);
@@ -138,13 +134,6 @@ async function postImage(path, imagePath) {
 
   formData.append('attachment', fs.createReadStream(imagePath));
 
-  // console.log('formData', formData.getHeaders());
-  // console.log('baseHeaders', baseHeaders);
-  // console.log('headers', {
-  //   ...baseHeaders,
-  //   ...formData.getHeaders(),
-  // });
-
   const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, {
     headers: {
       ...baseHeaders,
@@ -180,280 +169,6 @@ export async function shutdownBuySportsCards() {
   }
   finishSpinner('shutdown', 'BSC shutdown complete');
 }
-
-const useWaitForPageToLoad =
-  (driver) =>
-  async (url = undefined) => {
-    if (url) {
-      await driver.wait(until.urlIs(url), 10000);
-    }
-    try {
-      const element = await useWaitForElement(driver)(By.className('MuiSkeleton-pulse'));
-      await driver.wait(until.stalenessOf(element), 10000); // Adjust the timeout as needed (in milliseconds)
-    } catch (e) {
-      //do nothing
-      console.log('Waiting for page to load error');
-    }
-  };
-const runUpdates = async (groupedCards) => {
-  try {
-    const driver = await login();
-    const waitForElement = useWaitForElement(driver);
-    const waitForElementToBeReady = useWaitForElementToBeReady(driver);
-    const waitForPageLoad = useWaitForPageToLoad(driver);
-
-    const waitForButton = (text) =>
-      waitForElement(By.xpath(`//button[descendant::text()${caseInsensitive(text.toLowerCase())}]`));
-
-    await driver.get('https://www.buysportscards.com/sellers/bulk-upload');
-
-    for (const key in groupedCards) {
-      const setData = getGroupByBin(key);
-      const setFilter = async (placeHolderField, checkboxValue) => {
-        const sportSearchField = await waitForElement(By.xpath(`//input[@placeholder='${placeHolderField}']`));
-        await sportSearchField.clear();
-        await sportSearchField.sendKeys(checkboxValue?.trim());
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        const parentElement = await sportSearchField.findElement(By.xpath('../../..'));
-        let found;
-        try {
-          const checkbox = await parentElement.findElement(
-            By.xpath(
-              `//input[@type='checkbox' and translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = '${checkboxValue
-                .toLowerCase()
-                .trim()
-                .replaceAll(' ', '-')}']`,
-            ),
-          );
-          if (checkbox) {
-            await checkbox.click();
-            found = true;
-          }
-        } catch (err) {
-          found = false;
-        }
-        return found;
-      };
-
-      await setFilter('Search Sport', setData.sport || 'Multi-Sport');
-      await setFilter('Search Year', setData.year);
-      let foundSet = await setFilter('Search Set', `${setData.manufacture} ${setData.setName}`);
-      if (!foundSet) {
-        foundSet = await setFilter('Search Set', setData.setName);
-        if (!foundSet) {
-          console.log(`Please select ${chalk.red(setData.manufacture)} ${chalk.red(setData.setName)} to continue.`);
-        }
-      }
-      if (setData.insert) {
-        await setFilter('Search Variant', 'Insert');
-        const foundVariant = await setFilter('Search Variant Name', `${setData.insert} ${setData.parallel || ''}`);
-        if (!foundVariant) {
-          console.log(
-            `Please select ${chalk.red(setData.insert)}${
-              setData.parallel ? chalk.red(' ' + setData.parallel) : ''
-            } to continue.`,
-          );
-        }
-      } else if (setData.parallel) {
-        await setFilter('Search Variant', 'Parallel');
-        const foundParallel = await setFilter('Search Variant Name', setData.parallel);
-        if (!foundParallel) {
-          console.log(`Please select ${chalk.red(setData.parallel)} to continue.`);
-        }
-      } else {
-        if (setData.insert === 'The Franchise') {
-          await ask('checkbox');
-        }
-        const checkbox = await waitForElement(By.xpath(`//input[@type='checkbox' and @value='base']`), true);
-        await checkbox.click();
-      }
-
-      const conditionSelect = await waitForElement(By.css('.MuiSelect-select'));
-      await conditionSelect.click();
-      const conditionList = await waitForElement(By.xpath(`//*[@data-value='near_mint' or @data-value='nm']`));
-      await conditionList.click();
-      if (setData.bscPrice) {
-        const defaultPriceInput = await waitForElement(
-          By.xpath('//div[p[text()="Default Price:"]]/following-sibling::div/div/div/input'),
-        );
-        await defaultPriceInput.clear();
-        await defaultPriceInput.sendKeys(setData.bscPrice);
-      }
-
-      const defaultSkuInput = await waitForElement(
-        By.xpath('//div[p[text()="Default SKU:"]]/following-sibling::div/div/div/input'),
-      );
-      await defaultSkuInput.clear();
-      await defaultSkuInput.sendKeys(setData.bin);
-
-      const nextButton = await waitForButton('Generate');
-      await nextButton.click();
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      let pageAdds = 0;
-      let added = [];
-      //tr[.//*[contains(text(), '2023') and contains(text(), 'Topps') and contains(text(), 'Refractor')]]
-      let matcherForSet = `//h6[contains(text(), '${setData.year}')`; // and contains(text(), '${setData.setName}')`;
-      `${setData.setName} ${setData.insert || ''} ${setData.parallel || ''}`
-        .replaceAll('  ', ' ')
-        .trim()
-        .split(' ')
-        .forEach((word) => {
-          matcherForSet += ` and contains(text(), '${word}')`;
-        });
-      matcherForSet = matcherForSet.trim() + ']';
-      console.log('matcherForSet', matcherForSet);
-      await waitForElement(By.xpath(matcherForSet));
-      let tables = await driver.findElements(By.css(`.MuiTable-root`));
-      await waitForElementToBeReady(tables[0]);
-      const table = tables[0];
-      const body = await table.findElement(By.xpath(`./tbody`));
-      await waitForElementToBeReady(body);
-      const cardsToUpload = groupedCards[key];
-
-      const processRow = async (row, card, logEachCard = false) => {
-        const columns = await row.findElements(By.xpath(`./td`));
-
-        // console.log('uploading: ', card);
-        let cardNumberTextBox = await columns[6].findElement({ css: 'input' });
-        const currentValue = await cardNumberTextBox.getAttribute('value');
-        let newQuantity = card.quantity;
-        if (currentValue) {
-          await cardNumberTextBox.sendKeys('\u0008\u0008');
-          newQuantity += Number.parseInt(currentValue);
-
-          if (newQuantity < 0) {
-            newQuantity = 0;
-          }
-
-          if (card.bscPrice && card.bscPrice !== setData.bscPrice) {
-            const priceTextBox = await columns[5].findElement({ css: 'input' });
-            await priceTextBox.clear();
-            await driver.wait(until.elementTextIs(priceTextBox, ''), 5000);
-            await priceTextBox.sendKeys(card.bscPrice);
-          }
-
-          if (card.sku) {
-            const skuTextBox = await columns[7].findElement({ css: 'input' });
-            await skuTextBox.clear();
-            await driver.wait(until.elementTextIs(skuTextBox, ''), 5000);
-            await skuTextBox.sendKeys(card.sku);
-          }
-
-          await driver.wait(until.elementTextIs(cardNumberTextBox, ''), 5000);
-          await cardNumberTextBox.sendKeys(newQuantity);
-
-          try {
-            if (card.frontImage || card.backImage) {
-              //find the buttons inside columns[3] that have "x" as the text
-              const buttons = await columns[3].findElements(By.xpath(`.//div[text()='X']`));
-              for (let button of buttons) {
-                try {
-                  // await driver.wait(until.elementToBeClickable(button), 5000); // Adjust the timeout as needed
-
-                  await button.click();
-                } catch (e) {
-                  //button wasn't click-able. just move on.
-                }
-              }
-
-              const imageInputs = await columns[3].findElements(By.xpath(`.//input[@type='file']`));
-              if (card.frontImage) {
-                const b = await columns[3].findElement(By.id(`addPhotoFront${i}`));
-                await driver.wait(until.elementIsEnabled(b), 1000);
-                await b.click();
-                await imageInputs[0].sendKeys(`${process.cwd()}/output/${card.directory}${card.frontImage}`);
-                // await new Promise((resolve) => setTimeout(resolve, 1000));
-                // await ask('Press any key to continue.');
-              }
-              if (card.backImage) {
-                await imageInputs[1].sendKeys(`${process.cwd()}/output/${card.directory}${card.backImage}`);
-                // await new Promise((resolve) => setTimeout(resolve, 1000));
-                // await ask('Press any key to continue.');
-              }
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-            if (logEachCard) {
-              console.log(`Updated Card ${chalk.green(card.cardNumber)}${card.frontImage ? ' with images' : ''}`);
-            }
-          } catch (e) {
-            if (logEachCard) {
-              console.log(`Failed to add Image to card ${chalk.red(card.cardNumber)}`);
-            }
-          }
-
-          pageAdds++;
-          added.push(card);
-        }
-        let count = 0;
-        if (cardsToUpload.length > 20) {
-          await iterateOverRows(cardsToUpload, body, processRow);
-        } else {
-          await iterateOverCards(cardsToUpload, body, processRow);
-        }
-
-        await validateUploaded(cardsToUpload, added, 'bscPrice');
-
-        await driver.executeScript('window.scrollTo(0, 0);');
-        if (pageAdds > 0) {
-          const saveButton = await waitForButton('Save');
-          await saveButton.click();
-
-          await waitForElement(By.className('MuiAlert-filledSuccess'));
-        }
-
-        console.log(`Updated ${chalk.green(pageAdds)} cards for ${chalk.cyan(key)}`);
-
-        const reset = await waitForButton('Reset');
-        await reset.click();
-      };
-    }
-  } catch (e) {
-    console.log('error', e);
-    throw e;
-  }
-};
-
-const iterateOverRows = async (cardsToUpdate, body, processRow) => {
-  const rows = await body.findElements(By.xpath(`./tr`));
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const columns = await row.findElements(By.xpath(`./td`));
-    const cardNumberElement = await columns[1].findElement(By.xpath('./*'));
-    const tableCardNumber = await cardNumberElement.getText();
-    const card = cardsToUpdate.find((card) => card.cardNumber.toString() === tableCardNumber);
-    if (card) {
-      await processRow(row, card);
-    }
-  }
-};
-
-const iterateOverCards = async (cardsToUpdate, body, processRow) => {
-  for (const card of cardsToUpdate) {
-    try {
-      const row = await body.findElement(
-        By.xpath(
-          `//tr[.//*[contains(text(), '#${card.cardNumber}') and not(normalize-space(substring-after(text(), '#${card.cardNumber}')))]]`,
-        ),
-      );
-      if (row) {
-        await processRow(row, card);
-      } else {
-        console.log('could not find card ', card);
-      }
-    } catch (e) {
-      await ask(`could not find card ${card.title} in table. Please update manually and Press any key to continue.`);
-    }
-  }
-};
-
-export const uploadToBuySportsCardsOldUI = async (groupedCards) => {
-  console.log(chalk.magenta('BSC Starting Upload'));
-  console.log('Uploading:', Object.keys(groupedCards));
-  await runUpdates(groupedCards);
-  console.log(chalk.magenta('BSC Upload COMPLETE!'));
-};
 
 export async function saveBulk(listings) {
   showSpinner('saveBulk', 'Saving Bulk Upload');
@@ -578,7 +293,6 @@ async function getAllListings(setData) {
     }
   } catch (e) {
     errorSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
-    const spinners = pauseSpinners();
     filters = {
       sport: [setData.sport.toLowerCase()],
     };
@@ -617,14 +331,9 @@ async function getAllListings(setData) {
       filters.variant = ['base'];
     }
 
-    resumeSpinners(spinners);
     showSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
 
-    if (filters.variantName === 'None') {
-      console.log(chalk.red('Could not find a match for'), setData);
-    } else {
-      allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
-    }
+    allPossibleListings = await post('seller/bulk-upload/results', buildBody(filters));
   }
 
   finishSpinner('get-listings');
@@ -635,6 +344,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
   showSpinner('upload', 'Uploading to BSC');
   await login();
   const notAdded = [];
+
   for (const key in cardsToUpload) {
     showSpinner(`upload-${key}`, `Uploading set ${key}`);
     const setData = await getGroupByBin(key);
@@ -660,49 +370,51 @@ export async function uploadToBuySportsCards(cardsToUpload) {
         const updates = [];
         let updated = 0;
         showSpinner(`upload-${key}-details`, 'Adding Cards');
-        for (const listing of listings) {
-          const card = cardsToUpload[key].find((card) => listing.card.cardNo === card.cardNumber);
-          if (card) {
-            showSpinner(`upload-${card.sku}`, `Uploading ${card.title}`);
-            try {
-              const newListing = {
-                ...listing,
-                availableQuantity: listing.availableQuantity + card.quantity,
-                price: card.bscPrice,
-                sellerSku: card.sku || card.bin,
-              };
-              if (card.directory) {
-                if (card.frontImage) {
-                  updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Front Image)`);
-                  newListing.sellerImgFront = (
-                    await postImage(
-                      'common/card/undefined/product/undefined/attachment',
-                      `output/${card.directory}${card.frontImage}`,
-                    )
-                  ).objectKey;
-                  newListing.imageChanged = true;
+        await Promise.all(
+          listings.map(async (listing) => {
+            const card = cardsToUpload[key].find((card) => listing.card.cardNo === card.cardNumber);
+            if (card) {
+              showSpinner(`upload-${card.sku}`, `Uploading ${card.title}`);
+              try {
+                const newListing = {
+                  ...listing,
+                  availableQuantity: listing.availableQuantity + card.quantity,
+                  price: card.bscPrice,
+                  sellerSku: card.sku || card.bin,
+                };
+                if (card.directory) {
+                  if (card.frontImage) {
+                    updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Front Image)`);
+                    newListing.sellerImgFront = (
+                      await postImage(
+                        'common/card/undefined/product/undefined/attachment',
+                        `output/${card.directory}${card.frontImage}`,
+                      )
+                    ).objectKey;
+                    newListing.imageChanged = true;
+                  }
+                  if (card.backImage) {
+                    updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Back Image)`);
+                    newListing.sellerImgBack = (
+                      await postImage(
+                        'common/card/undefined/product/undefined/attachment',
+                        `output/${card.directory}${card.backImage}`,
+                      )
+                    ).objectKey;
+                    newListing.imageChanged = true;
+                  }
                 }
-                if (card.backImage) {
-                  updateSpinner(`upload-${card.sku}`, `Uploading ${card.title} (Back Image)`);
-                  newListing.sellerImgBack = (
-                    await postImage(
-                      'common/card/undefined/product/undefined/attachment',
-                      `output/${card.directory}${card.backImage}`,
-                    )
-                  ).objectKey;
-                  newListing.imageChanged = true;
-                }
+                finishSpinner(`upload-${card.sku}`, `Added ${card.title}`);
+                updates.push(newListing);
+                updated++;
+              } catch (e) {
+                errorSpinner(`upload-${card.sku}`, `Error adding ${card.title}: ${e.message}`);
               }
-              finishSpinner(`upload-${card.sku}`, `Added ${card.title}`);
-              updates.push(newListing);
-              updated++;
-            } catch {
-              errorSpinner(`upload-${card.sku}`, `Error adding ${card.title}: ${e.message}`);
+            } else if (listing.availableQuantity > 0) {
+              updates.push(listing);
             }
-          } else if (listing.availableQuantity > 0) {
-            updates.push(listing);
-          }
-        }
+          }),
+        );
 
         if (updated > 0) {
           showSpinner(`upload-${key}-details`, 'Uploading Results');
@@ -752,7 +464,6 @@ const findListing = async (listings, card) => {
   }
 
   errorSpinner('find-listing', `No Exact match for ${card.title}`);
-  const paused = pauseSpinners();
 
   //look for fuzzy card number match
   if (!found) {
@@ -788,8 +499,6 @@ const findListing = async (listings, card) => {
       found = true;
     }
   }
-
-  resumeSpinners(paused);
 
   return found ? listing : undefined;
 };

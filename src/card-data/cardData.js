@@ -309,9 +309,9 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   const askFor = async (text, propName = text.toLowerCase(), options = { allowUpdates: resetAll }) =>
     await addCardData(text, output, propName, defaultValues, options);
 
-  let skipShipping = await ask('Use Set Info?', true, { allowUpdates: resetAll });
+  let useSetInfo = await ask('Use Set Info?', true, { allowUpdates: resetAll });
 
-  if (skipShipping) {
+  if (!useSetInfo) {
     await askFor('Sport', 'sport', {
       selectOptions: sports,
       allowUpdates: resetAll,
@@ -324,7 +324,7 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
 
-  if (skipShipping) {
+  if (useSetInfo) {
     output.quantity = 1;
   } else {
     await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
@@ -332,11 +332,11 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     await askFor('Parallel', 'parallel', { allowUpdates: true });
     await askFor('Insert', 'insert', { allowUpdates: true });
     await askFor('Features (RC, etc)', 'features', { allowUpdates: true });
-    await askFor('Print Run', 'printRun', { allowUpdates: skipShipping || resetAll });
-    await askFor('Autographed', 'autographed', { allowUpdates: skipShipping || resetAll });
+    await askFor('Print Run', 'printRun', { allowUpdates: useSetInfo || resetAll });
+    await askFor('Autographed', 'autographed', { allowUpdates: useSetInfo || resetAll });
     if (isYes(output.autographed)) {
       await askFor('Autograph Format', 'autoFormat', {
-        allowUpdates: skipShipping || resetAll,
+        allowUpdates: useSetInfo || resetAll,
         selectOptions: ['Label or Sticker', 'On Card', 'Cut Signature'],
       });
     } else {
@@ -350,11 +350,11 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
       await askFor('Cert Number', 'certNumber', { allowUpdates: resetAll });
     }
 
-    skipShipping = await ask('Use Standard Card Size/Shipping?', true);
+    useSetInfo = await ask('Use Standard Card Size/Shipping?', true);
   }
   await askFor('Quantity', 'quantity', { allowUpdates: resetAll });
 
-  if (skipShipping) {
+  if (useSetInfo) {
     output.size = 'Standard';
     output.material = 'Card Stock';
     output.thickness = '20pt';

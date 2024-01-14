@@ -7,7 +7,7 @@ import { prepareImageFile } from './image-processing/imageProcessor.js';
 import writeOutputFiles from './writeFiles.js';
 import collectBulkListings from './bulk.js';
 import chalk from 'chalk';
-import { useSpinners } from './utils/spinners.js';
+import { pauseSpinners, resumeSpinners, useSpinners } from './utils/spinners.js';
 import { processImageFile } from './listing-sites/firebase.js';
 
 // set up the queues
@@ -27,10 +27,7 @@ const queueImageFiles = new Queue({
   concurrency: 3,
 });
 
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'singles',
-  chalk.cyan,
-);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('singles', chalk.cyan);
 
 async function processSingles(savedAnswers, setData, files) {
   showSpinner('singles', 'Processing Singles');
@@ -162,7 +159,6 @@ const preProcessPair = async (front, back, allCards, setData, overrideImages) =>
 };
 
 const processPair = async (front, back, imageDefaults, allCards, overrideImages) => {
-  const spinners = pauseSpinners();
   try {
     if (!cardDataExistsForRawImage(front, allCards)) {
       pauseSpinners();
@@ -190,10 +186,7 @@ const processPair = async (front, back, imageDefaults, allCards, overrideImages)
     }
   } catch (e) {
     console.error(e);
-    resumeSpinners(spinners);
     throw e;
-  } finally {
-    resumeSpinners(spinners);
   }
 };
 

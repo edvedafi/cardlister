@@ -107,8 +107,6 @@ export const useSpinners = (processName, color) => ({
   },
   finishSpinner: (name, message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
   errorSpinner: (name, message) => errorSpinner(`${processName}-${name}`, color(`${message}`)),
-  pauseSpinners: pauseSpinners,
-  resumeSpinners: resumeSpinners,
   log: (...args) => {
     const paused = pauseSpinners();
     console.log(...args.map((arg) => (typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2)))));
