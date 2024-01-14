@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 import axios from 'axios';
-import { updateFirebaseListing } from './firebase.js';
+import { getCardBySKU, updateFirebaseListing } from './firebase.js';
 
 const color = chalk.hex('#275467');
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
@@ -19,8 +19,9 @@ export async function getMySlabSales() {
     await login();
     const apiResults = await fetchSales();
     log('api', apiResults);
-    sales = convertSalesToCards(apiResults);
+    sales = await convertSalesToCards(apiResults);
     log('sales', sales);
+    updateSpinner('sales', `Flagging Cards as sold on MySlabs`);
     finishSpinner('sales', `Found ${sales.length} cards sold on MySlabs`);
     return sales;
   } catch (e) {
@@ -136,23 +137,25 @@ export async function fetchSales() {
   }
 }
 
-export function convertSalesToCards(sales) {
+export async function convertSalesToCards(sales) {
   showSpinner('convertSalesToCards', 'Converting sales to cards');
   const cards = [];
-  sales.forEach((sale) => {
-    showSpinner('convertCard', `Converting ${sale.title}`);
-    if (new Date(sale.sold_date) < new Date(sale.updated_date)) {
-      finishSpinner('convertCard');
-    } else {
-      cards.push({
-        platform: 'MySlabs',
-        title: sale.title,
-        quantity: 1,
-        sku: sale.external_id,
-      });
-      finishSpinner('convertCard', `Sold: ${sale.title}`);
-    }
-  });
+  await Promise.all(
+    sales
+      .filter((sale) => sale.external_id)
+      .map(async (sale) => {
+        showSpinner('convertCard', `Converting ${sale.title}`);
+        const card = await getCardBySKU(sale.external_id);
+        if (card && !card.sold) {
+          card.platform = 'MySlabs';
+          card.quantity = 1;
+          cards.push(card);
+          finishSpinner('convertCard', `Sold: ${sale.title}`);
+        } else {
+          finishSpinner('convertCard');
+        }
+      }),
+  );
   finishSpinner('convertSalesToCards');
   return cards;
 }

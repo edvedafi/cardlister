@@ -261,14 +261,15 @@ export async function matchOldStyle(db, card) {
 }
 
 export async function getListingInfo(db, cards) {
-  showSpinner('getListingInfo', 'Getting listing info from Firebase'); //once oldMatch goes away can use spinner
-  // showSpinner('firebase', 'Getting listing info from Firebase');
+  showSpinner('getListingInfo', 'Getting listing info from Firebase');
   const removals = [];
   for (let card of cards) {
     if (card.sku) {
       showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
       const doc = await db.collection('CardSales').doc(card.sku).get();
       if (doc.data() && doc.data().sku) {
+        updateSpinner(card.sku, `Setting ${card.sku} to sold`);
+        await updateFirebaseListing({ sku: card.sku, sold: true });
         removals.push(await mergeFirebaseResult(card, doc.data()));
         finishSpinner(card.sku, card.sku);
       } else {
@@ -289,6 +290,19 @@ export async function getListingInfo(db, cards) {
   }
   finishSpinner('getListingInfo', 'Getting listing info from Firebase');
   return removals;
+}
+
+export async function getCardBySKU(sku) {
+  showSpinner('getCardBySKU', `Getting card by sku ${sku}`);
+  const db = getFirestore();
+  const doc = await db.collection('CardSales').doc(sku).get();
+  if (doc.data()) {
+    finishSpinner('getCardBySKU');
+    return doc.data();
+  } else {
+    errorSpinner('getCardBySKU', `Failed to find card by sku ${sku} | ${e.message}`);
+    return null;
+  }
 }
 
 /**
