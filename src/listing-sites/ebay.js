@@ -1,13 +1,13 @@
 //write a function that takes in a file path and an array of objects that will be written as a csv to the file
 import { createObjectCsvWriter } from 'csv-writer';
-import { isNo, isYes, manufactures, sets } from '../utils/data.js';
+import { isNo, isYes } from '../utils/data.js';
 import { gradeIds, graderIds } from './ebayConstants.js';
 import open from 'open';
 import eBayApi from 'ebay-api';
 import { Browser, Builder, By } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
 import chalk from 'chalk';
-import { useWaitForElement } from './uploads.js';
+import { reverseTitle, useWaitForElement } from './uploads.js';
 import express from 'express';
 import fs from 'fs-extra';
 import { useSpinners } from '../utils/spinners.js';
@@ -729,78 +729,6 @@ export const ebayAPIUpload = async (allCards) => {
       }),
   );
   finishSpinner('sales', `Uploaded ${chalk.green(count)} cards to ebay`);
-};
-
-export const reverseTitle = (title) => {
-  const cardNumberIndex = title.indexOf('#');
-  const yearIdx = title.match(/\D*-?\D+/)?.index;
-  let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
-  const card = {
-    cardNumber: title.match(/#(.*\w+)/)?.[1].replaceAll(' ', ''),
-    year: title.split(' ')[0],
-    parallel: '',
-    insert: '',
-    // setName: setName.join('|'),
-    // manufacture: 'Panini',
-    setName: setInfo,
-    // sport: 'Football',
-  };
-
-  const manufacture = manufactures.find((m) => setInfo.toLowerCase().indexOf(m) > -1);
-  if (manufacture) {
-    if (manufacture === 'score') {
-      card.manufacture = 'Panini';
-    } else {
-      card.manufacture = setInfo.slice(setInfo.toLowerCase().indexOf(manufacture), manufacture.length);
-      setInfo = setInfo.replace(card.manufacture, '').trim();
-      card.setName = setInfo;
-    }
-  }
-
-  const set = sets.find((s) => setInfo.toLowerCase().indexOf(s) > -1);
-  if (set) {
-    card.setName = setInfo.slice(setInfo.toLowerCase().indexOf(set), set.length);
-    setInfo = setInfo.replace(card.setName, '').trim();
-    if (!card.manufacture) {
-      const paniniSearch = `panini ${card.setName.toLowerCase()}`;
-      if (sets.find((s) => s === paniniSearch)) {
-        card.manufacture = 'Panini';
-      } else {
-        const toppsSearch = `topps ${card.setName.toLowerCase()}`;
-        if (sets.find((s) => s === toppsSearch)) {
-          card.manufacture = 'Topps';
-        }
-      }
-    }
-  }
-
-  const insertIndex = setInfo.toLowerCase().indexOf('insert');
-  if (insertIndex > -1) {
-    card.insert = setInfo.slice(0, insertIndex).trim();
-    setInfo = setInfo.replace(card.insert, '').trim();
-    setInfo = setInfo.replace('Insert', '').trim();
-  }
-
-  const parallelIndex = setInfo.toLowerCase().indexOf('parallel');
-  if (parallelIndex > -1) {
-    card.parallel = setInfo.slice(0, parallelIndex).trim();
-    setInfo = setInfo.replace(card.parallel, '').trim();
-    setInfo = setInfo.replace('Parallel', '').trim();
-  }
-
-  if (setInfo.length > 0) {
-    if (!card.insert) {
-      card.insert = setInfo;
-    } else if (!card.parallel) {
-      card.parallel = setInfo;
-    } else {
-      console.log('No Field left to put the remaining SetInfo', setInfo, 'for', card);
-    }
-  }
-
-  // console.log('card', card);
-
-  return card;
 };
 
 export const getEbaySales = async () => {

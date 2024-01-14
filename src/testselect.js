@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import 'zx/globals';
 import minimist from 'minimist';
-import { getMySlabSales } from './listing-sites/myslabs.js';
+import { getSalesFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -9,4 +9,8 @@ $.verbose = false;
 
 dotenv.config();
 
-await getMySlabSales();
+try {
+  await getSalesFromMyCardPost();
+} finally {
+  await shutdownMyCardPost();
+}

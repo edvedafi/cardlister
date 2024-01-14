@@ -5,7 +5,7 @@ import { createGroups } from './listing-sites/uploads.js';
 import chalk from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
-import { removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
+import { getSalesFromMyCardPost, removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import { getFileSales, getGroupByBin, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
@@ -166,6 +166,7 @@ try {
     getEbaySales(),
     getBuySportsCardsSales(),
     getSalesSportLots(),
+    getSalesFromMyCardPost(),
   ]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
   finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);

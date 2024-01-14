@@ -1,7 +1,7 @@
 import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
 import { Browser, Builder, By } from 'selenium-webdriver';
-import { backImage, buttonByText, frontImage, inputByPlaceholder, useWaitForElement } from './uploads.js';
+import { backImage, buttonByText, frontImage, inputByPlaceholder, reverseTitle, useWaitForElement } from './uploads.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
@@ -261,5 +261,61 @@ export async function removeFromMyCardPost(cards) {
       'remove',
       `Only removed ${toRemove.length - notRemoved.length} of ${toRemove.length} cards from MyCardPost`,
     );
+  }
+}
+
+export async function getSalesFromMyCardPost() {
+  showSpinner('sales', 'My Card Post sales');
+  const spin = (message) => updateSpinner(`sales`, `My Card Post sales (${message})`);
+  let driver;
+
+  try {
+    driver = await login();
+
+    const waitForElement = useWaitForElement(driver);
+
+    //iterate over cardsToUpload values
+    spin('Launching site');
+    await driver.get('https://mycardpost.com/orders');
+    const sales = [];
+    spin('Watching for page to load');
+    const buttons = await driver.findElements(By.xpath('//input[@type="radio"]'));
+    const soldButton = buttons[2];
+    spin('Clicking Sold');
+    soldButton.click();
+    spin('Waiting for Sold');
+    await waitForElement(By.xpath('//h2[text()="Shipping Address"]'));
+    spin('Looking for a sales table');
+    const salesTable = await waitForElement(By.xpath('//div[@class="orders-blk " or @class="orders-blk"]'));
+
+    if (salesTable) {
+      const classes = await salesTable.getAttribute('class');
+      if (classes.includes('orders-blk')) {
+        spin('Get Order IDs');
+        const orderIdDiv = await salesTable.findElement(By.xpath('.//div[@class="order-id"]'));
+        const orderIdText = await orderIdDiv.getText();
+        const orderId = orderIdText.substring(orderIdText.indexOf('#') + 1);
+        spin('Getting rows');
+        const rows = await driver.findElements(By.xpath('//div[@class="col-md-4 or-lft mb-4"]/p'));
+        for (let row of rows) {
+          const title = await row.getText();
+          showSpinner(title, title);
+          const skuMatch = title.match(/\[(.*)\]/);
+          if (skuMatch) {
+            const sku = skuMatch[1];
+            const card = { sku, title, platform: `MCP ${orderId}` };
+            sales.push(card);
+            finishSpinner(title, title);
+          } else {
+            sales.push({ title, platform: `MCP ${orderId}`, ...reverseTitle(title) });
+            finishSpinner(title, title);
+          }
+        }
+      }
+    }
+    finishSpinner('sales', `Got ${sales.length} sales from My Card Post`);
+    return sales;
+  } catch (e) {
+    errorSpinner('sales', `Error getting sales from My Card Post ${e.message}`);
   }
 }
