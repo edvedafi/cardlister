@@ -237,8 +237,27 @@ export async function removeFromMyCardPost(cards) {
         await searchInput.clear();
         await searchInput.sendKeys(`[SKU: ${card.sku}]`);
         spinCard('Waiting for just one card');
-        await xpath('//h2[text()="All Cards (1)"]');
+        const header = await Promise.any([
+          xpath('//h2[text()="All Cards (1)"]'),
+          xpath('//h2[text()="All Cards (0)"]'),
+        ]);
+        const headerText = await header.getText();
+        if (headerText === 'All Cards (0)') {
+          await searchInput.clear();
+          await searchInput.sendKeys(card.title);
+          const secondSearchHeader = await Promise.any([
+            xpath('//h2[text()="All Cards (1)"]'),
+            xpath('//h2[text()="All Cards (0)"]'),
+          ]);
+          const secondHeaderText = await secondSearchHeader.getText();
+          if (secondHeaderText === 'All Cards (0)') {
+            errorSpinner(card.sku, `${card.title} (not found)`);
+            await ask('Please fix and press enter to continue');
+            continue;
+          }
+        }
         spinCard('Clicking Delete');
+        await driver.executeScript('window.scrollBy(50,50)');
         const removeButton = await xpath('//a[text()="Delete"]');
         await removeButton.click();
         spinCard('Confirming Delete');
@@ -250,6 +269,7 @@ export async function removeFromMyCardPost(cards) {
       }
     } catch (e) {
       errorSpinner(card.sku, `${card.title} (${e.message})`);
+      await ask('Please fix and press enter to continue');
       notRemoved.push(card);
     }
   }

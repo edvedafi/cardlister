@@ -6,13 +6,10 @@ import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
-import { useSpinners } from '../utils/spinners.js';
+import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
 
 const log = (...params) => console.log(chalk.blueBright(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, pauseSpinners, resumeSpinners } = useSpinners(
-  'sportlots',
-  chalk.blueBright,
-);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('sportlots', chalk.blueBright);
 
 const brands = {
   bowman: 'Bowman',
@@ -544,9 +541,9 @@ export async function removeFromSportLots(groupedCards) {
       }
       updateSpinner(`remove-${key}-details`, `Found the Update Inventory Page`);
     } catch (e) {
-      const pausedSpinners = pauseSpinners(['remove', `remove-${key}`, `remove-${key}-details`]);
       const find = new Promise((resolve) => {
         let askFail, waitFail;
+        pauseSpinners();
         const askPromise = confirm({
           message: `Does this set exist on SportLots? ${chalk.red(key)}. Please select the proper filters or say No`,
         });
@@ -588,7 +585,7 @@ export async function removeFromSportLots(groupedCards) {
           });
       });
       found = await find;
-      resumeSpinners(pausedSpinners);
+      resumeSpinners();
     }
 
     if (found) {
@@ -626,23 +623,26 @@ export async function removeFromSportLots(groupedCards) {
           //set the row background to yellow
           await driver.executeScript("arguments[0].style.backgroundColor = 'yellow';", row);
           updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Looking current quantity`);
-          let cardNumberTextBox = await row.findElement(By.xpath(`./td/input[starts-with(@name, 'qty')]`));
-          const currentQuantity = await cardNumberTextBox.getAttribute('value');
-          let newQuantity = parseInt(currentQuantity) - parseInt(card.quantity);
-          if (newQuantity < 0) {
-            newQuantity = 0;
-          }
+          try {
+            let cardNumberTextBox = await row.findElement(By.xpath(`./td/input[starts-with(@name, 'qty')]`));
+            const currentQuantity = await cardNumberTextBox.getAttribute('value');
+            let newQuantity = parseInt(currentQuantity) - parseInt(card.quantity);
+            if (newQuantity < 0) {
+              newQuantity = 0;
+            }
 
-          updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Updating quantity to: ${newQuantity}`);
-          await cardNumberTextBox.clear();
-          await cardNumberTextBox.sendKeys(newQuantity);
-          removed++;
-          finishSpinner(`remove-card-${card.cardNumber}`, `${card.title} now has ${newQuantity} cards remaining`);
+            updateSpinner(`remove-card-${card.cardNumber}`, `${card.title}: Updating quantity to: ${newQuantity}`);
+            await cardNumberTextBox.clear();
+            await cardNumberTextBox.sendKeys(newQuantity);
+            removed++;
+            finishSpinner(`remove-card-${card.cardNumber}`, `${card.title} now has ${newQuantity} cards remaining`);
+          } catch (e) {
+            errorSpinner(`remove-card-${card.cardNumber}`, `Could not find card ${card.title}`);
+            await ask(`Please reduce quantity by ${chalk.red(card.quantity)} and Press any key to continue...`);
+          }
         } else {
           errorSpinner(`remove-card-${card.cardNumber}`, `Could not find card ${card.title}`);
-          const paused = pauseSpinners(['remove', `remove-${key}`, `remove-${key}-details`]);
           await ask(`Please reduce quantity by ${chalk.red(card.quantity)} and Press any key to continue...`);
-          resumeSpinners(paused);
         }
       }
       updateSpinner(`remove-${key}-details`, `Submitting changes`);
