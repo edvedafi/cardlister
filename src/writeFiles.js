@@ -17,26 +17,38 @@ async function writeOutputFiles(allCards, bulk, restart = false) {
 
   const bulkGrouped = await createGroups(allCards, bulk);
 
-  if (!restart || (await ask('Upload to Firebase?', true))) {
-    await uploadToFirebase(allCards);
-  }
-  if (!restart || (await ask('Upload to Shopify?', true))) {
-    await uploadToShopify(allCards);
-  }
-  if (!restart || (await ask('Upload to SportLots?', true))) {
-    await enterIntoSportLotsWebsite(bulkGrouped);
-  }
-  if (!restart || (await ask('Upload to BuySportCards?', true))) {
-    await uploadToBuySportsCards(bulkGrouped);
-  }
-  if (!restart || (await ask('Upload to My Card Post?', true))) {
-    await uploadToMyCardPost(allCards);
-  }
-  if (!restart || (await ask('Upload to My Slabs?', true))) {
-    await uploadToMySlabs(allCards);
-  }
-  if (!restart || (await ask('Upload to Ebay?', true))) {
-    await ebayAPIUpload(allCards);
+  if (restart) {
+    if (await ask('Upload to Firebase?', true)) {
+      await uploadToFirebase(allCards);
+    }
+    if (await ask('Upload to Shopify?', true)) {
+      await uploadToShopify(allCards);
+    }
+    if (await ask('Upload to SportLots?', true)) {
+      await enterIntoSportLotsWebsite(bulkGrouped);
+    }
+    if (await ask('Upload to BuySportCards?', true)) {
+      await uploadToBuySportsCards(bulkGrouped);
+    }
+    if (await ask('Upload to My Card Post?', true)) {
+      await uploadToMyCardPost(allCards);
+    }
+    if (await ask('Upload to My Slabs?', true)) {
+      await uploadToMySlabs(allCards);
+    }
+    if (await ask('Upload to Ebay?', true)) {
+      await ebayAPIUpload(allCards);
+    }
+  } else {
+    await Promise.all([
+      uploadToFirebase(allCards),
+      uploadToShopify(allCards),
+      enterIntoSportLotsWebsite(bulkGrouped),
+      uploadToBuySportsCards(bulkGrouped),
+      uploadToMyCardPost(allCards),
+      uploadToMySlabs(allCards),
+      ebayAPIUpload(allCards),
+    ]);
   }
 
   finishSpinner('uploads', 'Finished uploading data to listing sites');

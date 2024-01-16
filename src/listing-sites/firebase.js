@@ -7,10 +7,7 @@ import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.hex('#ffc107');
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners, log } = useSpinners(
-  'firebase',
-  color,
-);
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', color);
 
 export async function uploadToFirebase(allCards) {
   showSpinner('upload', 'Firebase Starting Upload');
@@ -116,7 +113,6 @@ export async function mergeFirebaseResult(card, match) {
     (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName)
   ) {
     errorSpinner('merge', `Missing some required data. Please confirm for card: ${updatedCard.title}`);
-    const spinners = pauseSpinners();
     updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
     updatedCard.year = await ask('What year is this card?', updatedCard.year);
     updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
@@ -124,7 +120,6 @@ export async function mergeFirebaseResult(card, match) {
     updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
     updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
     updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
-    resumeSpinners(spinners);
   } else {
     finishSpinner('merge');
   }
@@ -506,10 +501,8 @@ export async function getGroup(info) {
         description: `${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
       });
     });
-    const paused = pauseSpinners();
     const response = await ask('Which group is correct?', undefined, { selectOptions: choices });
     _cachedGroups[response.bin] = response;
-    resumeSpinners(paused);
     finishSpinner('getGroup');
     return response;
   }

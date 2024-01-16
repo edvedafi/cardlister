@@ -509,61 +509,67 @@ export async function removeWithAPI(cardsToRemove) {
   const notRemoved = [];
   showSpinner('remove-details', `Removing ${Object.keys(cardsToRemove).length} sets`);
   for (const key in cardsToRemove) {
-    showSpinner(`remove-key-${key}`, `Removing ${key}`);
-    showSpinner(`remove-key-${key}-details`, `Removing ${key}`);
-    const setData = await parseKey(key, true);
+    try {
+      showSpinner(`remove-key-${key}`, `Removing ${key}`);
+      showSpinner(`remove-key-${key}-details`, `Removing ${key}`);
+      const setData = await parseKey(key, true);
 
-    let listings;
-    if (setData.bscFilters) {
-      updateSpinner(`remove-key-${key}-details`, `Getting exact results `);
-      listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
-    } else {
-      updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
-      let { body, allPossibleListings } = await getAllListings(setData);
-      listings = allPossibleListings.results;
-      if (listings?.length === 0) {
-        setData.bscFilters = body;
-        await updateGroup(setData);
+      let listings;
+      if (setData.bscFilters) {
+        updateSpinner(`remove-key-${key}-details`, `Getting exact results `);
+        listings = (await post('seller/bulk-upload/results', setData.bscFilters)).results;
+      } else {
+        updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
+        let { body, allPossibleListings } = await getAllListings(setData);
+        listings = allPossibleListings.results;
+        if (listings?.length === 0) {
+          setData.bscFilters = body;
+          await updateGroup(setData);
+        }
       }
-    }
 
-    if (listings && listings.length > 0) {
-      let updated = 0;
-      updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
-      for (const card of cardsToRemove[key]) {
-        showSpinner(`remove-card-${card.title}`, `Removing ${card.title}`);
-        const listing = await findListing(listings, card);
-        if (listing) {
-          let newQuantity = listing.availableQuantity + card.quantity;
-          if (newQuantity < 0) {
-            newQuantity = 0;
+      if (listings && listings.length > 0) {
+        let updated = 0;
+        updateSpinner(`remove-key-${key}-details`, `Searching for listings`);
+        for (const card of cardsToRemove[key]) {
+          showSpinner(`remove-card-${card.title}`, `Removing ${card.title}`);
+          const listing = await findListing(listings, card);
+          if (listing) {
+            let newQuantity = listing.availableQuantity + card.quantity;
+            if (newQuantity < 0) {
+              newQuantity = 0;
+            }
+            listing.availableQuantity = newQuantity;
+            updated++;
+            finishSpinner(`remove-card-${card.title}`, `Setting quantity of ${card.title} to ${newQuantity}`);
+          } else {
+            card.error = 'No match in set';
+            notRemoved.push(card);
+            errorSpinner(`remove-card-${card.title}`, `No match for ${card.title}`);
           }
-          listing.availableQuantity = newQuantity;
-          updated++;
-          finishSpinner(`remove-card-${card.title}`, `Setting quantity of ${card.title} to ${newQuantity}`);
-        } else {
-          card.error = 'No match in set';
-          notRemoved.push(card);
-          errorSpinner(`remove-card-${card.title}`, `No match for ${card.title}`);
         }
-      }
 
-      if (updated > 0) {
-        try {
-          updateSpinner(`remove-key-${key}-details`, `Saving updates`);
-          await saveBulk(listings);
-          finishSpinner(`remove-key-${key}-details`);
-          finishSpinner(`remove-key-${key}`);
-        } catch (e) {
-          notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: e.message })));
-          finishSpinner(`remove-key-${key}-details`);
-          errorSpinner(`remove-key-${key}`, `Failed to remove cards for set ${key}`);
+        if (updated > 0) {
+          try {
+            updateSpinner(`remove-key-${key}-details`, `Saving updates`);
+            await saveBulk(listings);
+            finishSpinner(`remove-key-${key}-details`);
+            finishSpinner(`remove-key-${key}`);
+          } catch (e) {
+            notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: e.message })));
+            finishSpinner(`remove-key-${key}-details`);
+            errorSpinner(`remove-key-${key}`, `Failed to remove cards for set ${key}`);
+          }
         }
+      } else {
+        notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: 'No Set Found' })));
+        finishSpinner(`remove-key-${key}-details`);
+        errorSpinner(`remove-key-${key}`, `Could not find any listings for ${key}`);
       }
-    } else {
-      notRemoved.push(...cardsToRemove[key].map((card) => ({ ...card, error: 'No Set Found' })));
+    } finally {
+      //These should both be closed out before this, but if something went off the rails just close them out to be safe
+      finishSpinner(`remove-key-${key}`);
       finishSpinner(`remove-key-${key}-details`);
-      errorSpinner(`remove-key-${key}`, `Could not find any listings for ${key}`);
     }
   }
 
