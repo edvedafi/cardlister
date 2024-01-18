@@ -75,33 +75,11 @@ export const getSetData = async () => {
   const isSet = await ask('Is this a complete set?', isYes(saveData.setData?.isSet));
 
   if (isSet) {
-    saveData.setData.isSet = true;
-
-    saveData.setData.sport = await ask('Sport', saveData.setData.sport, {
-      selectOptions: sports,
-    });
-    saveData.setData.year = await ask('Year', saveData.setData.year);
-    saveData.setData.player = await ask('Player', saveData.setData.player);
-    saveData.setData.league = findLeague(saveData.setData.sport);
-    saveData.setData.team = await ask('Team', saveData.setData.team, {
-      selectOptions: getTeamSelections(saveData.setData.sport),
-    });
-    saveData.setData.manufacture = await ask('Manufacturer', saveData.setData.manufacture);
-    saveData.setData.setName = await ask('Set Name', saveData.setData.setName);
-    saveData.setData.insert = await ask('Insert', saveData.setData.insert);
-    saveData.setData.parallel = await ask('Parallel', saveData.setData.parallel);
-    saveData.setData.features = await ask('Features', saveData.setData.features);
-    saveData.setData.printRun = await ask('Print Run', saveData.setData.printRun);
-    saveData.setData.autographed = await ask('Autograph', saveData.setData.autographed);
-
-    saveData.setData.graded = await ask('Graded', saveData.setData.graded || false);
-
-    saveData.setData.card_number_prefix = await ask('Enter Card Number Prefix', saveData.setData.card_number_prefix);
-    saveData.setData.price = await ask('Default Price', saveData.setData.price || 0.99);
-    // saveData.setData.autoOffer = await ask('Default Auto Accept Offer', saveData.setData.autoOffer || 0.01);
-    saveData.setData.bscPrice = await ask('BSC Price', saveData.setData.bscPrice || 0.25);
-    saveData.setData.slPrice = await ask('SportLots Price', saveData.setData.slPrice || 0.18);
-    saveData.setData.bin = (await getGroup(saveData.setData)).bin;
+    saveData.setData = {
+      ...saveData.setData,
+      ...(await getSetData(saveData.setData)),
+      isSet: true,
+    };
   } else {
     saveData.setData = {};
   }

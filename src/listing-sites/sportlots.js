@@ -1,7 +1,7 @@
 import { manufactures, sets } from '../utils/data.js';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
-import { caseInsensitive, useSetSelectValue, useWaitForElement } from './uploads.js';
+import { caseInsensitive, getSelectOptions, useSetSelectValue, useWaitForElement } from './uploads.js';
 import { validateUploaded } from './validate.js';
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
@@ -61,7 +61,7 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
     await setSelectValue(yearField, setInfo.sportlots?.year || setInfo.year);
     const brand =
       setInfo.sportlots?.manufacture ||
-      brands[setInfo.setName?.toLowerCase()] ||
+      brands[setInfo.setNameName?.toLowerCase()] ||
       brands[setInfo.manufacture?.toLowerCase()] ||
       'All Brands';
     updateSpinner('selectBrand', `Setting brand to ${brand}`);
@@ -150,7 +150,7 @@ const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
 
 let _driver;
 
-async function login() {
+export async function login() {
   if (!_driver) {
     showSpinner('login', 'Logging into SportLots');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
@@ -167,7 +167,7 @@ async function login() {
 
     updateSpinner('login', 'Submitting login request');
     await useClickSubmit(waitForElement)();
-    finishSpinner('login');
+    finishSpinner('login', 'Sportlots Logged In');
   }
   return _driver;
 }
@@ -681,3 +681,146 @@ export async function removeFromSportLots(groupedCards) {
 }
 
 export default enterIntoSportLotsWebsite;
+
+export async function findSetId(defaultValues = {}) {
+  const { update, finish } = showSpinner('setInfo', 'Find SetInfo');
+  let setInfo = {};
+  const driver = await login();
+  const waitForElement = useWaitForElement(driver);
+  const clickSubmit = useClickSubmit(waitForElement);
+  const setSelectValue = useSetSelectValue(driver);
+
+  await driver.get(`https://sportlots.com/inven/dealbin/newinven.tpl`);
+
+  const getAndSetValue = async (text, name, defaultValue, returnName = false) => {
+    const sportSelector = await waitForElement(By.name(name));
+    const sportOptions = await getSelectOptions(sportSelector);
+    const sport = await ask(text, defaultValue, { selectOptions: sportOptions });
+    await setSelectValue(sportSelector, sport);
+    if (returnName) {
+      return sportOptions.find((option) => option.value === sport)?.name.toLowerCase();
+    } else {
+      return sport;
+    }
+  };
+
+  setInfo.sport = await getAndSetValue('Sport', 'sprt', defaultValues.sport, true);
+  update(JSON.stringify(setInfo));
+  setInfo.year = await getAndSetValue('Year', 'yr', defaultValues.year);
+  update(JSON.stringify(setInfo));
+  setInfo.manufacture = await getAndSetValue('Manufacture', 'brd', defaultValues.manufacture);
+  update(JSON.stringify(setInfo));
+
+  await clickSubmit();
+
+  //find the table and iterate through the rows
+  const table = await waitForElement(By.xpath(`//th[contains(text(), 'Set Name')]`));
+  const rows = await table.findElements(By.xpath(`../../tr`));
+  const allSets = [];
+  for (let row of rows) {
+    const columns = await row.findElements(By.xpath(`./td`));
+    if (columns.length > 1) {
+      const fullSetText = await columns[1].getText();
+      allSets.push(fullSetText);
+    }
+  }
+
+  const sets = {};
+  let lastSet;
+  let lastInsert;
+  for (let i = 0; i < allSets.length; i++) {
+    const fullSetText = allSets[i];
+    const setNumber = fullSetText.substring(0, fullSetText.indexOf(' '));
+    const setText = fullSetText.substring(fullSetText.indexOf(' ') + 1);
+    let setName = setText;
+    if (!lastSet) {
+      lastSet = setName;
+      sets[setName] = {
+        base: { name: setText, value: { sportlots: { bin: setNumber }, setName: setName }, description: fullSetText },
+        inserts: {},
+        parallels: [],
+      };
+    } else {
+      if (setText.indexOf(lastSet) > -1) {
+        setName = lastSet;
+        if (!lastInsert || setText.indexOf(lastInsert) === -1) {
+          lastInsert = setText.replace(setName, '').trim();
+          if (allSets[i + 1] && allSets[i + 1].indexOf(lastInsert) > -1) {
+            sets[setName].inserts[lastInsert] = {
+              base: {
+                name: setText,
+                value: { sportlots: { bin: setNumber }, setName: setName, insert: lastInsert },
+                description: fullSetText,
+              },
+              parallels: [],
+            };
+          } else {
+            sets[setName].parallels.push({
+              name: setText,
+              value: { sportlots: { bin: setNumber }, setName: setName, parallel: lastInsert },
+              description: fullSetText,
+            });
+          }
+        } else {
+          sets[setName].inserts[lastInsert].parallels.push({
+            name: setText,
+            value: {
+              sportlots: { bin: setNumber },
+              setName: setName,
+              insert: lastInsert,
+              parallel: setText.replace(setName, '').replace(lastInsert, '').trim(),
+            },
+            description: fullSetText,
+          });
+        }
+      } else {
+        lastSet = setName;
+        lastInsert = undefined;
+        sets[setName] = {
+          base: { name: setText, value: { sportlots: { bin: setNumber }, setName: setName }, description: fullSetText },
+          inserts: {},
+          parallels: [],
+        };
+      }
+    }
+  }
+
+  setInfo.setName = await ask('Which set is this?', defaultValues.setName, { selectOptions: Object.keys(sets) });
+  const setType = await ask('Which type is this?', undefined, { selectOptions: ['base', 'insert', 'parallel'] });
+  if (setType === 'base') {
+    setInfo = {
+      ...setInfo,
+      ...sets[setInfo.setName].base.value,
+    };
+  } else if (setType === 'insert') {
+    const insert = await ask('Which insert is this?', defaultValues.insert, {
+      selectOptions: Object.keys(sets[setInfo.setNameName].inserts),
+    });
+    if (sets[setInfo.setName].inserts[insert].parallels.length > 0) {
+      setInfo = {
+        ...setInfo,
+        ...(await ask('Which parallel is this?', defaultValues.parallel, {
+          selectOptions: [
+            sets[setInfo.setName].inserts[insert].base,
+            ...sets[setInfo.setName].inserts[insert].parallels,
+          ],
+        })),
+      };
+    } else {
+      setInfo = {
+        ...setInfo,
+        ...sets[setInfo.setName].inserts[insert].base.value,
+      };
+    }
+  } else {
+    setInfo = {
+      ...setInfo,
+      ...(await ask('Which parallel is this?', defaultValues.parallel, {
+        selectOptions: [sets[setInfo.setName].base, ...sets[setInfo.setName].parallels],
+      })),
+    };
+  }
+
+  finish(`Selected Set Info ${JSON.stringify(setInfo)}`);
+  return setInfo;
+}

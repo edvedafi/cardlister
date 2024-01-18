@@ -476,6 +476,8 @@ export async function getGroup(info) {
       slPrice: info.slPrice || 0.18,
       price: info.price || 0.99,
       keys: setInfo,
+      sportlots: info.sportlots || null,
+      bscFilters: info.bscFilters || null,
     };
     await collection.doc(`${group.bin}`).set(group);
     _cachedGroups[group.bin] = group;
@@ -531,11 +533,12 @@ export async function getGroupByBin(bin) {
 
 export async function updateGroup(group) {
   showSpinner('updateGroup', `Updating group ${group.bin}`);
-  _cachedGroups[group.bin] = group;
-  const db = getFirestore();
-  // console.log('updating group', group);
-  await db.collection('SalesGroups').doc(`${group.bin}`).set(group);
+  const doc = getFirestore().collection('SalesGroups').doc(`${group.bin}`);
+  await doc.update(group);
+  const updatedDoc = await doc.get();
+  _cachedGroups[group.bin] = updatedDoc.data();
   finishSpinner('updateGroup');
+  return _cachedGroups[group.bin];
 }
 
 // upload file to firebase storage

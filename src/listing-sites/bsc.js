@@ -39,7 +39,7 @@ const baseHeaders = {
   // 'Referrer Policy:': 'strict-origin-when-cross-origin',
 };
 
-const login = async () => {
+export const login = async () => {
   if (!_driver) {
     showSpinner('login', 'Logging into BSC');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
@@ -74,7 +74,7 @@ const login = async () => {
     const redux = JSON.parse(reduxAsString);
     baseHeaders.authorization = 'Bearer ' + redux.secret.trim();
 
-    finishSpinner('login');
+    finishSpinner('login', 'BSC Logged In');
   }
 
   return _driver;
@@ -250,7 +250,8 @@ export async function getBuySportsCardsSales() {
   return sales;
 }
 
-async function getAllListings(setData) {
+export async function getAllListings(setData) {
+  await login();
   let filters = {
     sport: [setData.sport],
     year: [setData.year],

@@ -70,21 +70,23 @@ export const useHighlightElement =
     driver.executeScript(`arguments[0].setAttribute('style', 'background: ${color}');`, element);
 
 export const waitForElement = async (driver, locator, hidden = false) => {
-  // console.log('looking for element: ', locator);
+  const { update, finish } = showSpinner(`waitForElement-${locator}`, `Waiting for element: ${locator}`);
+
   try {
     await driver.wait(until.elementLocated(locator), 1000, `Looking for: ${locator}`);
   } catch (e) {
     await driver.wait(until.elementLocated(locator));
   }
-  // console.log('located element: ', locator);
+  update('located');
   const element = driver.findElement(locator);
-  //turn the element yellow
+  update('yellowing');
   await useHighlightElement(driver, 'yellow')(element);
 
-  // console.log('found element: ', locator);
+  update('waiting for ready');
   await waitForElementToBeReady(driver, element, hidden);
+  update('highlighting');
   await useHighlightElement(driver)(element);
-  // console.log('ready element: ', locator);
+  finish();
   return element;
 };
 
@@ -94,8 +96,10 @@ export const useWaitForElement =
     waitForElement(driver, locator, hidden);
 
 export const useSetSelectValue = (driver) => async (name, value) => {
-  // console.log(`Looking for ${name} to set to ${value}`);
-  const brandSelector = await useWaitForElement(driver)(By.name(name));
+  let brandSelector = name;
+  if (typeof name === 'string') {
+    brandSelector = await useWaitForElement(driver)(By.name(name));
+  }
   let brandSelectorSelect = new Select(brandSelector);
   await brandSelectorSelect.selectByValue('' + value);
 };
@@ -192,3 +196,21 @@ export const reverseTitle = (title) => {
 
   return card;
 };
+
+export async function getSelectOptions(selectBox) {
+  // Get all the option elements within the select box
+  const options = await selectBox.findElements(By.tagName('option'));
+
+  // Create an array to store the option values and text
+  const selectOptions = [];
+
+  // Iterate through each option and extract the value and text
+  for (const option of options) {
+    const value = await option.getAttribute('value');
+    const name = await option.getText();
+
+    // Add the value and text to the selectOptions array
+    selectOptions.push({ value, name });
+  }
+  return selectOptions;
+}

@@ -85,8 +85,28 @@ export const errorSpinner = (spinnerName, message) => {
   }
 };
 
-export const useSpinners = (processName, color) => ({
-  showSpinner: (name, message) => showSpinner(`${processName}-${name}`, color.inverse(`${message}`)),
+const log = (color, ...args) => {
+  pauseSpinners();
+  console.log(...args.map((arg) => (typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2)))));
+  resumeSpinners();
+};
+
+export const useSpinners = (processName, color = chalk.white) => ({
+  showSpinner: (name, message) => {
+    showSpinner(`${processName}-${name}`, color.inverse(`${message}`));
+    return {
+      update: (addition) => showSpinner(`${processName}-${name}`, color.inverse(`${message} (${addition})`)),
+      finish: (message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
+      error: (info, addition = message) => {
+        if (info instanceof Error) {
+          errorSpinner(`${processName}-${name}`, color(`${addition} (${info.message})`));
+          log(color, info);
+        } else {
+          errorSpinner(`${processName}-${name}`, color(`${message}`));
+        }
+      },
+    };
+  },
   updateSpinner: (name, message) => {
     const spinnerName = `${processName}-${name}`;
     const spinner = getSpinners().pick(spinnerName);
@@ -107,9 +127,5 @@ export const useSpinners = (processName, color) => ({
   },
   finishSpinner: (name, message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
   errorSpinner: (name, message) => errorSpinner(`${processName}-${name}`, color(`${message}`)),
-  log: (...args) => {
-    const paused = pauseSpinners();
-    console.log(...args.map((arg) => (typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2)))));
-    resumeSpinners(paused);
-  },
+  log: (...args) => log(color, ...args),
 });
