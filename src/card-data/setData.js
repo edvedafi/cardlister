@@ -4,10 +4,11 @@ import { useSpinners } from '../utils/spinners.js';
 import { getAllListings } from '../listing-sites/bsc.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
+import chalk from 'chalk';
 
 const color = chalk.white;
 const { showSpinner, log } = useSpinners('setData', color);
-export default async function getSetData(defaultValues) {
+export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
   try {
     let setInfo = { ...defaultValues };
@@ -31,7 +32,7 @@ export default async function getSetData(defaultValues) {
 
     log(setInfo);
     update('Gather Extra Info');
-    if (await ask('Update Set Details?', false)) {
+    if (collectDetails && (await ask('Update Set Details?', false))) {
       const updates = {};
       const updateInfo = async (key, display, defaultIfNull) => {
         const response = await ask(display, setInfo[key] || defaultIfNull);

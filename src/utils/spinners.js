@@ -1,4 +1,5 @@
 import Spinnies from 'spinnies';
+import chalk from 'chalk';
 
 let spinners;
 

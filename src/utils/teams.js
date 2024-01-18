@@ -1,5 +1,7 @@
 //load up the possible team names
 import { getFirestore } from 'firebase-admin/firestore';
+import { useSpinners } from './spinners.js';
+import chalk from 'chalk';
 
 const teams = [];
 const allTeams = {
@@ -21,9 +23,15 @@ export const leagues = {
   mnl: 'baseball',
 };
 
+const color = chalk.hex('#ffc107');
+const { showSpinner } = useSpinners('teams', color);
 export const loadTeams = async (app) => {
+  const { update, finish, error } = showSpinner('loadTeams', 'Loading teams');
+  update('Firestore');
   const db = getFirestore(app);
+  update('Query');
   const querySnapshot = await db.collection('team').get();
+  update('Processing');
   querySnapshot.forEach((doc) => {
     const sport = findSport(doc.data().league);
     const team = {
@@ -46,7 +54,7 @@ export const loadTeams = async (app) => {
     }
   });
 
-  // sort nfl before ncaa
+  update('Sorting');
   allTeams['football'] = allTeams['football'].sort((a, b) => {
     if (a.league === 'ncaa' && b.league === 'nfl') {
       return 1;
@@ -62,8 +70,7 @@ export const loadTeams = async (app) => {
       }
     }
   });
-
-  // console.log('loaded teams', allTeams);
+  finish('Loaded Teams');
 };
 
 export let isTeam = (team, sport, year) => {

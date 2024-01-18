@@ -11,37 +11,27 @@ const color = chalk.hex('#ffc107');
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('mcp', color);
 
 let _driver;
-const login = async (spin) => {
-  let finish;
-  if (!spin) {
-    showSpinner('login', 'Login');
-    spin = (message) => updateSpinner(`login`, message);
-    finish = () => finishSpinner('login');
-  } else {
-    finish = false;
-  }
-
+export const login = async () => {
   if (!_driver) {
-    spin('Login - Loading');
+    const { finish, update } = showSpinner('login', 'Login');
+    update('Loading');
     _driver = await new Builder().forBrowser(Browser.CHROME).build();
     await _driver.get('https://mycardpost.com/login');
 
     const waitForElement = useWaitForElement(_driver);
 
-    spin('Login - Email');
+    update('Email');
     const emailInput = await waitForElement(inputByPlaceholder('Email *'));
     await emailInput.sendKeys(process.env.MCP_EMAIL);
-    spin('Login - Password');
+    update('Password');
     const passwordInput = await waitForElement(inputByPlaceholder('Password *'));
     await passwordInput.sendKeys(process.env.MCP_PASSWORD);
 
-    spin('Login - Submit');
+    update('Submit');
     const nextButton = await waitForElement(buttonByText('Login'));
     await nextButton.click();
     await waitForElement(By.xpath(`//h2[text()='edvedafi']`));
-    if (finish) {
-      finish();
-    }
+    finish('MCP Logged In');
   }
   return _driver;
 };

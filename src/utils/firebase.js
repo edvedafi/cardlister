@@ -43,9 +43,11 @@ export const initializeStorage = (app) => {
 export function getFirestore() {
   if (!_db) {
     _db = getFirestoreAdmin(getFirebase());
+    _db.settings({ ignoreUndefinedProperties: true });
   }
   return _db;
 }
+
 export function getFirebase() {
   if (!_firebase) {
     initializeFirebase();

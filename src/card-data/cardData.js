@@ -5,6 +5,7 @@ import fs from 'fs-extra';
 import { getGroup } from '../listing-sites/firebase.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
+import getFullSetData from './setData.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('trim', chalk.white);
 
@@ -77,7 +78,7 @@ export const getSetData = async () => {
   if (isSet) {
     saveData.setData = {
       ...saveData.setData,
-      ...(await getSetData(saveData.setData)),
+      ...(await getFullSetData(saveData.setData)),
       isSet: true,
     };
   } else {
@@ -287,28 +288,31 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   const askFor = async (text, propName = text.toLowerCase(), options = { allowUpdates: resetAll }) =>
     await addCardData(text, output, propName, defaultValues, options);
 
-  let useSetInfo = await ask('Use Set Info?', true, { allowUpdates: resetAll });
-
-  if (!useSetInfo) {
-    await askFor('Sport', 'sport', {
-      selectOptions: sports,
-      allowUpdates: resetAll,
-    });
-    output.league = findLeague(output.sport);
-    output.storeCategory = findStoreCategory(output.sport);
-    await askFor('Year', 'year', { allowUpdates: resetAll });
-  }
   await askFor('Player/Card Name', 'player', { allowUpdates: resetAll });
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
 
+  let useSetInfo = await ask('Use Set Info?', true, { allowUpdates: resetAll });
   if (useSetInfo) {
     output.quantity = 1;
   } else {
-    await askFor('Manufacturer', 'manufacture', { allowUpdates: resetAll });
-    await askFor('Set Name', 'setName', { allowUpdates: resetAll });
-    await askFor('Parallel', 'parallel', { allowUpdates: true });
-    await askFor('Insert', 'insert', { allowUpdates: true });
+    const updatedSet = await getSetData({
+      year: output.year,
+      sport: output.sport,
+      manufacture: output.manufacture,
+      setName: output.setName,
+    });
+    output = {
+      ...output,
+      setName: updatedSet.setName,
+      manufacture: updatedSet.manufacture,
+      parallel: updatedSet.parallel,
+      insert: updatedSet.insert,
+      bin: updatedSet.bin,
+      slPrice: updatedSet.slPrice,
+      bscPrice: updatedSet.bscPrice,
+      price: updatedSet.price,
+    };
     await askFor('Features (RC, etc)', 'features', { allowUpdates: true });
     await askFor('Print Run', 'printRun', { allowUpdates: useSetInfo || resetAll });
     await askFor('Autographed', 'autographed', { allowUpdates: useSetInfo || resetAll });

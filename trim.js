@@ -5,10 +5,10 @@ import 'zx/globals';
 import { getFiles, getInputs } from './src/utils/inputs.js';
 import processSingles from './src/singles.js';
 import initializeFirebase from './src/utils/firebase.js';
-import { shutdownSportLots } from './src/listing-sites/sportlots.js';
-import { shutdownBuySportsCards } from './src/listing-sites/bsc.js';
+import { login as sportslotLogin, shutdownSportLots } from './src/listing-sites/sportlots.js';
+import { login as bscLogin, shutdownBuySportsCards } from './src/listing-sites/bsc.js';
 import { shutdownFirebase } from './src/listing-sites/firebase.js';
-import { shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
+import { login as mcpLogin, shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
 import chalk from 'chalk';
 import { useSpinners } from './src/utils/spinners.js';
 
@@ -32,14 +32,13 @@ const shutdown = async () => {
   ),
 );
 
-const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('trim', chalk.cyan);
+const { showSpinner, log } = useSpinners('trim', chalk.cyan);
 
-showSpinner('trim', 'Processing Singles');
+const { update, finish, error } = showSpinner('trim', 'Processing Singles');
 
 try {
-  const app = initializeFirebase();
-  await loadTeams(app);
+  update('Logging in');
+  await Promise.all([loadTeams(initializeFirebase()), sportslotLogin(), bscLogin(), mcpLogin()]);
 
   // Set up full run information
   let input_directory = await getInputs();
@@ -54,7 +53,9 @@ try {
   }
 
   await processSingles(savedAnswers, setData, files);
+} catch (e) {
+  error(e);
 } finally {
   await shutdown();
-  finishSpinner('trim', 'Completed Processing');
+  finish('Completed Processing');
 }

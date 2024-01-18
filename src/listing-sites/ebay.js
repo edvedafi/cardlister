@@ -1,13 +1,10 @@
 //write a function that takes in a file path and an array of objects that will be written as a csv to the file
-import { createObjectCsvWriter } from 'csv-writer';
 import { isNo, isYes } from '../utils/data.js';
 import { gradeIds, graderIds } from './ebayConstants.js';
 import open from 'open';
 import eBayApi from 'ebay-api';
-import { Browser, Builder, By } from 'selenium-webdriver';
-import { ask } from '../utils/ask.js';
 import chalk from 'chalk';
-import { reverseTitle, useWaitForElement } from './uploads.js';
+import { reverseTitle } from './uploads.js';
 import express from 'express';
 import fs from 'fs-extra';
 import { useSpinners } from '../utils/spinners.js';
@@ -54,181 +51,6 @@ const defaultValues = {
   acceptOffers: 'TRUE',
   weightUnit: 'LB',
   packageType: 'Letter',
-};
-
-const filePath = 'output/ebay.csv';
-
-async function writeEbayFile(data) {
-  console.log(chalk.magenta('Ebay Starting Upload'));
-  const csvWriter = createObjectCsvWriter({
-    path: filePath,
-    header: [
-      {
-        id: 'action',
-        title: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)',
-      },
-      { id: 'customLabel', title: 'CustomLabel' },
-      { id: 'category', title: '*Category' },
-      { id: 'storeCategory', title: 'StoreCategory' },
-      { id: 'title', title: '*Title' },
-      { id: 'condition', title: '*ConditionID' },
-      { id: 'graded', title: '*C:Graded' },
-      { id: 'sport', title: '*C:Sport' },
-      { id: 'player', title: '*C:Player/Athlete' },
-      { id: 'parallel', title: '*C:Parallel/Variety' },
-      { id: 'manufacture', title: '*C:Manufacturer' },
-      { id: 'year', title: 'C:Season' },
-      { id: 'features', title: '*C:Features' },
-      { id: 'setName', title: '*C:Set' },
-      { id: 'grade', title: '*C:Grade' },
-      { id: 'grader', title: '*C:Professional Grader' },
-      { id: 'teamDisplay', title: '*C:Team' },
-      { id: 'league', title: '*C:League' },
-      { id: 'autographed', title: '*C:Autographed' },
-      { id: 'conditionDetail', title: 'CD:Card Condition - (ID: 40001)' },
-      { id: 'graderID', title: 'CD:Card Condition - (ID: 27501)' },
-      { id: 'gradeID', title: 'CD:Card Condition - (ID: 27502)' },
-      // { id: "certNumber", title: "CD:Card Condition - (ID: 27503)" },
-      { id: 'cardName', title: '*C:Card Name' },
-      { id: 'cardNumber', title: '*C:Card Number' },
-      { id: 'certNumber', title: '*C:Certification Number' },
-      { id: 'cardType', title: '*C:Type' },
-      { id: 'signedBy', title: 'C:Signed By' },
-      { id: 'autoAuth', title: 'C:Autograph Authentication' },
-      { id: 'yearManufactured', title: 'C:Year Manufactured' },
-      { id: 'size', title: 'C:Card Size' },
-      { id: 'country', title: 'C:Country/Region of Manufacture' },
-      { id: 'material', title: 'C:Material' },
-      { id: 'autoFormat', title: 'C:Autograph Format' },
-      { id: 'vintage', title: 'C:Vintage' },
-      { id: 'original', title: 'C:Original/Licensed Reprint' },
-      { id: 'language', title: 'C:Language' },
-      { id: 'thickness', title: 'C:Card Thickness' },
-      { id: 'insert', title: 'C:Insert Set' },
-      { id: 'printRun', title: 'C:Print Run' },
-      { id: 'pics', title: 'PicURL' },
-      { id: 'description', title: '*Description' },
-      { id: 'format', title: '*Format' },
-      { id: 'duration', title: '*Duration' },
-      { id: 'price', title: '*StartPrice' },
-      // { id: 'autoOffer', title: 'BestOfferAutoAcceptPrice' },
-      { id: 'minOffer', title: 'MinimumBestOfferPrice' },
-      { id: 'returns', title: '*ReturnsAcceptedOption' },
-      { id: 'returnPolicy', title: 'ReturnProfileName' },
-      { id: 'acceptOffers', title: 'BestOfferEnabled' },
-      { id: 'shippingPolicy', title: 'ShippingProfileName' },
-      { id: 'shippingFrom', title: '*Location' },
-      { id: 'shippingZip', title: 'PostalCode' },
-      { id: 'shippingTime', title: '*DispatchTimeMax' },
-      { id: 'weightUnit', title: 'WeightUnit' },
-      { id: 'lbs', title: 'WeightMajor' },
-      { id: 'oz', title: 'WeightMinor' },
-      { id: 'length', title: 'PackageLength' },
-      { id: 'width', title: 'PackageWidth' },
-      { id: 'depth', title: 'PackageDepth' },
-      { id: 'packageType', title: 'PackageType' },
-      { id: 'quantity', title: '*Quantity' },
-      { id: 'numberOfCards', title: '*C:Number of Cards' },
-    ],
-  });
-
-  //ebay mapping logic
-  let csvData = Object.values(data).map((card) => {
-    if (isYes(card.autographed)) {
-      card.signedBy = card.player;
-      card.autoAuth = card.manufacture;
-      card.autographed = 'Yes';
-      if (['Label', 'Sticker'].includes(card.autoFormat)) {
-        card.autoFormat = 'Label or Sticker';
-      }
-    } else {
-      card.autographed = 'No';
-    }
-
-    return card;
-  });
-
-  // merge defaults
-  console.log('ebay data size: ', chalk.green(csvData.length));
-  csvData = csvData.map((card) => ({ ...defaultValues, ...card }));
-
-  try {
-    await csvWriter.writeRecords(csvData);
-  } catch (e) {
-    console.log('Failed to write ebay file: ', filePath);
-    console.log(e);
-    throw e;
-  }
-
-  if (csvData.length > 0) {
-    await uploadEbayFile();
-  }
-  console.log(chalk.magenta('Ebay Completed Upload'));
-}
-
-export const uploadEbayFile = async () => {
-  let driver;
-
-  async function signIn(waitForElement) {
-    let signInButton = await Promise.race([waitForElement(By.id('userid')), waitForElement(By.xpath('//iframe'))]);
-
-    const id = await signInButton.getAttribute('id');
-    console.log('sign in id', id);
-    if (id === 'userid') {
-      //do nothing because we found the right button
-    } else {
-      const checkbox = await waitForElement(By.id('checkbox'));
-      await checkbox.click();
-      console.log('clicked checkbox');
-      signInButton = waitForElement(By.id('userid'));
-    }
-
-    await signInButton.sendKeys(process.env.EBAY_ID);
-    await driver.findElement(By.id('signin-continue-btn')).click();
-
-    const passwordField = await waitForElement(By.id('pass'));
-    await passwordField.sendKeys(process.env.EBAY_PASS);
-    await driver.findElement(By.id('sgnBt')).click();
-  }
-
-  try {
-    driver = await new Builder().forBrowser(Browser.CHROME).build();
-    await driver.get('https://www.ebay.com/');
-    await driver.findElement(By.linkText('Sign in')).click();
-    // await setTimeout(10000);
-
-    const waitForElement = useWaitForElement(driver);
-    console.log('waiting for element sign in');
-    await signIn(waitForElement);
-    // await signIn(waitForElement);
-
-    await driver.get('https://www.ebay.com/sh/lst/active');
-    const uploadButton = await waitForElement(By.xpath('//button[text()="Upload"]'));
-    try {
-      await uploadButton.click();
-    } catch (e) {
-      //scroll right and down 50px
-      await driver.executeScript('window.scrollBy(50,50)');
-      await uploadButton.click();
-    }
-
-    await driver.findElement(By.xpath("//input[@type='file']")).sendKeys(`${process.cwd()}/${filePath}`);
-
-    const resultTitle = await waitForElement(By.id('Listing-popup-title'));
-    const result = await resultTitle.getText();
-    if (result === 'Not everything was uploaded.') {
-      await ask('Press any key to continue...');
-    } else {
-      console.log(chalk.green(result));
-    }
-  } catch (e) {
-    console.log(e);
-    await ask('Press any key to continue...');
-  } finally {
-    if (driver) {
-      await driver.quit();
-    }
-  }
 };
 
 const scopes = [
@@ -311,8 +133,8 @@ export const loginEbayAPI = async () => {
 };
 
 export const getFeatures = (card) => {
-  let features = card.features.split('|');
-  if ((features.length === 1 && isNo(features[0])) || features[0] === '') {
+  let features = card.features?.split('|');
+  if (!features || (features.length === 1 && isNo(features[0])) || features[0] === '') {
     features = [];
   }
 
@@ -331,15 +153,14 @@ export const getFeatures = (card) => {
     features.push('Serial Numbered');
   }
 
-  if (card.features.indexOf('RC') > -1) {
+  if (card.features?.indexOf('RC') > -1) {
     features.push('Rookie');
   }
 
-  if (card.features.length === 0) {
+  if (features.length === 0) {
     features.push('Base Set');
   }
 
-  // console.log('features', features);
   return features;
 };
 
@@ -933,5 +754,3 @@ export const removeFromEbay = async (cards = [], db) => {
     finishSpinner('ebay', 'No cards to remove from ebay');
   }
 };
-
-export default writeEbayFile;
