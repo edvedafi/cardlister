@@ -2,9 +2,10 @@ import { getFirestore, getStorage } from '../utils/firebase.js';
 import chalk from 'chalk';
 import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
-import { findLeague, sports } from '../utils/teams.js';
+import { findLeague } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
+import getSetData from '../card-data/setData.js';
 
 const color = chalk.hex('#ffc107');
 const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', color);
@@ -113,13 +114,7 @@ export async function mergeFirebaseResult(card, match) {
     (!updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName)
   ) {
     errorSpinner('merge', `Missing some required data. Please confirm for card: ${updatedCard.title}`);
-    updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
-    updatedCard.year = await ask('What year is this card?', updatedCard.year);
-    updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
-    updatedCard.setName = await ask('What set is this card?', updatedCard.setName);
-    updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
-    updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
-    updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
+    updatedCard = { ...updatedCard, ...(await getSetData(updatedCard, false)) };
   } else {
     finishSpinner('merge');
   }
@@ -127,12 +122,14 @@ export async function mergeFirebaseResult(card, match) {
 }
 
 export async function matchOldStyle(db, card) {
-  showSpinner(`old-${card.title}`, `Getting listing info from Firebase for ${card.title} via old style`);
-  showSpinner(`old-${card.title}-details`, `Getting listing info from Firebase for ${card.title} via old style`);
+  const { update, finish, error } = showSpinner(
+    `old-${card.title}`,
+    `Getting listing info from Firebase for ${card.title} via old style`,
+  );
   let updatedCard = { ...card };
 
   //now try a fairly specific search
-  updateSpinner(`old-${card.title}-details`, `Set up collection query`);
+  update(`Set up collection query`);
   let query = db.collection('OldSales').where('year', '==', updatedCard.year);
   if (updatedCard.sport) {
     query = query.where('sport', '==', titleCase(updatedCard.sport));
@@ -144,7 +141,7 @@ export async function matchOldStyle(db, card) {
     possibleCards.push(doc.data());
   });
 
-  updateSpinner(`old-${card.title}-details`, `Try to find match on everything`);
+  update(`match on everything`);
   let match = possibleCards.find(
     (c) =>
       updatedCard.cardNumber === c.cardNumber &&
@@ -154,12 +151,11 @@ export async function matchOldStyle(db, card) {
       updatedCard.parallel === c.parallel,
   );
   if (match) {
-    finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found exact listing for ${card.title}`);
+    finish(`Found exact listing for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to match on card numbers with letters removed`);
+  update(`card numbers with letters removed`);
   //remove non-digits from the number and search again
   match = possibleCards.find(
     (c) =>
@@ -170,12 +166,11 @@ export async function matchOldStyle(db, card) {
       updatedCard.parallel === c.parallel,
   );
   if (match) {
-    finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found fuzzy number listing in firebase for ${card.title}`);
+    finish(`Found fuzzy number listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to match with lower case set name`);
+  update(`lower case set name`);
   const searchSet =
     updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
   match = possibleCards.find(
@@ -186,12 +181,11 @@ export async function matchOldStyle(db, card) {
       (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
   );
   if (match) {
-    finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found lower case set name listing in firebase for ${card.title}`);
+    finish(`Found lower case set name listing in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, match);
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to match Chronicles`);
+  update(`Chronicles`);
   if (updatedCard.setName === 'Chronicles') {
     match = possibleCards.find(
       (c) =>
@@ -211,52 +205,43 @@ export async function matchOldStyle(db, card) {
         c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
     );
     if (match) {
-      finishSpinner(`old-${card.title}-details`);
-      finishSpinner(`old-${card.title}`, `Found Chronicles listing in firebase for ${card.title}`);
+      finish(`Found Chronicles listing in firebase for ${card.title}`);
       return mergeFirebaseResult(updatedCard, match);
     }
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to find the matching sales group even if we don't have the card`);
+  update(`matching sales group even if we don't have the card`);
   const collection = db.collection('SalesGroups');
   if (card.bin) {
     const queryResults = await collection.doc(card.bin).get();
     if (queryResults.exists) {
-      finishSpinner(`old-${card.title}-details`);
-      finishSpinner(`old-${card.title}`, `Found sales group by bin in firebase for ${card.title}`);
+      finish(`Found sales group by bin in firebase for ${card.title}`);
       return mergeFirebaseResult(updatedCard, queryResults.data());
     }
   }
 
-  updateSpinner(`old-${card.title}-details`, `Try to find the matching sales group via exact skuPrefix match`);
+  update(`exact skuPrefix match`);
   const skuPrefix = getSkuPrefix(card);
   const skuQuery = collection.where('skuPrefix', '==', skuPrefix);
   const skuQueryResults = await skuQuery.get();
   if (skuQueryResults.size === 1) {
-    finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found sales group by skuPrefix in firebase for ${card.title}`);
+    finish(`Found sales group by skuPrefix in firebase for ${card.title}`);
     return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
   }
 
   if (!match || !updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
-    finishSpinner(`old-${card.title}-details`);
-    errorSpinner(`old-${card.title}`, `Could not find listing in firebase for ${card.title}`);
-    updatedCard.sport = await ask('What sport is this card?', updatedCard.sport, { selectOptions: sports });
-    updatedCard.year = await ask('What year is this card?', updatedCard.year);
-    updatedCard.manufacture = await ask('What manufacture is this card?', updatedCard.manufacture);
-    updatedCard.setName = await ask('What set is this card?', updatedCard.setName);
-    updatedCard.insert = await ask('What insert is this card?', updatedCard.insert);
-    updatedCard.parallel = await ask('What parallel is this card?', updatedCard.parallel);
-    updatedCard = { ...updatedCard, ...(await getGroup(updatedCard)) };
+    error(`Could not find listing in firebase for ${card.title}`);
+    updatedCard = { ...updatedCard, ...(await getSetData(updatedCard, false)) };
   } else {
-    finishSpinner(`old-${card.title}-details`);
-    finishSpinner(`old-${card.title}`, `Found listing in firebase for ${card.title}`);
+    finish(`Found listing in firebase for ${card.title}`);
   }
+
   return updatedCard;
 }
 
-export async function getListingInfo(db, cards) {
+export async function getListingInfo(cards) {
   showSpinner('getListingInfo', 'Getting listing info from Firebase');
+  const db = getFirestore();
   const removals = [];
   for (let card of cards) {
     if (card.sku) {

@@ -1,22 +1,36 @@
 import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
 import dotenv from 'dotenv';
 import 'zx/globals';
-import { createGroups } from './listing-sites/uploads.js';
+import { buildTableData, createGroups } from './listing-sites/uploads.js';
 import chalk from 'chalk';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
-import { getSalesSportLots, removeFromSportLots, shutdownSportLots } from './listing-sites/sportlots.js';
-import { getSalesFromMyCardPost, removeFromMyCardPost, shutdownMyCardPost } from './listing-sites/mycardpost.js';
-import { getBuySportsCardsSales, removeFromBuySportsCards, shutdownBuySportsCards } from './listing-sites/bsc.js';
+import {
+  getSalesSportLots,
+  login as sportlotsLogin,
+  removeFromSportLots,
+  shutdownSportLots,
+} from './listing-sites/sportlots.js';
+import {
+  getSalesFromMyCardPost,
+  login as mcpLogin,
+  removeFromMyCardPost,
+  shutdownMyCardPost,
+} from './listing-sites/mycardpost.js';
+import {
+  getBuySportsCardsSales,
+  login as bscLogin,
+  removeFromBuySportsCards,
+  shutdownBuySportsCards,
+} from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
-import { getFileSales, getGroupByBin, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
-import { getFirestore } from 'firebase-admin/firestore';
-import initializeFirebase from './utils/firebase.js';
+import { getFileSales, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
 import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import open from 'open';
 import { pauseSpinners, useSpinners } from './utils/spinners.js';
 import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
 import { ask } from './utils/ask.js';
+import initializeFirebase from './utils/firebase.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -43,119 +57,9 @@ const shutdown = async () => {
   });
 });
 
-async function buildTableData(groupedCards) {
-  showSpinner('buildTableData', 'Building table data');
-  const divider = {
-    sport: '--------',
-    year: '----',
-    setName: '---',
-    parallel: '--------',
-    insert: '------',
-    cardNumber: '-----',
-    quantity: '-----',
-    title: '-----',
-    platform: '--------',
-  };
-  Object.values(groupedCards).forEach((cards) =>
-    cards.forEach((card) =>
-      Object.keys(divider).forEach((key) => {
-        divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length || 0), parseInt(divider[key]?.length || 0)));
-      }),
-    ),
-  );
-
-  const displayCards = [];
-  let color = chalk.magenta;
-  const orderColors = {};
-  const orderColor = (orderId) => {
-    if (!orderColors[orderId]) {
-      orderColors[orderId] = [
-        chalk.red,
-        chalk.green,
-        chalk.yellow,
-        chalk.blue,
-        // chalk.magenta,
-        chalk.cyan,
-        chalk.white,
-        chalk.redBright,
-        chalk.greenBright,
-        chalk.yellowBright,
-        // chalk.blueBright,
-        chalk.magentaBright,
-        chalk.cyanBright,
-        chalk.whiteBright,
-        chalk.bgRed,
-        chalk.bgGreen,
-        chalk.bgYellow,
-        chalk.bgBlue,
-        chalk.bgMagenta,
-        chalk.bgCyan,
-        chalk.bgWhite,
-        chalk.bgBlackBright,
-        chalk.bgRedBright,
-        chalk.bgGreenBright,
-        chalk.bgYellowBright,
-        chalk.bgBlueBright,
-        chalk.bgMagentaBright,
-        chalk.bgCyanBright,
-        chalk.bgWhiteBright,
-      ][Object.keys(orderColors).length];
-    }
-    return orderColors[orderId];
-  };
-  log(Object.keys(groupedCards));
-  (await Promise.all(Object.keys(groupedCards).map((bin) => getGroupByBin(bin))))
-    .sort((group1, group2) => {
-      if (group2.sport.toLowerCase() !== group1.sport.toLowerCase()) {
-        return group2.sport.toLowerCase() < group1.sport.toLowerCase() ? -1 : 1;
-      } else if (group2.year !== group1.year) {
-        return group2.year < group1.year ? -1 : 1;
-      } else if (group2.manufacture !== group1.manufacture) {
-        return group2.manufacture < group1.manufacture ? -1 : 1;
-      } else if (group2.setName !== group1.setName) {
-        return group2.setName < group1.setName ? -1 : 1;
-      } else if (group2.insert !== group1.insert) {
-        return group2.insert < group1.insert ? -1 : 1;
-      } else if (group2.parallel !== group1.parallel) {
-        return group2.parallel < group1.parallel ? -1 : 1;
-      } else {
-        return 0;
-      }
-    })
-    .forEach(({ bin }, i) => {
-      if (i > 0) displayCards.push(divider);
-      displayCards.push(
-        ...groupedCards[bin]
-          .sort((c1, c2) => {
-            const cardNumber1 = Number.parseInt(c1.cardNumber);
-            const cardNumber2 = Number.parseInt(c2.cardNumber);
-            if (cardNumber1 && cardNumber2) {
-              return cardNumber1 - cardNumber2;
-            } else if (cardNumber1) {
-              return -1;
-            } else if (cardNumber2) {
-              return 1;
-            } else {
-              return 0;
-            }
-          })
-          .map((card) => {
-            Object.keys(card).forEach(
-              (key) => (card[key] = key === 'platform' ? orderColor(card.platform)(card.platform) : color(card[key])),
-            );
-            return card;
-          }),
-      );
-      color = color === chalk.magenta ? chalk.blueBright : chalk.magenta;
-    });
-  finishSpinner('buildTableData');
-  return displayCards;
-}
-
 try {
-  const firebase = initializeFirebase();
-  const db = getFirestore(firebase);
-  await loadTeams(firebase);
+  initializeFirebase();
+  await Promise.all([loadTeams(), sportlotsLogin(), bscLogin(), mcpLogin()]);
 
   //gather sales
   showSpinner('top-level', 'Running sales processing');
@@ -175,7 +79,7 @@ try {
   showSpinner('sales-info', 'Updating sales with listing info');
   const openSalesSites = [];
 
-  const sales = await getListingInfo(db, rawSales);
+  const sales = await getListingInfo(rawSales);
   const groupedCards = await createGroups({}, sales);
 
   if (sales.find((sale) => sale.platform.indexOf('SportLots: ') > -1)) {
@@ -209,7 +113,7 @@ try {
       await remove();
     }
   };
-  await removeListings('Ebay', () => removeFromEbay(sales, db));
+  await removeListings('Ebay', () => removeFromEbay(sales));
   await removeListings('Sportlots', () => removeFromSportLots(groupedCards));
   await removeListings('Buy Sports Cards', () => removeFromBuySportsCards(groupedCards));
   await removeListings('Shopify', () => removeFromShopify(sales));
@@ -232,10 +136,10 @@ try {
         columns: [
           { field: 'sport', name: 'Sport' },
           { field: 'year', name: 'Year' },
-          { field: 'setName', name: 'Set' },
-          { field: 'parallel', name: chalk.green('Parallel') },
-          { field: 'insert', name: chalk.blue('Insert') },
-          { field: 'cardNumber', name: 'Card #' },
+          // { field: 'setName', name: 'Set' },
+          // { field: 'parallel', name: chalk.green('Parallel') },
+          // { field: 'insert', name: chalk.blue('Insert') },
+          // { field: 'cardNumber', name: 'Card #' },
           { field: 'quantity', name: 'Count' },
           { field: 'title', name: 'Title' },
           { field: 'platform', name: 'Sold On' },

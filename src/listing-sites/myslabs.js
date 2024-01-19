@@ -18,9 +18,7 @@ export async function getMySlabSales() {
   try {
     await login();
     const apiResults = await fetchSales();
-    log('api', apiResults);
     sales = await convertSalesToCards(apiResults);
-    log('sales', sales);
     updateSpinner('sales', `Flagging Cards as sold on MySlabs`);
     finishSpinner('sales', `Found ${sales.length} cards sold on MySlabs`);
     return sales;

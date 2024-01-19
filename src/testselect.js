@@ -20,12 +20,13 @@ const { update, finish, error } = showSpinner('testselect', 'Getting set data');
 try {
   update('logging in');
   await Promise.all([bscLogin(), sportlotsLogin(), initializeFirebase()]);
-  update('Bin test');
-  const byBin = await getSetData({ bin: '96' });
-  log('byBin', byBin);
+
+  // update('Bin test');
+  // const byBin = await getSetData({ bin: '96' });
+  // log('byBin', byBin);
 
   update('Info test');
-  const setInfo = await getSetData({ sport: 'football', year: '2023', manufacture: 'Bowman' });
+  const setInfo = await getSetData({ sport: 'football', year: '2021', manufacture: 'Panini' });
   log('byinfo', setInfo);
   finish();
 } catch (e) {

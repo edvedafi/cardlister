@@ -700,12 +700,11 @@ export const removeFromEbayBySKU = async (sku, quantity, title) => {
   return result;
 };
 
-export const removeFromEbay = async (cards = [], db) => {
+export const removeFromEbay = async (cards = []) => {
   showSpinner('ebay', 'Removing Cards from eBay');
   showSpinner('ebay-details', 'Removing Cards from eBay');
   let toRemove = cards.filter((card) => !card.platform?.startsWith('ebay'));
   updateSpinner('ebay', `Removing ${chalk.green(toRemove.length)} cards from eBay`);
-  const notRemoved = [];
   const removed = [];
 
   if (toRemove.length > 0) {
@@ -720,7 +719,6 @@ export const removeFromEbay = async (cards = [], db) => {
         updateSpinner(`ebay-card-${card.title}`, `${card.title}: Removing by SKU`);
         removals.push(await removeFromEbayBySKU(card.sku, card.quantity, card.title));
       } else {
-        notRemoved.push({ ...card, remaining: '?', error: 'No Item Number or SKU' });
         errorSpinner(
           `ebay-card-${card.title}`,
           `${card.title}: No Item Number or SKU ${card.quantity > 1 ? `(x${card.quantity})` : ''}`,
@@ -735,7 +733,6 @@ export const removeFromEbay = async (cards = [], db) => {
         removed.push(result);
         finishSpinner(`ebay-card-${result.title}`, `${result.title}`);
       } else {
-        notRemoved.push(result);
         errorSpinner(
           `ebay-card-${result.title}`,
           `${result.title}: Failed to remove. ${result.error} ${result.quantity > 1 ? `(x${result.quantity})` : ''}`,

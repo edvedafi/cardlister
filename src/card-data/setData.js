@@ -30,7 +30,6 @@ export default async function getSetData(defaultValues, collectDetails = true) {
       }
     }
 
-    log(setInfo);
     update('Gather Extra Info');
     if (collectDetails && (await ask('Update Set Details?', false))) {
       const updates = {};

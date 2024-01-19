@@ -4,9 +4,8 @@ import { getGroup, getGroupByBin } from './firebase.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
-const color = chalk.yellow;
-const log = (...params) => console.log(color(...params));
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('uploads', color);
+const color = chalk.greenBright;
+const { showSpinner, finishSpinner, log } = useSpinners('uploads', color);
 
 const createKey = (card) =>
   `${titleCase(card.sport)}|${
@@ -213,4 +212,126 @@ export async function getSelectOptions(selectBox) {
     selectOptions.push({ value, name });
   }
   return selectOptions;
+}
+
+export async function buildTableData(groupedCards) {
+  const { finish } = showSpinner('buildTableData', 'Building table data');
+  log(groupedCards);
+  const divider = {
+    sport: '--------',
+    year: '----',
+    setName: '---',
+    parallel: '--------',
+    insert: '------',
+    cardNumber: '-----',
+    quantity: '-----',
+    title: '-----',
+    platform: '--------',
+  };
+  Object.values(groupedCards).forEach((cards) =>
+    cards.forEach((card) =>
+      Object.keys(divider).forEach((key) => {
+        divider[key] = '-'.repeat(Math.max(parseInt(card[key]?.length || 0), parseInt(divider[key]?.length || 0)));
+      }),
+    ),
+  );
+
+  const displayCards = [];
+  let color = chalk.magenta;
+  const orderColors = {};
+  const orderColor = (orderId) => {
+    if (!orderColors[orderId]) {
+      orderColors[orderId] = [
+        chalk.red,
+        // chalk.green,
+        chalk.yellow,
+        chalk.blue,
+        // chalk.magenta,
+        chalk.cyan,
+        chalk.white,
+        chalk.redBright,
+        // chalk.greenBright,
+        chalk.yellowBright,
+        chalk.blueBright,
+        // chalk.magentaBright,
+        chalk.cyanBright,
+        chalk.whiteBright,
+        chalk.bgRed,
+        chalk.bgGreen,
+        chalk.bgYellow,
+        chalk.bgBlue,
+        chalk.bgMagenta,
+        chalk.bgCyan,
+        chalk.bgWhite,
+        chalk.bgBlackBright,
+        chalk.bgRedBright,
+        chalk.bgGreenBright,
+        chalk.bgYellowBright,
+        chalk.bgBlueBright,
+        chalk.bgMagentaBright,
+        chalk.bgCyanBright,
+        chalk.bgWhiteBright,
+      ][Object.keys(orderColors).length];
+    }
+    return orderColors[orderId];
+  };
+
+  (await Promise.all(Object.keys(groupedCards).map((bin) => getGroupByBin(bin))))
+    .sort((group1, group2) => {
+      if (group2.sport.toLowerCase() !== group1.sport.toLowerCase()) {
+        return group2.sport.toLowerCase() < group1.sport.toLowerCase() ? -1 : 1;
+      } else if (group2.year !== group1.year) {
+        return group2.year < group1.year ? -1 : 1;
+      } else if (group2.manufacture !== group1.manufacture) {
+        return group2.manufacture < group1.manufacture ? -1 : 1;
+      } else if (group2.setName !== group1.setName) {
+        return group2.setName < group1.setName ? -1 : 1;
+      } else if (group2.insert !== group1.insert) {
+        return group2.insert < group1.insert ? -1 : 1;
+      } else if (group2.parallel !== group1.parallel) {
+        return group2.parallel < group1.parallel ? -1 : 1;
+      } else {
+        return 0;
+      }
+    })
+    .forEach(({ bin }, i) => {
+      if (i > 0) displayCards.push(divider);
+      displayCards.push(
+        ...groupedCards[bin]
+          .sort((c1, c2) => {
+            try {
+              const cardNumber1 = parseInt(c1.cardNumber);
+              const cardNumber2 = parseInt(c2.cardNumber);
+              if (cardNumber1 && cardNumber2) {
+                return cardNumber1 - cardNumber2;
+              } else if (cardNumber1) {
+                return -1;
+              } else if (cardNumber2) {
+                return 1;
+              } else {
+                return 0;
+              }
+            } catch (e) {
+              if (c1.cardNumber && c2.cardNumber) {
+                return c1.cardNumber.localeCompare(c2.cardNumber);
+              } else if (c1.cardNumber) {
+                return -1;
+              } else if (c2.cardNumber) {
+                return 1;
+              } else {
+                return 0;
+              }
+            }
+          })
+          .map((card) => {
+            Object.keys(card).forEach(
+              (key) => (card[key] = key === 'platform' ? orderColor(card.platform)(card.platform) : color(card[key])),
+            );
+            return card;
+          }),
+      );
+      color = color === chalk.magentaBright ? chalk.greenBright : chalk.magentaBright;
+    });
+  finish();
+  return displayCards;
 }

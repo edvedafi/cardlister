@@ -16,8 +16,8 @@ const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, 
   color,
 );
 export default function initializeFirebase() {
-  showSpinner('firebase', 'Initializing Firebase');
-  //instantiate firebase
+  const { update, finish } = showSpinner('firebase', 'Firebase');
+  update('Configuring');
   const hofDBJSON = JSON.parse(readFileSync('./hofdb-2038e-firebase-adminsdk-jllij-4025146e4e.json'));
   const firebaseConfig = {
     credential: cert(hofDBJSON),
@@ -29,8 +29,11 @@ export default function initializeFirebase() {
     appId: '1:78796187147:web:aa89f01d66d63dfc5d490e',
     measurementId: 'G-4T1D5KNQ7N',
   };
+  update('Initializing');
   _firebase = initializeApp(firebaseConfig);
-  finishSpinner('firebase', 'Using Firebase');
+  update('Setting up DB');
+  _db = getFirestore();
+  finish('Initialized');
   return _firebase;
 }
 
@@ -50,7 +53,7 @@ export function getFirestore() {
 
 export function getFirebase() {
   if (!_firebase) {
-    initializeFirebase();
+    _firebase = initializeFirebase();
   }
   return _firebase;
 }

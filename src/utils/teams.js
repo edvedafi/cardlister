@@ -1,7 +1,7 @@
 //load up the possible team names
-import { getFirestore } from 'firebase-admin/firestore';
 import { useSpinners } from './spinners.js';
 import chalk from 'chalk';
+import { getFirestore } from './firebase.js';
 
 const teams = [];
 const allTeams = {
@@ -25,10 +25,10 @@ export const leagues = {
 
 const color = chalk.hex('#ffc107');
 const { showSpinner } = useSpinners('teams', color);
-export const loadTeams = async (app) => {
+export const loadTeams = async () => {
   const { update, finish, error } = showSpinner('loadTeams', 'Loading teams');
   update('Firestore');
-  const db = getFirestore(app);
+  const db = getFirestore();
   update('Query');
   const querySnapshot = await db.collection('team').get();
   update('Processing');

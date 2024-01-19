@@ -8,8 +8,7 @@ import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
 
-const log = (...params) => console.log(chalk.blueBright(...params));
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('sportlots', chalk.blueBright);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('sportlots', chalk.blueBright);
 
 const brands = {
   bowman: 'Bowman',
@@ -61,7 +60,7 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
     await setSelectValue(yearField, setInfo.sportlots?.year || setInfo.year);
     const brand =
       setInfo.sportlots?.manufacture ||
-      brands[setInfo.setNameName?.toLowerCase()] ||
+      brands[setInfo.setName?.toLowerCase()] ||
       brands[setInfo.manufacture?.toLowerCase()] ||
       'All Brands';
     updateSpinner('selectBrand', `Setting brand to ${brand}`);
@@ -682,6 +681,8 @@ export async function removeFromSportLots(groupedCards) {
 
 export default enterIntoSportLotsWebsite;
 
+const setCache = {};
+
 export async function findSetId(defaultValues = {}) {
   const { update, finish } = showSpinner('setInfo', 'Find SetInfo');
   let setInfo = {};
@@ -706,23 +707,34 @@ export async function findSetId(defaultValues = {}) {
 
   setInfo.sport = await getAndSetValue('Sport', 'sprt', defaultValues.sport, true);
   update(JSON.stringify(setInfo));
+  if (!setCache[setInfo.sport]) {
+    setCache[setInfo.sport] = {};
+  }
   setInfo.year = await getAndSetValue('Year', 'yr', defaultValues.year);
   update(JSON.stringify(setInfo));
+  if (!setCache[setInfo.sport][setInfo.year]) {
+    setCache[setInfo.sport][setInfo.year] = {};
+  }
   setInfo.manufacture = await getAndSetValue('Manufacture', 'brd', defaultValues.manufacture);
   update(JSON.stringify(setInfo));
 
   await clickSubmit();
-
-  //find the table and iterate through the rows
-  const table = await waitForElement(By.xpath(`//th[contains(text(), 'Set Name')]`));
-  const rows = await table.findElements(By.xpath(`../../tr`));
-  const allSets = [];
-  for (let row of rows) {
-    const columns = await row.findElements(By.xpath(`./td`));
-    if (columns.length > 1) {
-      const fullSetText = await columns[1].getText();
-      allSets.push(fullSetText);
+  let allSets = [];
+  if (!setCache[setInfo.sport][setInfo.year][setInfo.manufacture]) {
+    //find the table and iterate through the rows
+    const table = await waitForElement(By.xpath(`//th[contains(text(), 'Set Name')]`));
+    const rows = await table.findElements(By.xpath(`../../tr`));
+    for (let row of rows) {
+      const columns = await row.findElements(By.xpath(`./td`));
+      if (columns.length > 1) {
+        const fullSetText = await columns[1].getText();
+        allSets.push(fullSetText.replace('Base Set', '').trim());
+      }
     }
+
+    setCache[setInfo.sport][setInfo.year][setInfo.manufacture] = allSets.sort();
+  } else {
+    allSets = setCache[setInfo.sport][setInfo.year][setInfo.manufacture];
   }
 
   const sets = {};
@@ -741,10 +753,14 @@ export async function findSetId(defaultValues = {}) {
         parallels: [],
       };
     } else {
-      if (setText.indexOf(lastSet) > -1) {
+      if (
+        setText.indexOf(lastSet) > -1 &&
+        !(setText === `${lastSet} Draft Picks` && allSets[i + 1].indexOf(`${lastSet} Draft Picks`) > -1)
+      ) {
         setName = lastSet;
-        if (!lastInsert || setText.indexOf(lastInsert) === -1) {
-          lastInsert = setText.replace(setName, '').trim();
+        const nextInsert = setText.replace(setName, '').trim();
+        if (!lastInsert || nextInsert.indexOf(lastInsert) === -1 || nextInsert.length < lastInsert.length) {
+          lastInsert = nextInsert;
           if (allSets[i + 1] && allSets[i + 1].indexOf(lastInsert) > -1) {
             sets[setName].inserts[lastInsert] = {
               base: {
@@ -785,40 +801,77 @@ export async function findSetId(defaultValues = {}) {
     }
   }
 
-  setInfo.setName = await ask('Which set is this?', defaultValues.setName, { selectOptions: Object.keys(sets) });
-  const setType = await ask('Which type is this?', undefined, { selectOptions: ['base', 'insert', 'parallel'] });
-  if (setType === 'base') {
-    setInfo = {
-      ...setInfo,
-      ...sets[setInfo.setName].base.value,
-    };
-  } else if (setType === 'insert') {
-    const insert = await ask('Which insert is this?', defaultValues.insert, {
-      selectOptions: Object.keys(sets[setInfo.setNameName].inserts),
-    });
-    if (sets[setInfo.setName].inserts[insert].parallels.length > 0) {
+  const none = { name: 'None', value: { setName: 'None', insert: 'None', parallel: 'None' } };
+  setInfo.setName = await ask('Which set is this?', defaultValues.setName, {
+    selectOptions: ['None', ...Object.keys(sets)],
+  });
+  if (setInfo.setName !== 'None') {
+    const setType = await ask('Which type is this?', undefined, { selectOptions: ['base', 'insert', 'parallel'] });
+    if (setType === 'base') {
       setInfo = {
         ...setInfo,
-        ...(await ask('Which parallel is this?', defaultValues.parallel, {
-          selectOptions: [
-            sets[setInfo.setName].inserts[insert].base,
-            ...sets[setInfo.setName].inserts[insert].parallels,
-          ],
-        })),
+        ...sets[setInfo.setName].base.value,
       };
+    } else if (setType === 'insert') {
+      const insert = await ask('Which insert is this?', defaultValues.insert, {
+        selectOptions: ['None', ...Object.keys(sets[setInfo.setName].inserts)],
+      });
+      if (insert === 'None') {
+        setInfo = {
+          ...setInfo,
+          ...(await ask('Which parallel is this?', defaultValues.parallel, {
+            selectOptions: [none, sets[setInfo.setName].base, ...sets[setInfo.setName].parallels],
+          })),
+        };
+      } else {
+        let parallel;
+        if (sets[setInfo.setName].inserts[insert].parallels.length > 0) {
+          parallel = await ask('Which parallel is this?', defaultValues.parallel, {
+            selectOptions: [
+              { name: 'None', value: undefined },
+              sets[setInfo.setName].inserts[insert].base,
+              ...sets[setInfo.setName].inserts[insert].parallels,
+            ],
+          });
+        }
+        if (parallel) {
+          setInfo = {
+            ...setInfo,
+            ...parallel,
+          };
+        } else {
+          setInfo = {
+            ...setInfo,
+            ...sets[setInfo.setName].inserts[insert].base.value,
+          };
+        }
+      }
     } else {
       setInfo = {
         ...setInfo,
-        ...sets[setInfo.setName].inserts[insert].base.value,
+        ...(await ask('Which parallel is this?', defaultValues.parallel, {
+          selectOptions: [none, sets[setInfo.setName].base, ...sets[setInfo.setName].parallels],
+        })),
       };
     }
-  } else {
-    setInfo = {
-      ...setInfo,
-      ...(await ask('Which parallel is this?', defaultValues.parallel, {
-        selectOptions: [sets[setInfo.setName].base, ...sets[setInfo.setName].parallels],
-      })),
-    };
+  }
+
+  if (setInfo.setName === 'None' || setInfo.insert === 'None' || setInfo.parallel === 'None') {
+    const tryAgain = await ask('Could not find set. Try again?', true);
+    if (tryAgain) {
+      setInfo = await findSetId(setInfo);
+    } else if (setInfo.setName !== 'None' && setInfo.bin) {
+      const clearInsert = await ask('Clear Insert?', true);
+      if (clearInsert) {
+        setInfo.insert = undefined;
+      }
+      const clearParallel = await ask('Clear Parallel?', true);
+      if (clearParallel) {
+        setInfo.parallel = undefined;
+      }
+    } else {
+      setInfo = {};
+    }
   }
 
   finish(`Selected Set Info ${JSON.stringify(setInfo)}`);
