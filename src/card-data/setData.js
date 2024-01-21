@@ -31,11 +31,14 @@ export default async function getSetData(defaultValues, collectDetails = true) {
           ...setInfo,
         };
         if (setInfo.bscFilters) {
-          if (setInfo.bin) {
-            await updateGroup({ bin: setInfo.bin, bscFilters: setInfo.bscFilters });
-          } else {
-            setInfo = await getGroup(setInfo);
+          if (!setInfo.bin) {
+            setInfo = {
+              ...(await getGroup(setInfo)),
+              bscFilters: setInfo.bscFilters,
+              sportlots: setInfo.sportlots,
+            };
           }
+          await updateGroup({ bin: setInfo.bin, bscFilters: setInfo.bscFilters });
         }
       }
     }

@@ -229,7 +229,16 @@ export async function matchOldStyle(db, card) {
     return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
   }
 
-  if (!match || !updatedCard.sport || !updatedCard.year || !updatedCard.manufacture || !updatedCard.setName) {
+  if (
+    !match ||
+    !updatedCard.sport ||
+    !updatedCard.year ||
+    !updatedCard.manufacture ||
+    !updatedCard.setName ||
+    !updatedCard.bin ||
+    !updatedCard.sportlots ||
+    !updatedCard.bscFiltersx
+  ) {
     error(`Could not find listing in firebase for ${card.title}`);
     updatedCard = { ...updatedCard, ...(await getSetData(updatedCard, false)) };
   } else {
