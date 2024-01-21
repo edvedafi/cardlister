@@ -250,6 +250,16 @@ export async function getBuySportsCardsSales() {
   return sales;
 }
 
+const buildBody = (filters) => ({
+  currentListings: true,
+  condition: 'near_mint',
+  productType: 'raw',
+  filters: Object.keys(filters).reduce((result, key) => {
+    result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
+    return result;
+  }, {}),
+});
+
 export async function getAllListings(setData) {
   await login();
   let filters = {
@@ -269,19 +279,6 @@ export async function getAllListings(setData) {
 
   let allPossibleListings = {};
   let body = {};
-
-  const buildBody = (filters) => {
-    body = {
-      currentListings: true,
-      condition: 'near_mint',
-      productType: 'raw',
-      filters: Object.keys(filters).reduce((result, key) => {
-        result[key] = [filters[key]?.toString().toLowerCase().replaceAll(' ', '-')];
-        return result;
-      }, {}),
-    };
-    return body;
-  };
 
   try {
     showSpinner('get-listings', `Getting listings for ${JSON.stringify(filters)}`);
@@ -338,7 +335,59 @@ export async function getAllListings(setData) {
   }
 
   finishSpinner('get-listings');
-  return { body, allPossibleListings };
+  return { body: buildBody(filters), allPossibleListings };
+}
+
+export async function findSetInfo(defaultValues) {
+  const setData = { ...defaultValues };
+  const { update, finish, error } = showSpinner('findSetInfo', `Finding set info for ${JSON.stringify(setData)}`);
+  update('login');
+  await login();
+  update('default filters');
+  let filters = {};
+
+  try {
+    const getNextFilter = async (text, filterType, defaultValue) => {
+      const filterOptions = await post('search/bulk-upload/filters', { filters });
+      const response = await ask(text, defaultValue, {
+        selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
+          filterOptions.aggregations[filterType].map((variant) => ({
+            name: variant.label,
+            value: variant.slug,
+          })),
+        ),
+      });
+      filters[filterType] = [response];
+      return response;
+    };
+
+    setData.sport = await getNextFilter('Sport?', 'sport', setData.sport);
+    setData.year = await getNextFilter('Year?', 'year', setData.year);
+    if (!setData.manufacture) {
+      setData.manufacture = await ask('Manufacturer?');
+    }
+    const setName = await getNextFilter('Set Name?', 'setName', setData.setName || setData.manufacture);
+    setData.setName = setData.setName || setName;
+    await getNextFilter('variantType?', 'variant', setData.variant);
+
+    if (filters.variant.includes('insert')) {
+      const insert = await getNextFilter('Insert?', 'variantName', setData.insert);
+      setData.insert = setData.insert || insert;
+    }
+
+    if (filters.variant.includes('parallel')) {
+      const parallel = await getNextFilter('Parallel?', 'variantName', setData.parallel);
+      setData.parallel = setData.parallel || parallel;
+    }
+
+    setData.bscFilters = buildBody(filters);
+
+    finish(JSON.stringify(setData));
+  } catch (e) {
+    error(e);
+  }
+
+  return setData;
 }
 
 export async function uploadToBuySportsCards(cardsToUpload) {

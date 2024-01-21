@@ -1,7 +1,7 @@
 import { getGroup, getGroupByBin, updateGroup } from '../listing-sites/firebase.js';
 import { findSetId } from '../listing-sites/sportlots.js';
 import { useSpinners } from '../utils/spinners.js';
-import { getAllListings } from '../listing-sites/bsc.js';
+import { findSetInfo } from '../listing-sites/bsc.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
@@ -19,14 +19,24 @@ export default async function getSetData(defaultValues, collectDetails = true) {
     } else {
       update('Gathering');
       setInfo = await findSetId(defaultValues);
-      setInfo.league = findLeague(setInfo.sport);
-      update(`Firebase lookup ${JSON.stringify(setInfo)}`);
-      setInfo = await getGroup(setInfo);
+      if (!setInfo.sportlots.skip) {
+        setInfo.league = findLeague(setInfo.sport);
+        update(`Firebase lookup ${JSON.stringify(setInfo)}`);
+        setInfo = await getGroup(setInfo);
+      }
       if (!setInfo.bscFilters) {
         update('BSC');
-        const { body } = await getAllListings(setInfo);
-        setInfo.bscFilters = body;
-        await updateGroup({ bin: setInfo.bin, bscFilters: body });
+        setInfo = {
+          ...(await findSetInfo(setInfo)),
+          ...setInfo,
+        };
+        if (setInfo.bscFilters) {
+          if (setInfo.bin) {
+            await updateGroup({ bin: setInfo.bin, bscFilters: setInfo.bscFilters });
+          } else {
+            setInfo = await getGroup(setInfo);
+          }
+        }
       }
     }
 

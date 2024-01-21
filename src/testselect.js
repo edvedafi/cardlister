@@ -26,7 +26,7 @@ try {
   // log('byBin', byBin);
 
   update('Info test');
-  const setInfo = await getSetData({ sport: 'football', year: '2021', manufacture: 'Panini' });
+  const setInfo = await getSetData({ sport: 'football', year: '2023', manufacture: 'Bowman' });
   log('byinfo', setInfo);
   finish();
 } catch (e) {

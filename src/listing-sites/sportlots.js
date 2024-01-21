@@ -182,24 +182,38 @@ export async function shutdownSportLots() {
 }
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
-  console.log(chalk.magenta('SportLots Starting Upload'));
-  console.log('Uploading:', Object.keys(cardsToUpload));
+  const { update, finish, error } = showSpinner('upload', 'Uploading');
+  update('login');
   const driver = await login();
 
   try {
+    update('setup');
     const waitForElement = useWaitForElement(driver);
     const clickSubmit = useClickSubmit(waitForElement);
-    // const setSelectValue = useS
     const selectBrand = useSelectBrand(driver, 'newinven', 'yr', 'sprt', 'brd');
     const selectSet = useSelectSet(driver, selectBrand);
 
     for (const key in cardsToUpload) {
+      update(key);
+      const {
+        update: updateSet,
+        finish: finishSet,
+        error: errorSet,
+      } = showSpinner(`upload-${key}`, `Uploading ${key}`);
+      updateSet('Get Group Info');
       const setInfo = await getGroupByBin(key);
+
+      if (setInfo.sportlots?.skip) {
+        finishSet(`Skipping ${key}`);
+        continue;
+      }
+
       if (!setInfo.sportlots) {
         setInfo.sportlots = {};
       }
       let cardsAdded = 0;
 
+      updateSet('Brand');
       await selectBrand(setInfo);
       const onFoundSet = async (fullSetText, row) => {
         const fullSetNumbers = fullSetText.split(' ')[0];
@@ -210,16 +224,20 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       };
       let found = false;
       if (setInfo.sportlots.id) {
+        updateSet('Set - id');
         const radioButton = await waitForElement(By.xpath(`//input[@value = '${setInfo.sportlots.id}']`));
         await radioButton.click();
         found = true;
       } else {
+        updateSet('Set - lookup');
         found = (await selectSet(setInfo, onFoundSet)).found;
       }
       if (found) {
+        updateSet('Update Group');
         await updateGroup(setInfo);
         await clickSubmit();
       } else {
+        updateSet('Set - not found');
         const inputYear = setInfo.sportlots.year || setInfo.year;
         const selectedYear = await ask('Year?', inputYear);
         if (selectedYear !== inputYear) {
@@ -260,6 +278,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
       }
 
       if (found) {
+        updateSet('Upload Cards');
         while ((await driver.getCurrentUrl()).includes('listcards.tpl')) {
           const addedCards = [];
           let rows = await driver.findElements({
@@ -287,7 +306,7 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
               );
 
               if (card) {
-                // console.log("uploading: ", card);
+                updateSet(`Adding ${tableCardNumber}`);
                 let cardNumberTextBox = await columns[0].findElement({ css: 'input' });
                 await cardNumberTextBox.sendKeys(card.quantity);
 
@@ -297,15 +316,14 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
                 addedCards.push(card);
                 const binTextBox = await columns[5].findElement({ css: 'input' });
                 await binTextBox.sendKeys(card.sku || card.bin);
-                console.log(`Added Card ${chalk.green(tableCardNumber)}`);
-              } else {
-                // console.log(`Card ${chalk.red(tableCardNumber)} not found`);
+                updateSet(`Added ${tableCardNumber}`);
               }
             }
           }
 
           //in the case where 'Skip to Page' exists we know that there are multiple pages, so we should only be counting
           //the cards that fit within the current range. Otherwise, we should be counting all cards.
+          updateSet('Validating');
           const skipToPage = await driver.findElements(By.xpath(`//*[contains(text(), 'Skip to Page')]`));
           let expectedCards;
           if (skipToPage.length > 0) {
@@ -318,7 +336,9 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
 
           await validateUploaded(expectedCards, addedCards, 'slPrice');
 
+          updateSet('Submit');
           await clickSubmit();
+          updateSet('Wait for Results');
           const resultHeader = await driver.wait(
             until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)),
           );
@@ -328,16 +348,15 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
             cardsAdded += parseInt(cardsAddedText[0]);
           }
         }
-        console.log(`${chalk.green(cardsAdded)} cards added to Sportlots at ${chalk.cyan(key)}`);
+        finishSet(`Added ${cardsAdded} cards to ${key}`);
       } else {
-        console.log(`Could not find ${chalk.red(key)} on SportLots`);
+        errorSet(`Could not find ${setInfo.skuPrefix}`);
         await ask('Press any key to continue...');
       }
     }
-    console.log(chalk.magenta('SportLots Completed Upload!'));
+    finish('Sportlots');
   } catch (e) {
-    console.log(chalk.red('Failed to upload to SportLots'));
-    console.log(e);
+    error(e);
     await ask('Press any key to continue...');
   }
 }
@@ -477,12 +496,14 @@ export async function removeFromSportLots(groupedCards) {
   const toRemove = {};
   let removed = 0;
   const notRemoved = [];
-  Object.keys(groupedCards).forEach((key) => {
-    const toRemoveAtKey = groupedCards[key].filter((card) => card.platform.indexOf('SportLots') === -1);
-    if (toRemoveAtKey?.length > 0) {
-      toRemove[key] = toRemoveAtKey;
-    }
-  });
+  Object.keys(groupedCards)
+    .filter((key) => !groupedCards[key].sportlots?.skip)
+    .forEach((key) => {
+      const toRemoveAtKey = groupedCards[key].filter((card) => card.platform.indexOf('SportLots') === -1);
+      if (toRemoveAtKey?.length > 0) {
+        toRemove[key] = toRemoveAtKey;
+      }
+    });
 
   if (Object.keys(toRemove).length === 0) {
     finishSpinner('remove', 'No cards to remove from SportLots');
@@ -870,7 +891,11 @@ export async function findSetId(defaultValues = {}) {
         setInfo.parallel = undefined;
       }
     } else {
-      setInfo = {};
+      setInfo = {
+        sportlots: {
+          skip: true,
+        },
+      };
     }
   }
 
