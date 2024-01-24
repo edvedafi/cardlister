@@ -126,7 +126,10 @@ export async function matchOldStyle(db, card) {
     `old-${card.title}`,
     `Getting listing info from Firebase for ${card.title} via old style`,
   );
-  let updatedCard = { ...card };
+  let updatedCard = {
+    ...card,
+    manufacture: card.setName === 'Score' ? 'Score' : card.manufacture,
+  };
 
   //now try a fairly specific search
   update(`Set up collection query`);

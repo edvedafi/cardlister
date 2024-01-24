@@ -529,9 +529,10 @@ export async function removeFromSportLots(groupedCards) {
     updateSpinner(`remove-${key}`, `Removing ${toRemove[key]?.length} cards from [${setInfo.skuPrefix}]`);
     showSpinner(`remove-${key}-details`, `Removing ${toRemove[key]?.length} cards from [${setInfo.skuPrefix}]`);
     let found = false;
-    if (setInfo.sportlots?.id) {
-      updateSpinner(`remove-${key}-details`, `Navigating direct to set ${setInfo.sportlots.id}`);
-      await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
+    const id = setInfo.sportlots?.id || setInfo.sportlots?.bin;
+    if (id) {
+      updateSpinner(`remove-${key}-details`, `Navigating direct to set ${id}`);
+      await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${id}`);
       found = true;
     } else {
       updateSpinner(`remove-${key}-details`, `Searching for set ${setInfo.skuPrefix}`);

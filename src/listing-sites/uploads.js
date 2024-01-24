@@ -216,7 +216,6 @@ export async function getSelectOptions(selectBox) {
 
 export async function buildTableData(groupedCards) {
   const { finish } = showSpinner('buildTableData', 'Building table data');
-  log(groupedCards);
   const divider = {
     sport: '--------',
     year: '----',

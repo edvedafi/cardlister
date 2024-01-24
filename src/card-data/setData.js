@@ -27,8 +27,8 @@ export default async function getSetData(defaultValues, collectDetails = true) {
       if (!setInfo.bscFilters) {
         update('BSC');
         setInfo = {
-          ...(await findSetInfo(setInfo)),
           ...setInfo,
+          ...(await findSetInfo(setInfo)),
         };
         if (setInfo.bscFilters) {
           if (!setInfo.bin) {
@@ -39,6 +39,8 @@ export default async function getSetData(defaultValues, collectDetails = true) {
             };
           }
           await updateGroup({ bin: setInfo.bin, bscFilters: setInfo.bscFilters });
+        } else {
+          throw new Error(`Unable to find set info for ${JSON.stringify(setInfo)}`);
         }
       }
     }
