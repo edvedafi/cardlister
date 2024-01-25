@@ -31,7 +31,11 @@ const shutdown = async () => {
   ),
 );
 
-const inputDirectory = await getInputs();
-const savedAnswers = await initializeAnswers(inputDirectory, true);
+try {
+  const inputDirectory = await getInputs();
+  const savedAnswers = await initializeAnswers(inputDirectory, true);
 
-await writeFiles(savedAnswers.allCardData, savedAnswers.bulk, args.r);
+  await writeFiles(savedAnswers.allCardData, savedAnswers.bulk, args.r);
+} finally {
+  await shutdown();
+}
