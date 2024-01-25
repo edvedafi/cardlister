@@ -104,56 +104,6 @@ export const login = async () => {
 
   return _api;
 };
-//
-// //REMOVE ALL OF THESE
-// const fetchJson = async (path, method = 'GET', body) => {
-//   const fetchOptions = {
-//     headers: baseHeaders,
-//     method: method,
-//   };
-//
-//   if (body) {
-//     fetchOptions.body = JSON.stringify(body);
-//   }
-//   const responseObject = await fetch(`https://api-prod.buysportscards.com/${path}`, fetchOptions);
-//
-//   if (responseObject.status === 401) {
-//     console.log('BSC Token Expired');
-//     await login();
-//   } else if (responseObject.status < 200 || responseObject.status >= 300) {
-//     const err = new Error(
-//       `Error from ${method} https://api-prod.buysportscards.com/${path}: ${responseObject.status} ${responseObject.statusText}`,
-//     );
-//
-//     if (body) {
-//       err.body = JSON.stringify(body, null, 2);
-//       err.bodyKeys = Object.keys(body);
-//     }
-//     if (responseObject) {
-//       err.response = responseObject;
-//     }
-//
-//     throw err;
-//   }
-//
-//   const text = await responseObject.text();
-//
-//   if (text === '' || text.trim().length === 0) {
-//     return undefined;
-//   }
-//
-//   try {
-//     return JSON.parse(text);
-//   } catch (e) {
-//     console.log(`Error parsing JSON response from PUT ${path}`, text);
-//     console.log(e);
-//     throw e;
-//   }
-// };
-//
-// const get = fetchJson;
-// const put = async (path, body) => fetchJson(path, 'PUT', body);
-// const post = async (path, body) => fetchJson(path, 'POST', body);
 
 async function postImage(path, imagePath) {
   const { finish, error } = showSpinner('post-image', `Uploading ${imagePath}`);
