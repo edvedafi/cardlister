@@ -16,10 +16,32 @@ let _pausedErrors = [];
 let isPaused = false;
 
 export const showSpinner = (spinnerName, message) => {
-  getSpinners().add(spinnerName, { text: message });
-  if (isPaused) {
-    _paused.push({ name: spinnerName, spinner: getSpinners().pick(spinnerName) });
-    pauseSpinners();
+  if (getSpinners().pick(spinnerName)) {
+    updateSpinner(spinnerName, message);
+  } else {
+    getSpinners().add(spinnerName, { text: message });
+    if (isPaused) {
+      _paused.push({ name: spinnerName, spinner: getSpinners().pick(spinnerName) });
+      pauseSpinners();
+    }
+  }
+};
+
+export const updateSpinner = (spinnerName, message) => {
+  const spinner = getSpinners().pick(spinnerName);
+  if (spinner) {
+    if (isPaused) {
+      const pausedSpinner = _paused.find((s) => s.name === spinnerName);
+      if (pausedSpinner) {
+        pausedSpinner.text = message;
+      } else {
+        showSpinner(spinnerName, message);
+      }
+    } else {
+      getSpinners().update(spinnerName, { text: message });
+    }
+  } else {
+    showSpinner(spinnerName, message);
   }
 };
 
@@ -96,7 +118,7 @@ export const useSpinners = (processName, color = chalk.white) => ({
   showSpinner: (name, message) => {
     showSpinner(`${processName}-${name}`, color.inverse(`${message}`));
     return {
-      update: (addition) => showSpinner(`${processName}-${name}`, color.inverse(`${message} (${addition})`)),
+      update: (addition) => updateSpinner(`${processName}-${name}`, color.inverse(`${message} (${addition})`)),
       finish: (message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
       error: (info, addition = message) => {
         if (info instanceof Error) {
@@ -108,24 +130,7 @@ export const useSpinners = (processName, color = chalk.white) => ({
       },
     };
   },
-  updateSpinner: (name, message) => {
-    const spinnerName = `${processName}-${name}`;
-    const spinner = getSpinners().pick(spinnerName);
-    if (spinner) {
-      if (isPaused) {
-        const pausedSpinner = _paused.find((s) => s.name === spinnerName);
-        if (pausedSpinner) {
-          pausedSpinner.text = color.inverse(`${message}`);
-        } else {
-          showSpinner(spinnerName, color.inverse(`${message}`));
-        }
-      } else {
-        getSpinners().update(spinnerName, { text: color.inverse(message) });
-      }
-    } else {
-      showSpinner(spinnerName, color.inverse(`${message}`));
-    }
-  },
+  updateSpinner: (name, message) => updateSpinner(`${processName}-${name}`, color.inverse(`${message}`)),
   finishSpinner: (name, message) => finishSpinner(`${processName}-${name}`, message ? color(`${message}`) : null),
   errorSpinner: (name, message) => errorSpinner(`${processName}-${name}`, color(`${message}`)),
   log: (...args) => log(color, ...args),
