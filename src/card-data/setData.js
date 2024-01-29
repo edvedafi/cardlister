@@ -6,8 +6,7 @@ import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
 
-const color = chalk.white;
-const { showSpinner, log } = useSpinners('setData', color);
+const { showSpinner, log } = useSpinners('setData', chalk.white);
 export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
   try {

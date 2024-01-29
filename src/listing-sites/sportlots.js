@@ -1,12 +1,17 @@
-import { manufactures, sets } from '../utils/data.js';
 import { Browser, Builder, By, until } from 'selenium-webdriver';
 import { ask } from '../utils/ask.js';
-import { caseInsensitive, getSelectOptions, useSetSelectValue, useWaitForElement } from './uploads.js';
+import {
+  caseInsensitive,
+  convertTitleToCard,
+  getSelectOptions,
+  useSetSelectValue,
+  useWaitForElement,
+} from './uploads.js';
 import { validateUploaded } from './validate.js';
-import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
+import chalk from 'chalk';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('sportlots', chalk.blueBright);
 
@@ -360,66 +365,6 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
     await ask('Press any key to continue...');
   }
 }
-
-export const convertTitleToCard = (title) => {
-  const cardNumberIndex = title.indexOf('#');
-  const yearIdx = title.match(/\D*-?\D+/)?.index;
-  let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
-  let setInfoLower = setInfo.toLowerCase();
-  const card = {
-    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
-    year: title.split(' ')[0],
-    parallel: '',
-    insert: '',
-    sport: { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)],
-    title,
-  };
-
-  const manufacture = manufactures.find((m) => setInfoLower.indexOf(m) > -1);
-  if (manufacture) {
-    if (manufacture === 'score') {
-      card.manufacture = 'Panini';
-    } else {
-      card.manufacture = setInfo.slice(setInfoLower.indexOf(manufacture), manufacture.length);
-      setInfo = setInfo.replace(card.manufacture, '').trim();
-      setInfoLower = setInfo.toLowerCase();
-    }
-  }
-
-  const set = sets.find((s) => setInfo.toLowerCase().indexOf(s) > -1);
-  if (set) {
-    card.setName = setInfo.slice(setInfoLower.indexOf(set), set.length);
-    setInfo = setInfo.replace(card.setName, '').trim();
-    setInfoLower = setInfo.toLowerCase();
-  }
-
-  if (setInfoLower.indexOf('base set') === -1) {
-    const insertIndex = setInfoLower.indexOf('insert');
-    if (insertIndex > -1) {
-      card.insert = setInfo.slice(0, insertIndex).trim();
-      setInfo = setInfo.replace(card.insert, '').trim();
-      setInfoLower = setInfo.toLowerCase();
-    }
-
-    const parallelIndex = setInfoLower.indexOf('parallel');
-    if (parallelIndex > -1) {
-      card.parallel = setInfo.slice(0, parallelIndex).trim();
-      setInfo = setInfo.replace(card.parallel, '').trim();
-    }
-
-    if (setInfo.length > 0 && setInfo !== 'base') {
-      if (!card.setName) {
-        card.setName = setInfo;
-      } else if (!card.insert) {
-        card.insert = setInfo;
-      } else {
-        card.extraSetInfo = setInfo;
-      }
-    }
-  }
-
-  return card;
-};
 
 export function convertBinNumber(binNumber, cardNumberFromTitle) {
   const card = {};

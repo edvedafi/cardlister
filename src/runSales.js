@@ -1,9 +1,7 @@
-import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
 import dotenv from 'dotenv';
 import 'zx/globals';
 import { buildTableData, createGroups } from './listing-sites/uploads.js';
 import chalk from 'chalk';
-import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import {
   getSalesSportLots,
   login as sportlotsLogin,
@@ -24,13 +22,15 @@ import {
 } from './listing-sites/bsc.js';
 import chalkTable from 'chalk-table';
 import { getFileSales, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
-import { loadTeams } from './utils/teams.js';
 import minimist from 'minimist';
 import open from 'open';
 import { pauseSpinners, useSpinners } from './utils/spinners.js';
-import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
 import { ask } from './utils/ask.js';
 import initializeFirebase from './utils/firebase.js';
+import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
+import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
+import { removeFromShopify } from './listing-sites/shopifyUpload.js';
+import { loadTeams } from './utils/teams.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -94,9 +94,6 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
-  if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
-    openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
-  }
   if (sales.find((sale) => sale.platform.indexOf('MySlabs') > -1)) {
     openSalesSites.push('https://www.myslabs.com/account/history/sold/');
   }
@@ -136,10 +133,6 @@ try {
         columns: [
           { field: 'sport', name: 'Sport' },
           { field: 'year', name: 'Year' },
-          // { field: 'setName', name: 'Set' },
-          // { field: 'parallel', name: chalk.green('Parallel') },
-          // { field: 'insert', name: chalk.blue('Insert') },
-          // { field: 'cardNumber', name: 'Card #' },
           { field: 'quantity', name: 'Count' },
           { field: 'title', name: 'Title' },
           { field: 'platform', name: 'Sold On' },

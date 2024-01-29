@@ -3,11 +3,9 @@ import { isTeam, sports } from '../utils/teams.js';
 import { inserts, manufactures, sets, titleCase } from '../utils/data.js';
 import { HfInference } from '@huggingface/inference';
 import dotenv from 'dotenv';
-import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
-const color = chalk.hex('#f4d02e');
-const { showSpinner, finishSpinner, updateSpinner } = useSpinners('firebase', color);
+const { showSpinner, finishSpinner, updateSpinner } = useSpinners('firebase', '#f4d02e');
 
 dotenv.config();
 // import { readFileSync } from 'fs'

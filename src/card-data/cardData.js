@@ -292,16 +292,19 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
   output.team = await getTeam(output);
   output.teamDisplay = getTeamDisplay(output.team);
 
-  let useSetInfo = await ask('Use Set Info?', true, { allowUpdates: resetAll });
+  let useSetInfo = defaultValues.isSet && (await ask('Use Set Info?', true, { allowUpdates: resetAll }));
   if (useSetInfo) {
     output.quantity = 1;
   } else {
-    const updatedSet = await getSetData({
-      year: output.year,
-      sport: output.sport,
-      manufacture: output.manufacture,
-      setName: output.setName,
-    });
+    const updatedSet = await getFullSetData(
+      {
+        year: output.year,
+        sport: output.sport,
+        manufacture: output.manufacture,
+        setName: output.setName,
+      },
+      false,
+    );
     output = {
       ...output,
       setName: updatedSet.setName,

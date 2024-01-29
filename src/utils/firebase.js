@@ -1,19 +1,16 @@
 import { readFileSync } from 'fs';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore as getFirestoreAdmin } from 'firebase-admin/firestore';
-import chalk from 'chalk';
 import { useSpinners } from './spinners.js';
 import { getStorage as getFirebaseStorage } from 'firebase-admin/storage';
 
 let _db = null;
 let _firebase = null;
 let _storage = null;
-
-const color = chalk.hex('#ffc107');
 const log = (...params) => console.log(color(...params));
 const { showSpinner, finishSpinner, updateSpinner, errorSpinner, pauseSpinners, resumeSpinners } = useSpinners(
   'firebase',
-  color,
+  '#ffc107',
 );
 export default function initializeFirebase() {
   const { update, finish } = showSpinner('firebase', 'Firebase');

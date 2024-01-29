@@ -2,7 +2,6 @@ import { ask } from '../utils/ask.js';
 import dotenv from 'dotenv';
 import { Browser, Builder, By, Key } from 'selenium-webdriver';
 import { caseInsensitive, parseKey, useWaitForElement } from './uploads.js';
-import chalk from 'chalk';
 import { manufactures, titleCase } from '../utils/data.js';
 import pRetry from 'p-retry';
 import FormData from 'form-data';
@@ -12,8 +11,7 @@ import axios from 'axios';
 
 dotenv.config();
 
-const color = chalk.hex('#e5e5e5');
-const { showSpinner, log } = useSpinners('bsc', color);
+const { showSpinner, log } = useSpinners('bsc', '#e5e5e5');
 
 const userWaitForButton = (driver) => async (text) => {
   const waitForElement = useWaitForElement(driver);

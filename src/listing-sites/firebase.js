@@ -1,14 +1,12 @@
 import { getFirestore, getStorage } from '../utils/firebase.js';
-import chalk from 'chalk';
-import { convertTitleToCard } from './sportlots.js';
 import { ask } from '../utils/ask.js';
 import { findLeague } from '../utils/teams.js';
 import { titleCase } from '../utils/data.js';
 import { useSpinners } from '../utils/spinners.js';
 import getSetData from '../card-data/setData.js';
+import { convertTitleToCard } from './uploads.js';
 
-const color = chalk.hex('#ffc107');
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', color);
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', '#ffc107');
 
 export async function uploadToFirebase(allCards) {
   showSpinner('upload', 'Firebase Starting Upload');
@@ -130,122 +128,126 @@ export async function matchOldStyle(db, card) {
     ...card,
     manufacture: card.setName === 'Score' ? 'Score' : card.manufacture,
   };
+  try {
+    //now try a fairly specific search
+    update(`Set up collection query`);
+    let query = db.collection('OldSales').where('year', '==', updatedCard.year);
+    if (updatedCard.sport) {
+      query = query.where('sport', '==', titleCase(updatedCard.sport));
+    }
 
-  //now try a fairly specific search
-  update(`Set up collection query`);
-  let query = db.collection('OldSales').where('year', '==', updatedCard.year);
-  if (updatedCard.sport) {
-    query = query.where('sport', '==', titleCase(updatedCard.sport));
-  }
+    const queryResults = await query.get();
+    let possibleCards = [];
+    queryResults.forEach((doc) => {
+      possibleCards.push(doc.data());
+    });
 
-  const queryResults = await query.get();
-  let possibleCards = [];
-  queryResults.forEach((doc) => {
-    possibleCards.push(doc.data());
-  });
-
-  update(`match on everything`);
-  let match = possibleCards.find(
-    (c) =>
-      updatedCard.cardNumber === c.cardNumber &&
-      updatedCard.setName === c.setName &&
-      updatedCard.manufacture === c.manufacture &&
-      updatedCard.insert === c.insert &&
-      updatedCard.parallel === c.parallel,
-  );
-  if (match) {
-    finish(`Found exact listing for ${card.title}`);
-    return mergeFirebaseResult(updatedCard, match);
-  }
-
-  update(`card numbers with letters removed`);
-  //remove non-digits from the number and search again
-  match = possibleCards.find(
-    (c) =>
-      updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-      updatedCard.setName === c.setName &&
-      updatedCard.manufacture === c.manufacture &&
-      updatedCard.insert === c.insert &&
-      updatedCard.parallel === c.parallel,
-  );
-  if (match) {
-    finish(`Found fuzzy number listing in firebase for ${card.title}`);
-    return mergeFirebaseResult(updatedCard, match);
-  }
-
-  update(`lower case set name`);
-  const searchSet =
-    updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
-  match = possibleCards.find(
-    (c) =>
-      updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
-      c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
-      (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
-      (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
-  );
-  if (match) {
-    finish(`Found lower case set name listing in firebase for ${card.title}`);
-    return mergeFirebaseResult(updatedCard, match);
-  }
-
-  update(`Chronicles`);
-  if (updatedCard.setName === 'Chronicles') {
-    match = possibleCards.find(
+    update(`match on everything`);
+    let match = possibleCards.find(
       (c) =>
         updatedCard.cardNumber === c.cardNumber &&
-        c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
-        (!updatedCard.insert ||
-          c.Title.toLowerCase().indexOf(
-            updatedCard.insert
-              .toLowerCase()
-              .replace('update rookies', '')
-              .replace('rookie update', '')
-              .replace('rookies update', '')
-              .trim(),
-          ) > -1) &&
-        (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
-      !updatedCard.parallel ||
-        c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
+        updatedCard.setName === c.setName &&
+        updatedCard.manufacture === c.manufacture &&
+        updatedCard.insert === c.insert &&
+        updatedCard.parallel === c.parallel,
     );
     if (match) {
-      finish(`Found Chronicles listing in firebase for ${card.title}`);
+      finish(`Found exact listing for ${card.title}`);
       return mergeFirebaseResult(updatedCard, match);
     }
-  }
 
-  update(`matching sales group even if we don't have the card`);
-  const collection = db.collection('SalesGroups');
-  if (card.bin) {
-    const queryResults = await collection.doc(card.bin).get();
-    if (queryResults.exists) {
-      finish(`Found sales group by bin in firebase for ${card.title}`);
-      return mergeFirebaseResult(updatedCard, queryResults.data());
+    update(`card numbers with letters removed`);
+    //remove non-digits from the number and search again
+    match = possibleCards.find(
+      (c) =>
+        updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+        updatedCard.setName === c.setName &&
+        updatedCard.manufacture === c.manufacture &&
+        updatedCard.insert === c.insert &&
+        updatedCard.parallel === c.parallel,
+    );
+    if (match) {
+      finish(`Found fuzzy number listing in firebase for ${card.title}`);
+      return mergeFirebaseResult(updatedCard, match);
     }
-  }
 
-  update(`exact skuPrefix match`);
-  const skuPrefix = getSkuPrefix(card);
-  const skuQuery = collection.where('skuPrefix', '==', skuPrefix);
-  const skuQueryResults = await skuQuery.get();
-  if (skuQueryResults.size === 1) {
-    finish(`Found sales group by skuPrefix in firebase for ${card.title}`);
-    return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
-  }
+    update(`lower case set name`);
+    const searchSet =
+      updatedCard.year === '2021' && updatedCard.setName.indexOf('Absolute') > -1 ? 'Absolute' : updatedCard.setName;
+    match = possibleCards.find(
+      (c) =>
+        updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+        c.Title.toLowerCase().indexOf(searchSet.toLowerCase()) > -1 &&
+        (!updatedCard.insert || c.Title.toLowerCase().indexOf(updatedCard.insert.toLowerCase()) > -1) &&
+        (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+    );
+    if (match) {
+      finish(`Found lower case set name listing in firebase for ${card.title}`);
+      return mergeFirebaseResult(updatedCard, match);
+    }
 
-  if (
-    !match ||
-    !updatedCard.sport ||
-    !updatedCard.year ||
-    !updatedCard.manufacture ||
-    !updatedCard.setName ||
-    !updatedCard.bin ||
-    !updatedCard.sportlots ||
-    !updatedCard.bscFiltersx
-  ) {
-    error(`Could not find listing in firebase for ${card.title}`);
-    updatedCard = { ...updatedCard, ...(await getSetData(updatedCard, false)) };
-  } else {
-    finish(`Found listing in firebase for ${card.title}`);
+    update(`Chronicles`);
+    if (updatedCard.setName === 'Chronicles') {
+      match = possibleCards.find(
+        (c) =>
+          updatedCard.cardNumber === c.cardNumber &&
+          c.Title.toLowerCase().indexOf(updatedCard.setName.toLowerCase()) > -1 &&
+          (!updatedCard.insert ||
+            c.Title.toLowerCase().indexOf(
+              updatedCard.insert
+                .toLowerCase()
+                .replace('update rookies', '')
+                .replace('rookie update', '')
+                .replace('rookies update', '')
+                .trim(),
+            ) > -1) &&
+          (!updatedCard.parallel || c.Title.toLowerCase().indexOf(updatedCard.parallel.toLowerCase()) > -1),
+        !updatedCard.parallel ||
+          c.Title.toLowerCase().indexOf(updatedCard.parallel.replace('and', '&').toLowerCase()) > -1,
+      );
+      if (match) {
+        finish(`Found Chronicles listing in firebase for ${card.title}`);
+        return mergeFirebaseResult(updatedCard, match);
+      }
+    }
+
+    update(`matching sales group even if we don't have the card`);
+    const collection = db.collection('SalesGroups');
+    if (card.bin) {
+      const queryResults = await collection.doc(card.bin).get();
+      if (queryResults.exists) {
+        finish(`Found sales group by bin in firebase for ${card.title}`);
+        return mergeFirebaseResult(updatedCard, queryResults.data());
+      }
+    }
+
+    update(`exact skuPrefix match`);
+    const skuPrefix = getSkuPrefix(card);
+    const skuQuery = collection.where('skuPrefix', '==', skuPrefix);
+    const skuQueryResults = await skuQuery.get();
+    if (skuQueryResults.size === 1) {
+      finish(`Found sales group by skuPrefix in firebase for ${card.title}`);
+      return mergeFirebaseResult(updatedCard, skuQueryResults.docs[0].data());
+    }
+
+    if (
+      !match ||
+      !updatedCard.sport ||
+      !updatedCard.year ||
+      !updatedCard.manufacture ||
+      !updatedCard.setName ||
+      !updatedCard.bin ||
+      !updatedCard.sportlots ||
+      !updatedCard.bscFiltersx
+    ) {
+      error(`Could not find listing in firebase for ${card.title}`);
+      updatedCard = { ...updatedCard, ...(await getSetData(updatedCard, false)) };
+    } else {
+      finish(`Found listing in firebase for ${card.title}`);
+    }
+  } catch (e) {
+    error(e);
+    throw e;
   }
 
   return updatedCard;

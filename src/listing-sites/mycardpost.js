@@ -8,7 +8,7 @@ import { useSpinners } from '../utils/spinners.js';
 dotenv.config();
 
 const color = chalk.hex('#ffc107');
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('mcp', color);
+const { showSpinner, log } = useSpinners('mcp', color);
 
 let _driver;
 export const login = async () => {
@@ -37,13 +37,13 @@ export const login = async () => {
 };
 
 export async function shutdownMyCardPost() {
-  showSpinner('shutdown', 'Shutting down My Card Post');
+  const { finish } = showSpinner('shutdown', 'Shutting down My Card Post');
   if (_driver) {
     const d = _driver;
     _driver = undefined;
     await d.quit();
   }
-  finishSpinner('shutdown', 'My Card Post shutdown complete');
+  finish('My Card Post shutdown complete');
 }
 
 export const uploadToMyCardPost = async (cardsToUpload) => {
@@ -222,20 +222,26 @@ export async function removeFromMyCardPost(cards) {
       spinCard('Searching');
       const searchInput = await xpath(`//input[@placeholder='Search Cards']`);
       await searchInput.clear();
-      await searchInput.sendKeys(`[SKU: ${card.sku}]`);
+      await searchInput.sendKeys(`[${card.sku}]`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       spinCard('Waiting for just one card');
-      const header = await Promise.any([xpath('//h2[text()="All Cards (1)"]'), xpath('//h2[text()="All Cards (0)"]')]);
+      const header = await waitForElement([
+        By.xpath('//h2[text()="All Cards (1)"]'),
+        By.xpath('//h2[text()="All Cards (0)"]'),
+      ]);
       const headerText = await header.getText();
+      log(headerText);
       if (headerText === 'All Cards (0)') {
         await searchInput.clear();
         await searchInput.sendKeys(card.title);
-        const secondSearchHeader = await Promise.any([
-          xpath('//h2[text()="All Cards (1)"]'),
-          xpath('//h2[text()="All Cards (0)"]'),
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const secondSearchHeader = await waitForElement([
+          By.xpath('//h2[text()="All Cards (1)"]'),
+          By.xpath('//h2[text()="All Cards (0)"]'),
         ]);
         const secondHeaderText = await secondSearchHeader.getText();
         if (secondHeaderText === 'All Cards (0)') {
-          errorSpinner(card.sku, `${card.title} (not found)`);
+          errorCard(`${card.title} (not found)`);
           await ask('Please fix and press enter to continue');
           continue;
         }
@@ -268,8 +274,7 @@ export async function removeFromMyCardPost(cards) {
 }
 
 export async function getSalesFromMyCardPost() {
-  showSpinner('sales', 'My Card Post sales');
-  const spin = (message) => updateSpinner(`sales`, `My Card Post sales (${message})`);
+  const { update, finish } = showSpinner('sales', 'My Card Post sales');
   let driver;
 
   try {
@@ -278,47 +283,47 @@ export async function getSalesFromMyCardPost() {
     const waitForElement = useWaitForElement(driver);
 
     //iterate over cardsToUpload values
-    spin('Launching site');
+    update('Launching site');
     await driver.get('https://mycardpost.com/orders');
     const sales = [];
-    spin('Watching for page to load');
+    update('Watching for page to load');
     const buttons = await driver.findElements(By.xpath('//input[@type="radio"]'));
     const soldButton = buttons[2];
-    spin('Clicking Sold');
+    update('Clicking Sold');
     soldButton.click();
-    spin('Waiting for Sold');
+    update('Waiting for Sold');
     await waitForElement(By.xpath('//h2[text()="Shipping Address"]'));
-    spin('Looking for a sales table');
+    update('Looking for a sales table');
     const salesTable = await waitForElement(By.xpath('//div[@class="orders-blk " or @class="orders-blk"]'));
 
     if (salesTable) {
       const trackingInfo = await salesTable.findElement(By.xpath('.//div[@class="tr-id"]'));
       if (!trackingInfo) {
-        spin('Get Order IDs');
+        update('Get Order IDs');
         const orderIdDiv = await salesTable.findElement(By.xpath('.//div[@class="order-id"]'));
         const orderIdText = await orderIdDiv.getText();
         const orderId = orderIdText.substring(orderIdText.indexOf('#') + 1);
-        spin('Getting rows');
+        update('Getting rows');
         const rows = await driver.findElements(By.xpath('//div[@class="col-md-4 or-lft mb-4"]/p'));
         for (let row of rows) {
           const title = await row.getText();
-          showSpinner(title, title);
+          const { finish: finishCard } = showSpinner(title, title);
           const skuMatch = title.match(/\[(.*)\]/);
           if (skuMatch) {
             const sku = skuMatch[1];
             const card = { sku, title, platform: `MCP ${orderId}` };
             sales.push(card);
-            finishSpinner(title, title);
+            finishCard(title);
           } else {
             sales.push({ title, platform: `MCP ${orderId}`, ...reverseTitle(title) });
-            finishSpinner(title, title);
+            finishCard(title);
           }
         }
       }
     }
-    finishSpinner('sales', `Got ${sales.length} sales from My Card Post`);
+    finish(`Got ${sales.length} sales from My Card Post`);
     return sales;
   } catch (e) {
-    errorSpinner('sales', `Error getting sales from My Card Post ${e.message}`);
+    finish(e);
   }
 }

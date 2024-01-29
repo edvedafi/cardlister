@@ -1,9 +1,9 @@
 import { ask } from '../utils/ask.js';
 import { addCardData, getTeam, getTeamDisplay, mockSavedSetData } from './cardData.js';
 import fs from 'fs-extra';
-import { getGroup } from '../listing-sites/firebase.js';
 
 jest.mock('../utils/ask.js');
+jest.mock('../utils/spinners.js');
 jest.mock('fs-extra');
 jest.mock('../listing-sites/firebase.js');
 

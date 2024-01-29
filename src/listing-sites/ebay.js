@@ -9,8 +9,7 @@ import express from 'express';
 import fs from 'fs-extra';
 import { useSpinners } from '../utils/spinners.js';
 
-const color = chalk.hex('#84AF29');
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('ebay', color);
+const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('ebay', '#84AF29');
 
 const defaultValues = {
   action: 'Add',

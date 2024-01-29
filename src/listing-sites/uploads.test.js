@@ -1,7 +1,8 @@
-import { createGroups } from './uploads.js';
+import { convertTitleToCard, createGroups, reverseTitle } from './uploads.js';
 
 jest.mock('../utils/ask.js');
 jest.mock('../utils/inputs.js');
+jest.mock('../utils/spinners.js');
 jest.mock('chalk', () => jest.fn());
 jest.mock('open', () => jest.fn());
 
@@ -393,6 +394,105 @@ describe('uploads', () => {
       const result = await createGroups(allCards, bulk);
 
       expect(result).toContainAllKeys(['1']);
+    });
+  });
+
+  describe('convertTitleToCard', () => {
+    it('should convert a simple baseball title', () => {
+      expect(convertTitleToCard('2023 Topps Big League #80 Adolis Garcia BB')).toEqual({
+        cardNumber: '80',
+        year: '2023',
+        parallel: '',
+        insert: '',
+        manufacture: 'Topps',
+        setName: 'Big League',
+        sport: 'Baseball',
+        title: '2023 Topps Big League #80 Adolis Garcia BB',
+      });
+    });
+    it('should convert a simple Football title', () => {
+      expect(convertTitleToCard('2021 Score Base Set #260 Raheem Mostert FB')).toEqual({
+        cardNumber: '260',
+        year: '2021',
+        insert: '',
+        manufacture: 'Score',
+        setName: 'Score',
+        sport: 'Football',
+        title: '2021 Score Base Set #260 Raheem Mostert FB',
+        parallel: '',
+      });
+    });
+    it('should convert an insert title', () => {
+      expect(convertTitleToCard('2020 Panini Chronicles Prestige Rookies Update #310 Jalen Hurts FB')).toEqual({
+        cardNumber: '310',
+        year: '2020',
+        parallel: '',
+        insert: 'Prestige Rookies Update',
+        manufacture: 'Panini',
+        setName: 'Chronicles',
+        sport: 'Football',
+        title: '2020 Panini Chronicles Prestige Rookies Update #310 Jalen Hurts FB',
+      });
+    });
+    it('should reverse a simple title', () => {
+      expect(reverseTitle('2023 Panini Score #351 Zay Flowers Baltimore Ravens RC')).toEqual({
+        cardNumber: '351',
+        year: '2023',
+        parallel: '',
+        insert: '',
+        manufacture: 'Panini',
+        setName: 'Score',
+      });
+    });
+    it('should reverse a parallel title', () => {
+      expect(reverseTitle('2021 Panini Playoff Kickoff Parallel #9 Justin Herbert Los Angeles Chargers')).toEqual({
+        cardNumber: '9',
+        year: '2021',
+        parallel: 'Kickoff',
+        insert: '',
+        manufacture: 'Panini',
+        setName: 'Playoff',
+      });
+    });
+    it('should reverse an insert title', () => {
+      expect(reverseTitle('2022 Panini Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
+        cardNumber: 'S8',
+        year: '2022',
+        parallel: '',
+        insert: 'Squad',
+        manufacture: 'Panini',
+        setName: 'Score',
+      });
+    });
+    it('should reverse a title without a manufacture', () => {
+      expect(reverseTitle('2022 Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
+        cardNumber: 'S8',
+        year: '2022',
+        parallel: '',
+        insert: 'Squad',
+        manufacture: 'Panini',
+        setName: 'Score',
+      });
+    });
+    it('should reverse Mosaic example', () => {
+      expect(reverseTitle('2021 Panini Mosaic #257 Micah Parsons Dallas Cowboys RC')).toEqual({
+        cardNumber: '257',
+        year: '2021',
+        parallel: '',
+        insert: '',
+        manufacture: 'Panini',
+        setName: 'Mosaic',
+      });
+    });
+    it('should reverse a card number with spaces', () => {
+      expect(reverseTitle('2023 Big League Big Leaguers Insert #BL - 29 Willie Mays San Francisco Giants')).toEqual({
+        cardNumber: 'BL-29',
+        year: '2023',
+        parallel: '',
+        insert: 'Big Leaguers',
+        manufacture: 'Topps',
+        setName: 'Big League',
+      });
     });
   });
 });

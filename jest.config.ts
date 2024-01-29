@@ -6,6 +6,7 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  moduleDirectories: ['node_modules', '<rootDir>/src', '<roodDir>/__mocks__'],
   setupFilesAfterEnv: ['jest-extended/all.js'],
   transform: {
     // '^.+\\.[tj]sx?$' to process js/ts with `ts-jest`
