@@ -353,29 +353,47 @@ let _cachedNumbers;
 /**
  * Get the next number in the sequence for the given collection type
  *
+ * This should be changed back to the commented out version once all of the ids are consumed for performance reasons
+ *
  * @param collectionType {string}  The collection type to get the next number for
  * @returns {Promise<number>} The next number in the sequence
  */
 export async function getNextCounter(collectionType) {
-  showSpinner('getNextCounter', `Getting next counter for ${collectionType}`);
-  const doc = await getFirestore().collection('counters').doc('Sales');
-  if (!_cachedNumbers) {
-    const result = await doc.get();
-    _cachedNumbers = result.data();
+  const { update, finish } = showSpinner('getNextCounter', `Getting next counter for ${collectionType}`);
+
+  update('Fetching');
+  const records = await getFirestore().collection(collectionType).get();
+  update('Sorting');
+  const ids = records.docs.map((doc) => parseInt(doc.id)).sort();
+  update('Finding next');
+  let next = 1;
+  while (ids.includes(next)) {
+    next++;
   }
-
-  if (!_cachedNumbers[collectionType]) {
-    _cachedNumbers[collectionType] = 1;
-  }
-
-  _cachedNumbers[collectionType]++;
-
-  await doc.set(_cachedNumbers);
-
-  const next = ++_cachedNumbers[collectionType];
-  finishSpinner('getNextCounter');
+  finish();
   return next;
 }
+
+// export async function getNextCounter(collectionType) {
+//   const { update, finish } = showSpinner('getNextCounter', `Getting next counter for ${collectionType}`);
+//   const doc = await getFirestore().collection('counters').doc('Sales');
+//   if (!_cachedNumbers) {
+//     const result = await doc.get();
+//     _cachedNumbers = result.data();
+//   }
+//
+//   if (!_cachedNumbers[collectionType]) {
+//     _cachedNumbers[collectionType] = 1;
+//   }
+//
+//   _cachedNumbers[collectionType]++;
+//
+//   await doc.set(_cachedNumbers);
+//
+//   const next = ++_cachedNumbers[collectionType];
+//   finish();
+//   return next;
+// }
 
 /**
  * Save the current counter values to Firebase
