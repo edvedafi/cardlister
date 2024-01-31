@@ -122,6 +122,9 @@ try {
   for (const site of openSalesSites) {
     await open(site);
   }
+  if (openSalesSites.length) {
+    await $`/Applications/Firefox.app/Contents/MacOS/firefox --new-window https://docs.google.com/spreadsheets/d/174IZ-g8QM3TRIL0LktfarBhQKtKam9Komwj5KSTHUfs/edit#gid=1681793300`;
+  }
   finishSpinner('launching', 'Launching all sales sites');
 
   //output a pick list

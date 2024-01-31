@@ -409,19 +409,18 @@ export async function getSalesSportLots() {
         showSpinner(`sales-${orderNumberText}-${title}`, `Found ${title} in order ${orderNumberText}`);
         const binDiv = await driver.executeScript('return arguments[0].nextElementSibling;', titleDiv);
         let bin = await binDiv.getText();
-        if (bin === 'N/A') {
-          errorSpinner(`sales-${orderNumberText}-${title}`, `${title} had an N/A bin`);
-        } else {
-          const cardFromTitle = convertTitleToCard(title);
-          cards.push({
-            platform: `SportLots: ${orderNumberText}`,
-            title,
-            quantity,
-            ...cardFromTitle,
-            ...convertBinNumber(bin, cardFromTitle.cardNumber),
-          });
-          finishSpinner(`sales-${orderNumberText}-${title}`, `${title} x${quantity} sold.`);
+        if (bin === 'N/A' || bin === 'all' || bin === 'bsc') {
+          bin = '';
         }
+        const cardFromTitle = convertTitleToCard(title);
+        cards.push({
+          platform: `SportLots: ${orderNumberText}`,
+          title,
+          quantity,
+          ...cardFromTitle,
+          ...convertBinNumber(bin, cardFromTitle.cardNumber),
+        });
+        finishSpinner(`sales-${orderNumberText}-${title}`, `${title} x${quantity} sold.`);
       }
     }
   };
@@ -847,4 +846,10 @@ export async function findSetId(defaultValues = {}) {
 
   finish(`Selected Set Info ${JSON.stringify(setInfo)}`);
   return setInfo;
+}
+
+export async function assignIds() {
+  const { update, finish } = showSpinner('setInfo', 'Find SetInfo');
+
+  finish('Found All Set IDS');
 }
