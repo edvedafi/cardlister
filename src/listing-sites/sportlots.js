@@ -848,8 +848,43 @@ export async function findSetId(defaultValues = {}) {
   return setInfo;
 }
 
-export async function assignIds() {
-  const { update, finish } = showSpinner('setInfo', 'Find SetInfo');
+export async function findSetList() {
+  const { update, finish } = showSpinner('setInfo', 'Find Set List');
+  const driver = await login();
+  await driver.get(`https://sportlots.com/inven/dealbin/invenrpt.tpl`);
+  const setSelectValue = useSetSelectValue(driver);
+  const waitForElement = useWaitForElement(driver);
+  const clickSubmit = useClickSubmit(waitForElement);
 
-  finish('Found All Set IDS');
+  update('Looking for Sets');
+  const binOptions = await driver.findElements(By.xpath('//select[@name="BinVal"]//option'));
+  const bins = [];
+  for (const option of binOptions) {
+    const optionValue = await option.getAttribute('value');
+    if (optionValue && optionValue !== 'All' && !optionValue.match(/\d+/) && !optionValue.match(/\d+\|\d+/)) {
+      bins.push(optionValue);
+    }
+  }
+  const selectedBin = await ask('Bin to process?', undefined, { selectOptions: bins });
+  await setSelectValue('BinVal', selectedBin);
+  await clickSubmit();
+
+  update('Looking for Links');
+  const links = await driver.findElements(By.xpath(`//table[./tbody/tr/th[text()='Set']]//a`));
+
+  update('Processing Links');
+  const linkList = [];
+  for (const link of links) {
+    const linkText = await link.getText();
+    const linkHref = await link.getAttribute('href');
+    const id = linkHref.match(/Set_id=(\d+)/)?.[1];
+    linkList.push({
+      sportlots: { id },
+      linkText,
+      linkHref,
+      selectedBin,
+    });
+  }
+  finish();
+  return linkList;
 }

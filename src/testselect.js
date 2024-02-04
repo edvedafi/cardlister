@@ -1,11 +1,13 @@
 import dotenv from 'dotenv';
 import 'zx/globals';
 import minimist from 'minimist';
-import { login as sportlotsLogin, shutdownSportLots } from './listing-sites/sportlots.js';
-import getSetData from './card-data/setData.js';
-import { login as bscLogin, shutdownBuySportsCards } from './listing-sites/bsc.js';
-import { useSpinners } from './utils/spinners.js';
+import { shutdownSportLots } from './listing-sites/sportlots.js';
+import { shutdownBuySportsCards } from './listing-sites/bsc.js';
+import { shutdownFirebase } from './listing-sites/firebase.js';
+import { shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import initializeFirebase from './utils/firebase.js';
+import { loadTeams } from './utils/teams.js';
+import { assignIds } from './card-data/setData.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -13,25 +15,31 @@ $.verbose = false;
 
 dotenv.config();
 
-const color = chalk.cyan;
-const { showSpinner, log } = useSpinners('testselect', color);
-const { update, finish, error } = showSpinner('testselect', 'Getting set data');
+let isShuttingDown = false;
+const shutdown = async () => {
+  if (!isShuttingDown) {
+    isShuttingDown = true;
+    await Promise.all([shutdownSportLots(), shutdownBuySportsCards(), shutdownFirebase(), shutdownMyCardPost()]);
+  }
+};
+
+['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
+  process.on(signal, () =>
+    shutdown().then(() => {
+      process.exit();
+    }),
+  ),
+);
+
+initializeFirebase();
+await Promise.all([
+  loadTeams(),
+  // sportlotsLogin(), bscLogin()
+]);
 
 try {
-  update('logging in');
-  await Promise.all([bscLogin(), sportlotsLogin(), initializeFirebase()]);
-
-  // update('Bin test');
-  // const byBin = await getSetData({ bin: '96' });
-  // log('byBin', byBin);
-
-  update('Info test');
-  const setInfo = await getSetData({ sport: 'football', year: '2023', manufacture: 'Bowman' });
-  log('byinfo', setInfo);
-  finish();
-} catch (e) {
-  error(e);
+  // await getNextCounter('SalesGroups');
+  await assignIds();
 } finally {
-  await shutdownSportLots();
-  await shutdownBuySportsCards();
+  await shutdown();
 }

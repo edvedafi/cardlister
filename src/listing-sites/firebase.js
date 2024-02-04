@@ -6,7 +6,7 @@ import { useSpinners } from '../utils/spinners.js';
 import getSetData from '../card-data/setData.js';
 import { convertTitleToCard } from './uploads.js';
 
-const { showSpinner, finishSpinner, updateSpinner, errorSpinner } = useSpinners('firebase', '#ffc107');
+const { showSpinner, finishSpinner, updateSpinner, errorSpinner, log } = useSpinners('firebase', '#ffc107');
 
 export async function uploadToFirebase(allCards) {
   showSpinner('upload', 'Firebase Starting Upload');
@@ -362,14 +362,17 @@ export async function getNextCounter(collectionType) {
   const { update, finish } = showSpinner('getNextCounter', `Getting next counter for ${collectionType}`);
 
   update('Fetching');
-  const records = await getFirestore().collection(collectionType).get();
+  const records = await getFirestore().collection(collectionType).orderBy('bin').get();
   update('Sorting');
-  const ids = records.docs.map((doc) => parseInt(doc.id)).sort();
+  // log(collectionType, ' ', records.size);
+  const ids = records.docs.map((doc) => parseInt(doc.id));
   update('Finding next');
   let next = 1;
+  // log(`ids: ${JSON.stringify(ids)}`);
   while (ids.includes(next)) {
     next++;
   }
+  // log('Next: ', next);
   finish();
   return next;
 }
@@ -488,7 +491,7 @@ export async function getGroup(info) {
       parallel: info.parallel || null,
       league: info.league || findLeague(info.sport) || 'Other',
       skuPrefix: getSkuPrefix(setInfo),
-      bin: await getNextCounter('Group'),
+      bin: await getNextCounter('SalesGroups'),
       bscPrice: info.bscPrice || 0.25,
       slPrice: info.slPrice || 0.18,
       price: info.price || 0.99,
@@ -545,6 +548,39 @@ export async function getGroupByBin(bin) {
     _cachedGroups[bin] = group.data();
     finishSpinner('getGroupByBin');
     return group.data();
+  }
+}
+
+export async function getGroupBySportlotsId(id) {
+  const { update, error, finish } = showSpinner('getGroupBySportlotsId', `Getting Set by SportLots Id ${id}`);
+
+  try {
+    update('Fetching from Firebase');
+    const db = getFirestore();
+    const query = await db.collection('SalesGroups').where('sportlots.id', '==', id);
+    const queryResults = await query.get();
+    if (queryResults.size === 0) {
+      error('No group found');
+      return null;
+    } else if (queryResults.size === 1) {
+      finish();
+      return queryResults.docs[0].data();
+    } else {
+      const choices = [];
+      queryResults.forEach((doc) => {
+        const g = doc.data();
+        choices.push({
+          name: `${g.year} ${g.setName} ${g.insert} ${g.parallel}`,
+          value: g,
+          description: `${g.year} ${g.manufacture} ${g.setName} ${g.insert} ${g.parallel} ${g.sport}`,
+        });
+      });
+      const response = await ask('Which group is correct?', undefined, { selectOptions: choices });
+      finish();
+      return response;
+    }
+  } catch (e) {
+    error(e);
   }
 }
 

@@ -629,3 +629,27 @@ export async function removeFromBuySportsCards(cardsToRemove) {
   );
   finish();
 }
+
+export async function updateBSCSKU(setInfo) {
+  const { update, finish, error } = showSpinner('update-bsc-sku', `Updating BSC SKU for ${setInfo.linkText}`);
+  update('Login');
+  const api = await login();
+  update('Getting Listings');
+  const listings = await api.post('seller/bulk-upload/results', setInfo.bscFilters);
+  const cards = listings.data.results;
+  let updated = 0;
+  update('Updating Cards');
+  for (const card of cards) {
+    const sku = `${setInfo.bin}|${card.card.cardNo}`;
+    // log(card.card.cardNo, card.availableQuantity, card.sellerSku, sku);
+    if (card.availableQuantity > 0 && card.sellerSku !== `${sku}`) {
+      card.sellerSku = sku;
+      updated++;
+    }
+  }
+  if (updated > 0) {
+    update('Saving Updates');
+    await saveBulk(cards);
+  }
+  finish(`Updated ${updated} cards`);
+}

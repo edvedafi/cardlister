@@ -1,7 +1,7 @@
-import { getGroup, getGroupByBin, updateGroup } from '../listing-sites/firebase.js';
-import { findSetId } from '../listing-sites/sportlots.js';
+import { getGroup, getGroupByBin, getGroupBySportlotsId, updateGroup } from '../listing-sites/firebase.js';
+import { findSetId, findSetList } from '../listing-sites/sportlots.js';
 import { useSpinners } from '../utils/spinners.js';
-import { findSetInfo } from '../listing-sites/bsc.js';
+import { findSetInfo, updateBSCSKU } from '../listing-sites/bsc.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
@@ -78,4 +78,54 @@ export default async function getSetData(defaultValues, collectDetails = true) {
     error(e);
     throw e;
   }
+}
+
+export async function assignIds() {
+  const { update, finish } = showSpinner('setInfo', 'Find SetInfo');
+  const sets = await findSetList();
+  let complete = 0;
+  update(`${complete}/${sets.length}`);
+  for (const set of sets) {
+    const { update: updateSet, error: errorSet, finish: finishSet } = showSpinner(set.linkText, set.linkText);
+    updateSet('Firebase');
+    let setInfo = await getGroupBySportlotsId(set.sportlots.id);
+    log(`Set Info: ${JSON.stringify(setInfo)}`);
+
+    if (!setInfo) {
+      updateSet('Finding SetInfo via BSC');
+      log(`Enter Data for ${set.linkText}`);
+      setInfo = await findSetInfo(set);
+      if (setInfo.bscFilters) {
+        updateSet('Saving to Firebase');
+        log(`Saving to Firebase: ${JSON.stringify(setInfo)}`);
+        setInfo = await getGroup(setInfo);
+      }
+    }
+
+    if (!setInfo.bscFilters) {
+      updateSet('Adding BSC Filters');
+      log(`Enter Data for ${set.linkText}`);
+      setInfo = await findSetInfo(set);
+      if (setInfo.bscFilters) {
+        updateSet('Saving to Firebase');
+        setInfo = await updateGroup(setInfo);
+      } else {
+        errorSet(`Could not find set info for ${set.linkText}`);
+      }
+    }
+
+    if (!setInfo.sportlots || !setInfo.sportlots.id || !setInfo.sportlots.text) {
+      updateSet('Adding Sportlots Info');
+      setInfo.sportlots = set.sportlots;
+      setInfo.sportlots.text = set.linkText;
+    }
+
+    updateSet('Saving BSC updates');
+    await updateBSCSKU(setInfo);
+
+    complete++;
+    finishSet(`${set.linkText} => ${setInfo.bin}`);
+    update(`${complete}/${sets.length}`);
+  }
+  finish('Found All Set IDS');
 }
