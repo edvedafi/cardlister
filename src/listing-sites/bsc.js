@@ -361,7 +361,7 @@ export async function findSetInfo(defaultValues) {
 
     setData.bscFilters = buildBody(filters);
 
-    finish(JSON.stringify(setData));
+    finish();
   } catch (e) {
     error(e);
   }

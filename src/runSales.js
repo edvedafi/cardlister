@@ -118,14 +118,14 @@ try {
   await removeListings('MySlabs', () => removeFromMySlabs(sales));
   finishSpinner('remove-all', 'Completed removing listings from sites');
 
-  showSpinner('launching', 'Launching all sales sites');
+  const { finish: launched } = showSpinner('launching', 'Launching all sales sites');
   for (const site of openSalesSites) {
     await open(site);
   }
-  if (openSalesSites.length) {
-    await $`/Applications/Firefox.app/Contents/MacOS/firefox --new-window https://docs.google.com/spreadsheets/d/174IZ-g8QM3TRIL0LktfarBhQKtKam9Komwj5KSTHUfs/edit#gid=1681793300`;
-  }
-  finishSpinner('launching', 'Launching all sales sites');
+  // if (openSalesSites.length) {
+  //   await $`/Applications/Firefox.app/Contents/MacOS/firefox --new-window https://docs.google.com/spreadsheets/d/174IZ-g8QM3TRIL0LktfarBhQKtKam9Komwj5KSTHUfs/edit#gid=1681793300`;
+  // }
+  launched('Launching all sales sites');
 
   //output a pick list
   finishSpinner('top-level', 'Completed sales processing');

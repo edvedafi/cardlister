@@ -888,3 +888,38 @@ export async function findSetList() {
   finish();
   return linkList;
 }
+
+export async function updateSetBin(linkHref, setInfo) {
+  const { update, finish } = showSpinner('setInfo', 'Update Set Bin');
+  const driver = await login();
+  const waitForElement = useWaitForElement(driver);
+  const clickSubmit = useClickSubmit(waitForElement);
+
+  await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
+
+  const binTextBox = await waitForElement(By.xpath('//input[@name="minval"]'));
+  await binTextBox.clear();
+  await binTextBox.sendKeys(setInfo.bin);
+  await clickSubmit('Defaults Bin value');
+
+  finish('Sportlots');
+
+  // await driver.get(linkHref);
+  //
+  // const binFields = await driver.findElements(By.xpath("//input[@type='text' and starts-with(@name, 'bin')]"));
+  // const binCount = binFields.length;
+  // let counter = 0;
+  // update(`${counter}/${binCount}`);
+  // for (const binField of binFields) {
+  //   await binField.clear();
+  //   await binField.sendKeys(Key.BACK_SPACE);
+  //   await binField.sendKeys(Key.BACK_SPACE);
+  //   await binField.sendKeys(Key.BACK_SPACE);
+  //   await binField.sendKeys(Key.BACK_SPACE);
+  //   await binField.sendKeys(Key.BACK_SPACE);
+  //   await binField.sendKeys(setInfo.bin);
+  //   update(`${++counter}/${binCount}`);
+  // }
+  // await clickSubmit();
+  // finish(`Updated ${counter} cards`);
+}
