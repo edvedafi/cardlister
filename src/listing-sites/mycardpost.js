@@ -195,7 +195,7 @@ export const uploadToMyCardPost = async (cardsToUpload) => {
 };
 
 export async function removeFromMyCardPost(cards) {
-  let toRemove = cards.filter((card) => !card.platform.startsWith('MCP: ') && !!card.sku);
+  let toRemove = cards.filter((card) => !card.platform.startsWith('MCP:') && !!card.sku);
   const {
     update: spin,
     error: errorOuter,
@@ -294,30 +294,29 @@ export async function getSalesFromMyCardPost() {
     update('Waiting for Sold');
     await waitForElement(By.xpath('//h2[text()="Shipping Address"]'));
     update('Looking for a sales table');
-    const salesTable = await waitForElement(By.xpath('//div[@class="orders-blk " or @class="orders-blk"]'));
+    const orders = await driver.findElements(
+      By.xpath('//div[@class="orders-blk " or @class="orders-blk"][.//child::*[@class="add-t-url"]]'),
+    );
 
-    if (salesTable) {
-      const trackingInfo = await salesTable.findElement(By.xpath('.//div[@class="tr-id"]'));
-      if (!trackingInfo) {
-        update('Get Order IDs');
-        const orderIdDiv = await salesTable.findElement(By.xpath('.//div[@class="order-id"]'));
-        const orderIdText = await orderIdDiv.getText();
-        const orderId = orderIdText.substring(orderIdText.indexOf('#') + 1);
-        update('Getting rows');
-        const rows = await driver.findElements(By.xpath('//div[@class="col-md-4 or-lft mb-4"]/p'));
-        for (let row of rows) {
-          const title = await row.getText();
-          const { finish: finishCard } = showSpinner(title, title);
-          const skuMatch = title.match(/\[(.*)\]/);
-          if (skuMatch) {
-            const sku = skuMatch[1];
-            const card = { sku, title, platform: `MCP ${orderId}` };
-            sales.push(card);
-            finishCard(title);
-          } else {
-            sales.push({ title, platform: `MCP ${orderId}`, ...reverseTitle(title) });
-            finishCard(title);
-          }
+    for (const order of orders) {
+      update('Get Order ID');
+      const orderIdDiv = await order.findElement(By.xpath('.//div[@class="order-id"]'));
+      const orderIdText = await orderIdDiv.getText();
+      const orderId = orderIdText.substring(orderIdText.indexOf('#') + 1);
+      update(`Getting sales from order ${orderId}`);
+      const rows = await order.findElements(By.xpath('.//div[@class="col-md-4 or-lft mb-4"]/p'));
+      for (let row of rows) {
+        const title = await row.getText();
+        const { finish: finishCard } = showSpinner(title, title);
+        const skuMatch = title.match(/\[(.*)\]/);
+        if (skuMatch) {
+          const sku = skuMatch[1];
+          const card = { sku, title, quantity: 1, platform: `MCP: ${orderId}` };
+          sales.push(card);
+          finishCard(title);
+        } else {
+          sales.push({ title, platform: `MCP ${orderId}`, ...reverseTitle(title) });
+          finishCard(title);
         }
       }
     }

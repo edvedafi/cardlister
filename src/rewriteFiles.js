@@ -8,6 +8,7 @@ import { shutdownSportLots } from './listing-sites/sportlots.js';
 import { shutdownBuySportsCards } from './listing-sites/bsc.js';
 import { shutdownFirebase } from './listing-sites/firebase.js';
 import { shutdownMyCardPost } from './listing-sites/mycardpost.js';
+import initializeFirebase from './utils/firebase.js';
 
 $.verbose = false;
 
@@ -34,6 +35,8 @@ const shutdown = async () => {
 try {
   const inputDirectory = await getInputs();
   const savedAnswers = await initializeAnswers(inputDirectory, true);
+
+  await initializeFirebase();
 
   await writeFiles(savedAnswers.allCardData, savedAnswers.bulk, args.r);
 } finally {

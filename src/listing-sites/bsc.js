@@ -329,13 +329,17 @@ export async function findSetInfo(defaultValues) {
     const getNextFilter = async (text, filterType, defaultValue) => {
       const { data: filterOptions } = await api.post('search/bulk-upload/filters', { filters });
       const response = await ask(text, defaultValue, {
-        selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
-          filterOptions.aggregations[filterType].map((variant) => ({
+        selectOptions: filterOptions.aggregations[filterType]
+          .map((variant) => ({
             name: variant.label,
             value: variant.slug,
-          })),
-        ),
+          }))
+          .concat([{ name: 'None', value: null, description: 'None of the options listed are correct' }]),
       });
+
+      if (!response || response === 'None') {
+        return;
+      }
       filters[filterType] = [response];
       return response;
     };
@@ -346,20 +350,29 @@ export async function findSetInfo(defaultValues) {
       setData.manufacture = await ask('Manufacturer?');
     }
     const setName = await getNextFilter('Set Name?', 'setName', setData.setName || setData.manufacture);
-    setData.setName = setData.setName || setName;
-    await getNextFilter('variantType?', 'variant', setData.variant);
+    if (setName) {
+      setData.setName = setData.setName || setName;
+      await getNextFilter('variantType?', 'variant', setData.variant);
 
-    if (filters.variant.includes('insert')) {
-      const insert = await getNextFilter('Insert?', 'variantName', setData.insert);
-      setData.insert = setData.insert || insert;
+      if (filters.variant.includes('insert')) {
+        const insert = await getNextFilter('Insert?', 'variantName', setData.insert);
+        setData.insert = setData.insert || insert;
+      }
+
+      if (filters.variant.includes('parallel')) {
+        const parallel = await getNextFilter('Parallel?', 'variantName', setData.parallel);
+        setData.parallel = setData.parallel || parallel;
+      }
+
+      setData.bscFilters = buildBody(filters);
+    } else {
+      const tryAgain = await ask('Try Again?', true);
+      if (tryAgain) {
+        return findSetInfo(defaultValues);
+      } else {
+        setData.bscFilters = { skip: true };
+      }
     }
-
-    if (filters.variant.includes('parallel')) {
-      const parallel = await getNextFilter('Parallel?', 'variantName', setData.parallel);
-      setData.parallel = setData.parallel || parallel;
-    }
-
-    setData.bscFilters = buildBody(filters);
 
     finish();
   } catch (e) {
@@ -375,19 +388,19 @@ export async function uploadToBuySportsCards(cardsToUpload) {
   const notAdded = [];
 
   for (const key in cardsToUpload) {
-    const { error, finish } = showSpinner(`upload-${key}`, `Uploading set ${key}`);
+    const { error, finish, update } = showSpinner(`upload-${key}`, `Uploading set ${key}`);
     const setData = await getGroupByBin(key);
     if (setData) {
-      const { update } = showSpinner(
-        `upload-${key}`,
-        `Uploading set ${setData.year} ${setData.setName} ${setData.insert || ''} ${setData.parallel || ''}`,
-      );
       update('looking for set');
       let listings = {};
       if (setData.bscFilters) {
-        update(`Fetching listings for ${JSON.stringify(setData.bscFilters)}`);
-        const response = await api.post('seller/bulk-upload/results', setData.bscFilters);
-        listings = response.data.results;
+        if (setData.bscFilters.skip) {
+          listings = undefined;
+        } else {
+          update(`Fetching listings for ${JSON.stringify(setData.bscFilters)}`);
+          const response = await api.post('seller/bulk-upload/results', setData.bscFilters);
+          listings = response.data.results;
+        }
       } else {
         update('Searching for set for the first time');
         let { body, allPossibleListings } = await getAllListings(setData);
@@ -396,58 +409,76 @@ export async function uploadToBuySportsCards(cardsToUpload) {
         await updateGroup(setData);
       }
 
+      log(cardsToUpload[key].map((card) => card.cardNumber));
+      log('Listings', listings?.filter((l) => parseInt(l.card.cardNo) < 20).length);
       if (listings && listings.length > 0) {
         const updates = [];
         let updated = 0;
         update('Adding Cards');
         await Promise.all(
-          listings.map(async (listing) => {
-            const card = cardsToUpload[key].find((card) => listing.card.cardNo === card.cardNumber);
-            if (card) {
+          listings
+            .filter((l) => parseInt(l.card.cardNo) < 20)
+            .map(async (listing) => {
               const {
                 update: updateSKU,
                 finish: finishSKU,
                 error: errorSKU,
-              } = showSpinner(`upload-${card.sku}`, `Uploading ${card.title}`);
-              try {
-                const newListing = {
-                  ...listing,
-                  availableQuantity: listing.availableQuantity + card.quantity,
-                  price: card.bscPrice,
-                  sellerSku: card.sku || card.bin,
-                };
-                if (card.directory) {
-                  if (card.frontImage) {
-                    updateSKU(`Front Image`);
-                    newListing.sellerImgFront = (
-                      await postImage(
-                        'common/card/undefined/product/undefined/attachment',
-                        `output/${card.directory}${card.frontImage}`,
-                      )
-                    ).objectKey;
-                    newListing.imageChanged = true;
+              } = showSpinner(
+                `upload-${key}-${listing.card.cardNo}`,
+                `Uploading #${listing.card.cardNo} ${listing.card.players}`,
+              );
+              log(`upload-${key}-${listing.card.cardNo}`);
+              const card = cardsToUpload[key].find(
+                (card) => `${listing.card.cardNo}` === `${card.cardNumber.toString()}`,
+              );
+              log('card:', card);
+              if (card) {
+                try {
+                  const newListing = {
+                    ...listing,
+                    availableQuantity: card.quantity,
+                    price: card.bscPrice,
+                    sellerSku: card.sku || card.bin,
+                  };
+                  if (card.directory) {
+                    if (card.frontImage) {
+                      updateSKU(`Front Image`);
+                      newListing.sellerImgFront = (
+                        await postImage(
+                          'common/card/undefined/product/undefined/attachment',
+                          `output/${card.directory}${card.frontImage}`,
+                        )
+                      ).objectKey;
+                      newListing.imageChanged = true;
+                    }
+                    if (card.backImage) {
+                      updateSKU(`Back Image`);
+                      newListing.sellerImgBack = (
+                        await postImage(
+                          'common/card/undefined/product/undefined/attachment',
+                          `output/${card.directory}${card.backImage}`,
+                        )
+                      ).objectKey;
+                      newListing.imageChanged = true;
+                    }
                   }
-                  if (card.backImage) {
-                    updateSKU(`Back Image`);
-                    newListing.sellerImgBack = (
-                      await postImage(
-                        'common/card/undefined/product/undefined/attachment',
-                        `output/${card.directory}${card.backImage}`,
-                      )
-                    ).objectKey;
-                    newListing.imageChanged = true;
-                  }
+                  updates.push(newListing);
+                  updated++;
+                  finishSKU(card.title);
+                } catch (e) {
+                  errorSKU(e);
                 }
-                updates.push(newListing);
-                updated++;
-                finishSKU(card.title);
-              } catch (e) {
-                errorSKU(e, card.title);
+              } else if (listing.availableQuantity > 0) {
+                errorSKU(`No match for ${listing.card.cardNo}`);
+                // log(`No match for ${listing.card.cardNo}`);
+                // finishSKU();
+                updates.push(listing);
+              } else {
+                // finishSKU();
+                errorSKU(`No match for ${listing.card.cardNo}`);
+                // log(`No match for ${listing.card.cardNo}`);
               }
-            } else if (listing.availableQuantity > 0) {
-              updates.push(listing);
-            }
-          }),
+            }),
         );
 
         if (updated > 0) {
@@ -463,6 +494,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
             finish(`Added ${updates.length} cards to ${key}`);
           } catch (e) {
             error(e);
+            // console.log(e);
             notAdded.push(...cardsToUpload[key]);
           }
         }
@@ -479,6 +511,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
 
   if (notAdded.length > 0) {
     errorOuter(`Failed to add ${notAdded.length} cards to BSC`);
+    // log(notAdded.map((card) => card.cardNumber));
   } else {
     finishOuter('All cards added to BSC');
   }

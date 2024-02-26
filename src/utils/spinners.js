@@ -110,7 +110,15 @@ export const errorSpinner = (spinnerName, message) => {
 
 const log = (color, ...args) => {
   pauseSpinners();
-  console.log(...args.map((arg) => (typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2)))));
+  console.log(
+    ...args.map((arg) => {
+      if (arg instanceof Error) {
+        return arg;
+      } else {
+        return typeof arg === 'string' ? color(arg) : color(JSON.stringify(arg, null, 2));
+      }
+    }),
+  );
   resumeSpinners();
 };
 
@@ -121,23 +129,23 @@ export const useSpinners = (processName, color = chalk.white) => {
   }
   return {
     showSpinner: (name, message) => {
-      showSpinner(key, color.inverse(`${message}`));
+      showSpinner(`${key}-${name}`, color.inverse(`${message}`));
       return {
-        update: (addition) => updateSpinner(key, color.inverse(`${message} (${addition})`)),
-        finish: (message) => finishSpinner(key, message ? color(`${message}`) : null),
+        update: (addition) => updateSpinner(`${key}-${name}`, color.inverse(`${message} (${addition})`)),
+        finish: (message) => finishSpinner(`${key}-${name}`, message ? color(`${message}`) : null),
         error: (info, addition = message) => {
           if (info instanceof Error) {
-            errorSpinner(key, color(`${addition} (${info.message})`));
+            errorSpinner(`${key}-${name}`, color(`${addition} (${info.message})`));
             log(color, info);
           } else {
-            errorSpinner(key, color(`${message}`));
+            errorSpinner(`${key}-${name}`, color(`${info} ${addition}`));
           }
         },
       };
     },
-    updateSpinner: (name, message) => updateSpinner(key, color.inverse(`${message}`)),
-    finishSpinner: (name, message) => finishSpinner(key, message ? color(`${message}`) : null),
-    errorSpinner: (name, message) => errorSpinner(key, color(`${message}`)),
+    updateSpinner: (name, message) => updateSpinner(`${key}-${name}`, color.inverse(`${message}`)),
+    finishSpinner: (name, message) => finishSpinner(`${key}-${name}`, message ? color(`${message}`) : null),
+    errorSpinner: (name, message) => errorSpinner(`${key}-${name}`, color(`${message}`)),
     log: (...args) => log(color, ...args),
   };
 };

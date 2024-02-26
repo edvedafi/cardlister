@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 
 const color = chalk.greenBright;
-const { showSpinner } = useSpinners('uploads', color);
+const { showSpinner, log } = useSpinners('uploads', color);
 
 const createKey = (card) =>
   `${titleCase(card.sport)}|${
@@ -350,13 +350,17 @@ export const convertTitleToCard = (title) => {
   let setInfo = title.slice(yearIdx, cardNumberIndex).trim();
   let setInfoLower = setInfo.toLowerCase();
   const card = {
-    cardNumber: title.match(/#(.*\d+)/)?.[1].replaceAll(' ', ''),
+    cardNumber: title.match(/#(\S+(?:\s*-\s*\S+)*)/)?.[1].replaceAll(' ', ''),
     year: title.split(' ')[0],
     parallel: '',
     insert: '',
-    sport: { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)],
     title,
   };
+
+  const sport = { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)];
+  if (sport) {
+    card.sport = sport;
+  }
 
   const manufacture = manufactures.find((m) => setInfoLower.indexOf(m) > -1);
   if (manufacture) {
@@ -384,9 +388,16 @@ export const convertTitleToCard = (title) => {
     if (parallelIndex > -1) {
       card.parallel = setInfo.slice(0, parallelIndex).trim();
       setInfo = setInfo.replace(card.parallel, '').trim();
+      setInfoLower = setInfo.toLowerCase();
     }
 
-    if (setInfo.length > 0 && setInfo !== 'base') {
+    if (
+      setInfoLower.length > 0 &&
+      setInfoLower !== 'base' &&
+      setInfoLower !== 'base set' &&
+      setInfoLower !== 'insert' &&
+      setInfoLower !== 'parallel'
+    ) {
       if (!card.setName) {
         card.setName = setInfo;
       } else if (!card.insert) {

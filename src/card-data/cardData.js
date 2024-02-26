@@ -75,6 +75,7 @@ const saveBulkAnswers = (cardData) => {
 export const getSetData = async () => {
   const isSet = await ask('Is this a complete set?', isYes(saveData.setData?.isSet));
 
+  console.log('isSet', isSet);
   if (isSet) {
     saveData.setData = {
       ...saveData.setData,

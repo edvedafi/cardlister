@@ -5,12 +5,14 @@ import { findSetInfo, updateBSCSKU } from '../listing-sites/bsc.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
+import { convertTitleToCard } from '../listing-sites/uploads.js';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
 export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
   try {
     let setInfo = { ...defaultValues };
+    log(defaultValues);
 
     if (defaultValues.bin) {
       update(`Bin: ${defaultValues.bin}`);
@@ -94,7 +96,7 @@ export async function assignIds() {
       if (!setInfo) {
         updateSet('Finding SetInfo via BSC');
         log(`Enter Data for ${set.linkText}`);
-        setInfo = await findSetInfo(set);
+        setInfo = await findSetInfo(convertTitleToCard(set.linkText));
         if (setInfo.bscFilters) {
           updateSet('Saving to Firebase');
           setInfo = await getGroup(setInfo);
@@ -122,6 +124,13 @@ export async function assignIds() {
             text: set.linkText,
           },
         });
+        setInfo = {
+          ...setInfo,
+          sportlots: {
+            ...set.sportlots,
+            text: set.linkText,
+          },
+        };
       }
 
       updateSet('Saving BSC updates');

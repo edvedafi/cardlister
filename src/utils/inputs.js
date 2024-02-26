@@ -54,6 +54,7 @@ export const getInputDirectory = async () => {
     } else {
       fs.mkdirSync('input/bulk');
     }
+    input_directory = `input/bulk/`;
   } else if (input_directory.indexOf('/') !== input_directory.length - 1) {
     input_directory = `input/${input_directory}/`;
   } else {

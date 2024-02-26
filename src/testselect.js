@@ -40,6 +40,7 @@ await Promise.all([
 try {
   // await getNextCounter('SalesGroups');
   await assignIds();
+  // console.log(await getSalesFromMyCardPost());
 } finally {
   await shutdown();
 }

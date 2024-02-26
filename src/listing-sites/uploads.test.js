@@ -1,4 +1,4 @@
-import { convertTitleToCard, createGroups, reverseTitle } from './uploads.js';
+import { convertTitleToCard, createGroups } from './uploads.js';
 
 jest.mock('../utils/ask.js');
 jest.mock('../utils/inputs.js');
@@ -160,7 +160,7 @@ describe('uploads', () => {
       expect(result['6']).toIncludeSameMembers([examples.insert_parallel.second_parallel_same_insert]);
       expect(result['7']).toIncludeSameMembers([examples.insert_parallel.third_insert_third_parallel]);
     });
-    //   Football|2021|panini|chronicles|gridiron-kings|pink|1
+
     it('should generate the same result whether bulk or all cards', async () => {
       const allCards = undefined;
       const bulk = [
@@ -395,6 +395,136 @@ describe('uploads', () => {
 
       expect(result).toContainAllKeys(['1']);
     });
+
+    it('should process some real examples from MCP', async () => {
+      const sales = [
+        {
+          platform: 'ebay: joeysimpsons',
+          title: '2023 Bowman Chrome University #159 Bo Nix Oregon Ducks',
+          quantity: 3,
+          sku: '187|159',
+          sport: 'Football',
+          year: '2023',
+          setName: 'Bowman Chrome University',
+          cardNumber: '159',
+          bin: 187,
+        },
+        {
+          sku: '105|318',
+          quantity: 1,
+          title: '2022 Panini Mosaic #318 George Pickens Pittsburgh Steelers RC',
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '318',
+          bin: 105,
+        },
+        {
+          sku: '105|307',
+          title: '2022 Panini Mosaic #307 Breece Hall New York Jets RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '307',
+          bin: 105,
+        },
+        {
+          sku: '105|293',
+          title: '2022 Panini Mosaic #293 Patrick Mahomes Kansas City Chiefs',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '293',
+          bin: 105,
+        },
+        {
+          sku: '105|292',
+          title: '2022 Panini Mosaic #292 Tom Brady New England Patriots',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '292',
+          bin: 105,
+        },
+        {
+          sku: '105|289',
+          title: '2022 Panini Mosaic #289 Sauce Gardner New York Jets RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '289',
+          bin: 105,
+        },
+        {
+          sku: '105|287',
+          title: '2022 Panini Mosaic #287 Aidan Hutchinson Detroit Lions RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '287',
+          bin: 105,
+        },
+        {
+          sku: '105|277',
+          title: '2022 Panini Mosaic #277 Chris Olave New Orleans Saints RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '277',
+          bin: 105,
+        },
+        {
+          sku: '105|276',
+          title: '2022 Panini Mosaic #276 Garrett Wilson New York Jets RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '276',
+          bin: 105,
+        },
+        {
+          sku: '105|274',
+          title: '2022 Panini Mosaic #274 Sam Howell Washington Commanders RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '274',
+          bin: 105,
+        },
+        {
+          sku: '105|271',
+          title: '2022 Panini Mosaic #271 Desmond Ridder Atlanta Falcons RC',
+          quantity: 1,
+          platform: 'MCP: OD2003',
+          sport: 'Football',
+          year: '2022',
+          setName: 'Panini Mosaic',
+          cardNumber: '271',
+          bin: 105,
+        },
+      ];
+      const result = await createGroups({}, sales);
+      expect(result).toContainAllKeys(['105', '187']);
+      expect(result['105']).toHaveLength(10);
+      expect(result['187']).toHaveLength(1);
+    });
   });
 
   describe('convertTitleToCard', () => {
@@ -435,63 +565,83 @@ describe('uploads', () => {
       });
     });
     it('should reverse a simple title', () => {
-      expect(reverseTitle('2023 Panini Score #351 Zay Flowers Baltimore Ravens RC')).toEqual({
+      expect(convertTitleToCard('2023 Panini Score #351 Zay Flowers Baltimore Ravens RC')).toEqual({
         cardNumber: '351',
         year: '2023',
         parallel: '',
         insert: '',
         manufacture: 'Panini',
         setName: 'Score',
+        title: '2023 Panini Score #351 Zay Flowers Baltimore Ravens RC',
       });
     });
     it('should reverse a parallel title', () => {
-      expect(reverseTitle('2021 Panini Playoff Kickoff Parallel #9 Justin Herbert Los Angeles Chargers')).toEqual({
-        cardNumber: '9',
-        year: '2021',
-        parallel: 'Kickoff',
-        insert: '',
-        manufacture: 'Panini',
-        setName: 'Playoff',
-      });
+      expect(convertTitleToCard('2021 Panini Playoff Kickoff Parallel #9 Justin Herbert Los Angeles Chargers')).toEqual(
+        {
+          cardNumber: '9',
+          year: '2021',
+          parallel: 'Kickoff',
+          insert: '',
+          manufacture: 'Panini',
+          setName: 'Playoff',
+          title: '2021 Panini Playoff Kickoff Parallel #9 Justin Herbert Los Angeles Chargers',
+        },
+      );
     });
     it('should reverse an insert title', () => {
-      expect(reverseTitle('2022 Panini Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
+      expect(convertTitleToCard('2022 Panini Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
         cardNumber: 'S8',
         year: '2022',
         parallel: '',
         insert: 'Squad',
         manufacture: 'Panini',
         setName: 'Score',
+        title: '2022 Panini Score Squad Insert #S8 Brandon Jones Miami Dolphins',
       });
     });
     it('should reverse a title without a manufacture', () => {
-      expect(reverseTitle('2022 Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
+      expect(convertTitleToCard('2022 Score Squad Insert #S8 Brandon Jones Miami Dolphins')).toEqual({
         cardNumber: 'S8',
         year: '2022',
         parallel: '',
         insert: 'Squad',
-        manufacture: 'Panini',
-        setName: 'Score',
+        manufacture: 'Score',
+        title: '2022 Score Squad Insert #S8 Brandon Jones Miami Dolphins',
       });
     });
     it('should reverse Mosaic example', () => {
-      expect(reverseTitle('2021 Panini Mosaic #257 Micah Parsons Dallas Cowboys RC')).toEqual({
+      expect(convertTitleToCard('2021 Panini Mosaic #257 Micah Parsons Dallas Cowboys RC')).toEqual({
         cardNumber: '257',
         year: '2021',
         parallel: '',
         insert: '',
         manufacture: 'Panini',
         setName: 'Mosaic',
+        title: '2021 Panini Mosaic #257 Micah Parsons Dallas Cowboys RC',
       });
     });
     it('should reverse a card number with spaces', () => {
-      expect(reverseTitle('2023 Big League Big Leaguers Insert #BL - 29 Willie Mays San Francisco Giants')).toEqual({
+      expect(
+        convertTitleToCard('2023 Big League Big Leaguers Insert #BL - 29 Willie Mays San Francisco Giants'),
+      ).toEqual({
         cardNumber: 'BL-29',
         year: '2023',
         parallel: '',
         insert: 'Big Leaguers',
-        manufacture: 'Topps',
         setName: 'Big League',
+        title: '2023 Big League Big Leaguers Insert #BL - 29 Willie Mays San Francisco Giants',
+      });
+    });
+    it('should treat all letter numbers as a card number', () => {
+      expect(convertTitleToCard('2022 SAGE Artistry Insert Black #ART-TG Tyler Goodson FB')).toEqual({
+        cardNumber: 'ART-TG',
+        year: '2022',
+        parallel: '',
+        insert: 'Artistry',
+        manufacture: 'SAGE',
+        setName: 'Insert Black',
+        sport: 'Football',
+        title: '2022 SAGE Artistry Insert Black #ART-TG Tyler Goodson FB',
       });
     });
   });

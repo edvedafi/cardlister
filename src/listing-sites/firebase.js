@@ -160,7 +160,7 @@ export async function matchOldStyle(db, card) {
     //remove non-digits from the number and search again
     match = possibleCards.find(
       (c) =>
-        updatedCard.cardNumber.toString().replace(/\D*/, '') === c.cardNumber.toString().replace(/\D*/, '') &&
+        updatedCard.cardNumber?.toString().replace(/\D*/, '') === c.cardNumber?.toString().replace(/\D*/, '') &&
         updatedCard.setName === c.setName &&
         updatedCard.manufacture === c.manufacture &&
         updatedCard.insert === c.insert &&
@@ -246,7 +246,7 @@ export async function matchOldStyle(db, card) {
       finish(`Found listing in firebase for ${card.title}`);
     }
   } catch (e) {
-    error(e);
+    error(e, JSON.stringify(card));
     throw e;
   }
 
@@ -254,26 +254,35 @@ export async function matchOldStyle(db, card) {
 }
 
 export async function getListingInfo(cards) {
-  showSpinner('getListingInfo', 'Getting listing info from Firebase');
+  const { finish: finishOuter } = showSpinner('getListingInfo', 'Getting listing info from Firebase');
   const db = getFirestore();
   const removals = [];
   for (let card of cards) {
     if (card.sku) {
-      showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
-      const doc = await db.collection('CardSales').doc(card.sku).get();
-      if (doc.data() && doc.data().sku) {
-        updateSpinner(card.sku, `Setting ${card.sku} to sold`);
-        await updateFirebaseListing({ sku: card.sku, sold: true });
-        removals.push(await mergeFirebaseResult(card, doc.data()));
-        finishSpinner(card.sku, card.sku);
-      } else {
-        const match = await matchOldStyle(db, card);
-        if (match) {
-          removals.push(match);
-          finishSpinner(card.sku, card.sku);
+      const {
+        update: updateSKU,
+        finish: finishSKU,
+        error: errorSKU,
+      } = showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
+      try {
+        const doc = await db.collection('CardSales').doc(card.sku).get();
+        if (doc.data() && doc.data().sku) {
+          updateSKU(card.sku, `Setting ${card.sku} to sold`);
+          await updateFirebaseListing({ sku: card.sku, sold: true });
+          removals.push(await mergeFirebaseResult(card, doc.data()));
+          finishSKU(card.sku);
         } else {
-          errorSpinner(card.sku, card.sku);
+          const match = await matchOldStyle(db, card);
+          if (match) {
+            removals.push(match);
+            finishSKU(card.sku);
+          } else {
+            errorSKU(card.sku);
+          }
         }
+      } catch (e) {
+        errorSKU(e, `${card.title} [${card.sku}]`);
+        throw e;
       }
     } else {
       const match = await matchOldStyle(db, card);
@@ -282,7 +291,7 @@ export async function getListingInfo(cards) {
       }
     }
   }
-  finishSpinner('getListingInfo', 'Getting listing info from Firebase');
+  finishOuter('Getting listing info from Firebase');
   return removals;
 }
 

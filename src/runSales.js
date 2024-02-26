@@ -89,7 +89,7 @@ try {
     openSalesSites.push('https://www.buysportscards.com/sellers/orders');
   }
   if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
-    openSalesSites.push('https://mycardpost.com/edvedafi/offers');
+    openSalesSites.push('https://mycardpost.com/edvedafi/orders');
   }
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');

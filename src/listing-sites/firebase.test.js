@@ -14,21 +14,45 @@ describe('Listing Sites - Firebase', () => {
   describe('getNextCounter', () => {
     it('should return the first ID that does not exist in the array', async () => {
       const mockIds = [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '5' }, { id: '6' }];
-      mockCollection.mockReturnValue({ get: () => ({ docs: mockIds }) });
+      mockCollection.mockReturnValue({
+        orderBy: (key) => {
+          if (key === 'bin') {
+            return { get: () => ({ docs: mockIds }) };
+          } else {
+            throw new Error('Invalid orderBy key: ' + key);
+          }
+        },
+      });
       const result = await getNextCounter('mockCollectionType');
       expect(mockCollection).toBeCalledWith('mockCollectionType');
       expect(result).toEqual(4);
     });
     it('should return the first ID that does not exist in the array (multiple open numbers)', async () => {
       const mockIds = [{ id: '1' }, { id: '2' }, { id: '5' }, { id: '6' }];
-      mockCollection.mockReturnValue({ get: () => ({ docs: mockIds }) });
+      mockCollection.mockReturnValue({
+        orderBy: (key) => {
+          if (key === 'bin') {
+            return { get: () => ({ docs: mockIds }) };
+          } else {
+            throw new Error('Invalid orderBy key: ' + key);
+          }
+        },
+      });
       const result = await getNextCounter('mockCollectionType');
       expect(mockCollection).toBeCalledWith('mockCollectionType');
       expect(result).toEqual(3);
     });
     it('should return the first ID that does not exist in the array (multiple gaps)', async () => {
       const mockIds = [{ id: '1' }, { id: '3' }, { id: '5' }, { id: '6' }];
-      mockCollection.mockReturnValue({ get: () => ({ docs: mockIds }) });
+      mockCollection.mockReturnValue({
+        orderBy: (key) => {
+          if (key === 'bin') {
+            return { get: () => ({ docs: mockIds }) };
+          } else {
+            throw new Error('Invalid orderBy key: ' + key);
+          }
+        },
+      });
       const result = await getNextCounter('mockCollectionType');
       expect(mockCollection).toBeCalledWith('mockCollectionType');
       expect(result).toEqual(2);

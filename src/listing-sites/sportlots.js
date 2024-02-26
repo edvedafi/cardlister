@@ -213,9 +213,12 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         continue;
       }
 
-      if (!setInfo.sportlots) {
+      if (setInfo.sportlots) {
+        setInfo.sportlots.manufacture = 'All Brands';
+      } else {
         setInfo.sportlots = {};
       }
+
       let cardsAdded = 0;
 
       updateSet('Brand');
@@ -413,6 +416,9 @@ export async function getSalesSportLots() {
           bin = '';
         }
         const cardFromTitle = convertTitleToCard(title);
+        if (!cardFromTitle || !cardFromTitle.cardNumber) {
+          throw new Error(`Could not find card number for ${title}`);
+        }
         cards.push({
           platform: `SportLots: ${orderNumberText}`,
           title,
