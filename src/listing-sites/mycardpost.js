@@ -8,7 +8,7 @@ import { useSpinners } from '../utils/spinners.js';
 dotenv.config();
 
 const color = chalk.hex('#ffc107');
-const { showSpinner, log } = useSpinners('mcp', color);
+const { showSpinner } = useSpinners('mcp', color);
 
 let _driver;
 export const login = async () => {
@@ -230,7 +230,7 @@ export async function removeFromMyCardPost(cards) {
         By.xpath('//h2[text()="All Cards (0)"]'),
       ]);
       const headerText = await header.getText();
-      log(headerText);
+
       if (headerText === 'All Cards (0)') {
         await searchInput.clear();
         await searchInput.sendKeys(card.title);

@@ -388,101 +388,101 @@ export async function uploadToBuySportsCards(cardsToUpload) {
   const notAdded = [];
 
   for (const key in cardsToUpload) {
-    const { error, finish, update } = showSpinner(`upload-${key}`, `Uploading set ${key}`);
+    const {
+      error: errorKey,
+      finish: finishKey,
+      update: updateKey,
+    } = showSpinner(`upload-${key}`, `Uploading set ${key}`);
     const setData = await getGroupByBin(key);
     if (setData) {
-      update('looking for set');
+      updateKey('looking for set');
       let listings = {};
       if (setData.bscFilters) {
         if (setData.bscFilters.skip) {
           listings = undefined;
         } else {
-          update(`Fetching listings for ${JSON.stringify(setData.bscFilters)}`);
+          updateKey(`Fetching listings for ${JSON.stringify(setData.bscFilters)}`);
           const response = await api.post('seller/bulk-upload/results', setData.bscFilters);
           listings = response.data.results;
         }
       } else {
-        update('Searching for set for the first time');
+        updateKey('Searching for set for the first time');
         let { body, allPossibleListings } = await getAllListings(setData);
         listings = allPossibleListings.results;
         setData.bscFilters = body;
         await updateGroup(setData);
       }
 
-      log(cardsToUpload[key].map((card) => card.cardNumber));
-      log('Listings', listings?.filter((l) => parseInt(l.card.cardNo) < 20).length);
+      // log(cardsToUpload[key].map((card) => card.cardNumber));
+      // log('Listings', listings?.filter((l) => parseInt(l.card.cardNo) < 20).length);
       if (listings && listings.length > 0) {
         const updates = [];
         let updated = 0;
-        update('Adding Cards');
+        updateKey('Adding Cards');
         await Promise.all(
-          listings
-            .filter((l) => parseInt(l.card.cardNo) < 20)
-            .map(async (listing) => {
-              const {
-                update: updateSKU,
-                finish: finishSKU,
-                error: errorSKU,
-              } = showSpinner(
-                `upload-${key}-${listing.card.cardNo}`,
-                `Uploading #${listing.card.cardNo} ${listing.card.players}`,
-              );
-              log(`upload-${key}-${listing.card.cardNo}`);
-              const card = cardsToUpload[key].find(
-                (card) => `${listing.card.cardNo}` === `${card.cardNumber.toString()}`,
-              );
-              log('card:', card);
-              if (card) {
-                try {
-                  const newListing = {
-                    ...listing,
-                    availableQuantity: card.quantity,
-                    price: card.bscPrice,
-                    sellerSku: card.sku || card.bin,
-                  };
-                  if (card.directory) {
-                    if (card.frontImage) {
-                      updateSKU(`Front Image`);
-                      newListing.sellerImgFront = (
-                        await postImage(
-                          'common/card/undefined/product/undefined/attachment',
-                          `output/${card.directory}${card.frontImage}`,
-                        )
-                      ).objectKey;
-                      newListing.imageChanged = true;
-                    }
-                    if (card.backImage) {
-                      updateSKU(`Back Image`);
-                      newListing.sellerImgBack = (
-                        await postImage(
-                          'common/card/undefined/product/undefined/attachment',
-                          `output/${card.directory}${card.backImage}`,
-                        )
-                      ).objectKey;
-                      newListing.imageChanged = true;
-                    }
+          listings.map(async (listing) => {
+            const {
+              update: updateSKU,
+              finish: finishSKU,
+              error: errorSKU,
+            } = showSpinner(
+              `upload-${key}-${listing.card.cardNo}`,
+              `Uploading #${listing.card.cardNo} ${listing.card.players}`,
+            );
+            // log(`upload-${key}-${listing.card.cardNo}`);
+            const card = cardsToUpload[key].find((card) => `${listing.card.cardNo}` === `${card.cardNumber}`);
+            // log('card:', card);
+            if (card) {
+              try {
+                const newListing = {
+                  ...listing,
+                  availableQuantity: card.quantity,
+                  price: card.bscPrice,
+                  sellerSku: card.sku || card.bin,
+                };
+                if (card.directory) {
+                  if (card.frontImage) {
+                    updateSKU(`Front Image`);
+                    newListing.sellerImgFront = (
+                      await postImage(
+                        'common/card/undefined/product/undefined/attachment',
+                        `output/${card.directory}${card.frontImage}`,
+                      )
+                    ).objectKey;
+                    newListing.imageChanged = true;
                   }
-                  updates.push(newListing);
-                  updated++;
-                  finishSKU(card.title);
-                } catch (e) {
-                  errorSKU(e);
+                  if (card.backImage) {
+                    updateSKU(`Back Image`);
+                    newListing.sellerImgBack = (
+                      await postImage(
+                        'common/card/undefined/product/undefined/attachment',
+                        `output/${card.directory}${card.backImage}`,
+                      )
+                    ).objectKey;
+                    newListing.imageChanged = true;
+                  }
                 }
-              } else if (listing.availableQuantity > 0) {
-                errorSKU(`No match for ${listing.card.cardNo}`);
-                // log(`No match for ${listing.card.cardNo}`);
-                // finishSKU();
-                updates.push(listing);
-              } else {
-                // finishSKU();
-                errorSKU(`No match for ${listing.card.cardNo}`);
-                // log(`No match for ${listing.card.cardNo}`);
+                updates.push(newListing);
+                updated++;
+                finishSKU(card.title);
+              } catch (e) {
+                errorSKU(e);
               }
-            }),
+            } else if (listing.availableQuantity > 0) {
+              // errorSKU(`No match for ${listing.card.cardNo}, but available quantity is ${listing.availableQuantity}`);
+              // log(`No match for ${listing.card.cardNo}`);
+              finishSKU();
+              updates.push(listing);
+            } else {
+              finishSKU();
+              // errorSKU(`No match for ${listing.card.cardNo}`);
+              // log(`No match for ${listing.card.cardNo}`);
+            }
+          }),
         );
 
         if (updated > 0) {
-          update('Uploading Results');
+          updateKey('Uploading Results');
           if (updated < cardsToUpload[key].length) {
             const nonUpdated = cardsToUpload[key].filter(
               (card) => !updates.find((listing) => listing.card.cardNo === card.cardNumber),
@@ -491,22 +491,20 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           }
           try {
             await saveBulk(updates);
-            finish(`Added ${updates.length} cards to ${key}`);
+            finishKey(`Added ${cardsToUpload[key].length} cards to ${key}`);
           } catch (e) {
-            error(e);
-            // console.log(e);
+            errorKey(e, `Failed to save ${cardsToUpload[key].length} cards to ${key}`);
             notAdded.push(...cardsToUpload[key]);
           }
         }
       } else {
-        error(`Could not find set ${key}`);
+        errorKey(`Could not find set ${key}`);
         notAdded.push(...cardsToUpload[key]);
       }
     } else {
-      error(`Could not find set data for ${key}`);
+      errorKey(`Could not find set data for ${key}`);
       notAdded.push(...cardsToUpload[key]);
     }
-    finish();
   }
 
   if (notAdded.length > 0) {
