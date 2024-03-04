@@ -41,9 +41,11 @@ try {
   await Promise.all([loadTeams(initializeFirebase()), sportslotLogin(), bscLogin(), mcpLogin()]);
 
   // Set up full run information
+  update('Gathering Inputs');
   let input_directory = await getInputs();
+  update('Initializing Answers');
   const savedAnswers = await initializeAnswers(input_directory);
-
+  update('Gathering Set Data');
   const setData = await getSetData();
 
   //gather the list of files that we will process
@@ -52,6 +54,7 @@ try {
     files = await getFiles(input_directory);
   }
 
+  update('Processing Singles');
   await processSingles(savedAnswers, setData, files);
 } catch (e) {
   error(e);

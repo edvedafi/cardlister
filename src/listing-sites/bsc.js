@@ -268,15 +268,19 @@ export async function getAllListings(setData) {
     };
     const getNextFilter = async (text, filterType) => {
       const filterOptions = await api.post('search/bulk-upload/filters', { filters });
-      const response = await ask(text, undefined, {
-        selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
-          filterOptions.aggregations[filterType].map((variant) => ({
-            name: variant.label,
-            value: variant.slug,
-          })),
-        ),
-      });
-      return [response];
+      if (filterOptions.aggregations) {
+        const response = await ask(text, undefined, {
+          selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
+            filterOptions.aggregations[filterType].map((variant) => ({
+              name: variant.label,
+              value: variant.slug,
+            })),
+          ),
+        });
+        return [response];
+      } else {
+        throw new Error('No filters found: ' + JSON.stringify(filterOptions));
+      }
     };
 
     filters.year = await getNextFilter('Which year would you like to update?', 'year');
@@ -345,6 +349,11 @@ export async function findSetInfo(defaultValues) {
     };
 
     setData.sport = await getNextFilter('Sport?', 'sport', setData.sport);
+    if (!setData.sport) {
+      return {
+        bscFilters: { skip: true },
+      };
+    }
     setData.year = await getNextFilter('Year?', 'year', setData.year);
     if (!setData.manufacture) {
       setData.manufacture = await ask('Manufacturer?');

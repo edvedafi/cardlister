@@ -12,7 +12,6 @@ export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
   try {
     let setInfo = { ...defaultValues };
-    log(defaultValues);
 
     if (defaultValues.bin) {
       update(`Bin: ${defaultValues.bin}`);

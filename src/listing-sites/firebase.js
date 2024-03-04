@@ -540,24 +540,21 @@ export async function getGroup(info) {
 }
 
 export async function getGroupByBin(bin) {
-  showSpinner('getGroupByBin', `Getting group by bin ${bin}`);
-  if (_cachedGroups[bin]) {
-    finishSpinner('getGroupByBin');
-    return _cachedGroups[bin];
-  } else {
+  const { update, finish, error } = showSpinner('getGroupByBin', `Getting group by bin ${bin}`);
+  if (!_cachedGroups[bin]) {
     const db = getFirestore();
-    updateSpinner('getGroupByBin', `Getting group by bin ${bin} - Fetching from Firebase`);
+    update('getGroupByBin', `Getting group by bin ${bin} - Fetching from Firebase`);
     let group;
     try {
       group = await db.collection('SalesGroups').doc(`${bin}`).get();
+      _cachedGroups[bin] = group.data();
     } catch (e) {
-      console.log('getGroupByBin', `Failed to get group by bin ${bin}: ${e.message}`);
+      error(e);
       throw e;
     }
-    _cachedGroups[bin] = group.data();
-    finishSpinner('getGroupByBin');
-    return group.data();
   }
+  finish();
+  return _cachedGroups[bin];
 }
 
 export async function getGroupBySportlotsId(id) {
@@ -605,12 +602,12 @@ export async function updateGroup(group) {
 
 // upload file to firebase storage
 export const processImageFile = async (outputFile, filename) => {
-  showSpinner(`upload-${filename}`, `Uploading ${filename}`);
+  const { finish, error } = showSpinner(`upload-${filename}`, `Uploading ${filename}`);
   try {
     const r = await getStorage().bucket().upload(outputFile, { destination: filename });
-    finishSpinner(`upload-${filename}`, `Uploaded ${filename} to Firebase ${JSON.stringify(r)}`);
+    finish(`Uploaded ${filename} to Firebase`);
   } catch (e) {
-    errorSpinner(`upload-${filename}`, `Failed to upload ${filename} to Firebase: ${e.message}`);
+    error(e);
     throw e;
   }
 };

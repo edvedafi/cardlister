@@ -27,16 +27,19 @@ const queueImageFiles = new Queue({
   concurrency: 3,
 });
 
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner } = useSpinners('singles', chalk.cyan);
+const { showSpinner, log } = useSpinners('singles', chalk.cyan);
 
 async function processSingles(savedAnswers, setData, files) {
-  showSpinner('singles', 'Processing Singles');
+  const {
+    update: updateSpinner,
+    finish: finishSpinner,
+    error: errorSpinner,
+  } = showSpinner('singles', `Processing ${files.length / 2} Cards`);
   const overrideImages = savedAnswers.metadata.reprocessImages;
   const allCards = savedAnswers.allCardData || {};
   try {
     let i = 0;
     updateSpinner('singles', `Processing ${files.length / 2} Cards`);
-    updateSpinner('singles-details', `Processing ${files.length / 2} Cards`);
 
     updateSpinner('singles-details', `Setting up Queues`);
     while (i < files.length - 1) {
@@ -54,7 +57,7 @@ async function processSingles(savedAnswers, setData, files) {
     const watchForError = (name, queue) =>
       queue.addEventListener('error', (error, job) => {
         hasQueueError = true;
-        console.log(`${name} Queue error: `, error, job);
+        log(`${name} Queue error: `, error, job);
         queueReadImage.stop();
         queueGatherData.stop();
         queueImageFiles.stop();
@@ -63,56 +66,53 @@ async function processSingles(savedAnswers, setData, files) {
     watchForError('Gather', queueGatherData);
     watchForError('Process Images', queueImageFiles);
 
-    updateSpinner('singles-details', `Waiting for the queues to finish`);
-    updateSpinner('singles-details-image-queue', `Waiting for the Image Queue to finish`);
+    updateSpinner(`Waiting for the queues to finish`);
+
+    const { finish: finishImage, error: errorImage } = showSpinner('image', `Waiting for Image Queue to finish`);
     if (queueReadImage.length > 0 && !hasQueueError) {
       await new Promise((resolve) => queueReadImage.addEventListener('end', resolve));
-      finishSpinner('singles-details-image-queue', `Image Queue finished`);
+      finishImage();
     } else if (hasQueueError) {
-      errorSpinner('singles-details-image-queue', `Image Queue errored`);
+      errorImage(`Image Queue errored`);
     } else {
-      finishSpinner('singles-details-image-queue', `No image queue to wait for`);
+      finishImage();
     }
 
-    updateSpinner('singles-details-data-queue', `Waiting for the Data Queue to finish`);
+    const { finish: finishData, error: errorData } = showSpinner('data', `Waiting for Data Queue to finish`);
     if (queueGatherData.length > 0 && !hasQueueError) {
       await new Promise((resolve) => queueGatherData.addEventListener('end', resolve));
-      finishSpinner('singles-details-data-queue', `Data Queue finished`);
+      finishData();
     } else if (hasQueueError) {
-      errorSpinner('singles-details-data-queue', `Data Queue errored`);
+      errorData(`Data Queue errored`);
     } else {
-      finishSpinner('singles-details-data-queue', `No data queue to wait for`);
+      finishData();
     }
 
-    updateSpinner('singles-details-file-queue', `Waiting for the File Queue to finish`);
+    const { finish: finishFile, error: errorFile } = showSpinner('data', `Waiting for File Queue to finish`);
     if (queueImageFiles.length > 0 && !hasQueueError) {
       await new Promise((resolve) => queueImageFiles.addEventListener('end', resolve));
-      finishSpinner('singles-details-file-queue', `File Queue finished`);
+      finishFile();
     } else if (hasQueueError) {
-      errorSpinner('singles-details-file-queue', `File Queue errored`);
+      errorFile(`File Queue errored`);
     } else {
-      finishSpinner('singles-details-file-queue', `No File Queue to wait for`);
+      finishFile();
     }
 
     //write the output
     if (hasQueueError) {
-      errorSpinner('singles-details', `Queue errored: ${hasQueueError}`);
+      errorSpinner(hasQueueError);
     } else {
-      updateSpinner('singles-details', `Writing output files`);
+      updateSpinner(`Writing output files`);
 
       const bulk = await collectBulkListings(savedAnswers, setData);
       await writeOutputFiles(allCards, bulk);
-
-      finishSpinner('singles-details');
     }
-    finishSpinner('singles', 'Completed Singles Processing');
+    finishSpinner('Completed Singles Processing');
   } catch (e) {
-    finishSpinner('singles-details');
-    errorSpinner('singles', `Failed to process singles: ${e.message}`);
-    console.log(e);
+    errorSpinner(e);
   } finally {
     //print all the title values in allCards
-    Object.values(allCards).forEach((t) => console.log(t.title));
+    Object.values(allCards).forEach((t) => log(t.title));
   }
 }
 
@@ -140,20 +140,19 @@ async function processSingles(savedAnswers, setData, files) {
 
 //Here we run the actual process
 const preProcessPair = async (front, back, allCards, setData, overrideImages) => {
-  showSpinner(`singles-preprocess-${front}`, `Pre-Processing ${front}/${back}`);
-  const spin = (message) => updateSpinner(`singles-preprocess-${front}`, `Pre-Processing ${front}/${back}: ${message}`);
+  const { update, finish, error } = showSpinner(`singles-preprocess-${front}`, `Pre-Processing ${front}/${back}`);
   let imageDefaults;
   try {
-    spin(`Checking for existing data`);
+    update(`Checking for existing data`);
     if (!cardDataExistsForRawImage(front, allCards)) {
-      spin(`Getting image recognition data`);
+      update(`Getting image recognition data`);
       imageDefaults = await imageRecognition(front, back, setData);
-      spin(`Queueing next step`);
+      update(`Queueing next step`);
       queueGatherData.push(() => processPair(front, back, imageDefaults, allCards, overrideImages));
     }
-    finishSpinner(`singles-preprocess-${front}`, `Pre-Processed ${front}/${back}`);
+    finish();
   } catch (e) {
-    errorSpinner(`singles-preprocess-${front}`, `Failed to Pre-Process ${front}/${back}: ${e.message}`);
+    error(e);
     throw e;
   }
 };
