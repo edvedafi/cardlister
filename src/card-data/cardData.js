@@ -290,12 +290,12 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     await addCardData(text, output, propName, defaultValues, options);
 
   await askFor('Player/Card Name', 'player', { allowUpdates: resetAll });
-  output.team = await getTeam(output);
-  output.teamDisplay = getTeamDisplay(output.team);
 
   let useSetInfo = defaultValues.isSet && (await ask('Use Set Info?', true, { allowUpdates: resetAll }));
   if (useSetInfo) {
     output.quantity = 1;
+    output.team = await getTeam(output);
+    output.teamDisplay = getTeamDisplay(output.team);
   } else {
     const updatedSet = await getFullSetData(
       {
@@ -308,6 +308,7 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
     );
     output = {
       ...output,
+      sport: updatedSet.sport,
       setName: updatedSet.setName,
       manufacture: updatedSet.manufacture,
       parallel: updatedSet.parallel,
@@ -317,6 +318,8 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
       bscPrice: updatedSet.bscPrice,
       price: updatedSet.price,
     };
+    output.team = await getTeam(output);
+    output.teamDisplay = getTeamDisplay(output.team);
     await askFor('Features (RC, etc)', 'features', { allowUpdates: true });
     await askFor('Print Run', 'printRun', { allowUpdates: useSetInfo || resetAll });
     await askFor('Autographed', 'autographed', { allowUpdates: useSetInfo || resetAll });

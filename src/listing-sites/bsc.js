@@ -8,6 +8,7 @@ import FormData from 'form-data';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import { useSpinners } from '../utils/spinners.js';
 import axios from 'axios';
+import Queue from 'queue';
 
 dotenv.config();
 
@@ -104,25 +105,41 @@ export const login = async () => {
 };
 
 async function postImage(path, imagePath) {
-  const { finish, error } = showSpinner('post-image', `Uploading ${imagePath}`);
+  const { finish, error, update } = showSpinner(`post-image-${imagePath}`, `Uploading ${imagePath.lastIndexOf('/')}`);
   const api = await login();
 
   const formData = new FormData();
 
   formData.append('attachment', fs.createReadStream(imagePath));
-  try {
-    const response = await api.post(`https://api-prod.buysportscards.com/${path}`, formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
 
-    finish();
-    return response.data;
-  } catch (e) {
+  let count = 0;
+  let data;
+
+  await pRetry(
+    async () => {
+      count++;
+      if (count > 1) {
+        update(`Attempt ${count} of 5`);
+      }
+      const { data: results } = await api.post(`https://api-prod.buysportscards.com/${path}`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
+      if (results.objectKey) {
+        data = results;
+        finish();
+      } else {
+        throw new Error(results);
+      }
+    },
+    { retries: 5 },
+  ).catch((e) => {
     error(e);
     throw e;
-  }
+  });
+
+  return data;
 }
 
 export async function shutdownBuySportsCards() {
@@ -425,11 +442,18 @@ export async function uploadToBuySportsCards(cardsToUpload) {
       // log(cardsToUpload[key].map((card) => card.cardNumber));
       // log('Listings', listings?.filter((l) => parseInt(l.card.cardNo) < 20).length);
       if (listings && listings.length > 0) {
-        const updates = [];
+        const queueResults = [];
         let updated = 0;
         updateKey('Adding Cards');
-        await Promise.all(
-          listings.map(async (listing) => {
+
+        const queue = new Queue({
+          results: queueResults,
+          autostart: true,
+          concurrency: 5,
+        });
+
+        listings.map((listing) =>
+          queue.push(async () => {
             const {
               update: updateSKU,
               finish: finishSKU,
@@ -471,9 +495,9 @@ export async function uploadToBuySportsCards(cardsToUpload) {
                     newListing.imageChanged = true;
                   }
                 }
-                updates.push(newListing);
                 updated++;
                 finishSKU(card.title);
+                return newListing;
               } catch (e) {
                 errorSKU(e);
               }
@@ -481,7 +505,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
               // errorSKU(`No match for ${listing.card.cardNo}, but available quantity is ${listing.availableQuantity}`);
               // log(`No match for ${listing.card.cardNo}`);
               finishSKU();
-              updates.push(listing);
+              return listing;
             } else {
               finishSKU();
               // errorSKU(`No match for ${listing.card.cardNo}`);
@@ -490,7 +514,11 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           }),
         );
 
-        if (updated > 0) {
+        await new Promise((resolve) => queue.addEventListener('end', resolve));
+
+        const updates = queueResults.map((result) => result[0]).filter((result) => result);
+
+        if (updates.length > 0) {
           updateKey('Uploading Results');
           if (updated < cardsToUpload[key].length) {
             const nonUpdated = cardsToUpload[key].filter(
@@ -500,7 +528,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           }
           try {
             await saveBulk(updates);
-            finishKey(`Added ${cardsToUpload[key].length} cards to ${key}`);
+            finishKey(`Uploaded ${updates.length} which contained ${cardsToUpload[key].length} new cards to ${key}`);
           } catch (e) {
             errorKey(e, `Failed to save ${cardsToUpload[key].length} cards to ${key}`);
             notAdded.push(...cardsToUpload[key]);
