@@ -320,7 +320,7 @@ export async function getSalesFromMyCardPost() {
         }
       }
     }
-    finish(`Got ${sales.length} sales from My Card Post`);
+    finish(`Found ${sales.length} cards sold on My Card Post`);
     return sales;
   } catch (e) {
     finish(e);

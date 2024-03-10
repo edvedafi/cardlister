@@ -105,7 +105,8 @@ export const login = async () => {
 };
 
 async function postImage(path, imagePath) {
-  const { finish, error, update } = showSpinner(`post-image-${imagePath}`, `Uploading ${imagePath.lastIndexOf('/')}`);
+  const fileName = imagePath.substring(imagePath.lastIndexOf('/'));
+  const { finish, error, update } = showSpinner(`post-image-${fileName}`, `Uploading ${fileName}`);
   const api = await login();
 
   const formData = new FormData();
@@ -254,83 +255,83 @@ const buildBody = (filters) => ({
 
 export async function getAllListings(setData) {
   const { update, finish, error } = showSpinner('get-listings', `Getting listings`);
-  const api = await login();
+  let allPossibleListings = {};
   let filters = {
     sport: [setData.sport],
     year: [setData.year],
     setName: [setData.setName],
   };
-  if (setData.parallel) {
-    filters.variant = ['parallel'];
-    filters.variantName = [setData.parallel];
-  } else if (setData.insert) {
-    filters.variant = ['insert'];
-    filters.variantName = [setData.insert];
-  } else {
-    filters.variant = ['base'];
-  }
-
-  let allPossibleListings = {};
   try {
-    update(JSON.stringify(filters));
-    const { data: allPossibleListings } = await api.post('seller/bulk-upload/results', buildBody(filters));
-
-    if (!allPossibleListings.results || allPossibleListings.results.length === 0) {
-      throw new Error(`No listings found for ${JSON.stringify(filters)}`);
-    }
-  } catch (e) {
-    log(e);
-    filters = {
-      sport: [setData.sport.toLowerCase()],
-    };
-    const getNextFilter = async (text, filterType) => {
-      const filterOptions = await api.post('search/bulk-upload/filters', { filters });
-      if (filterOptions.aggregations) {
-        const response = await ask(text, undefined, {
-          selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
-            filterOptions.aggregations[filterType].map((variant) => ({
-              name: variant.label,
-              value: variant.slug,
-            })),
-          ),
-        });
-        return [response];
-      } else {
-        throw new Error('No filters found: ' + JSON.stringify(filterOptions));
-      }
-    };
-
-    filters.year = await getNextFilter('Which year would you like to update?', 'year');
-
-    filters.setName = await getNextFilter('Which set would you like to update?', 'setName');
-
-    if (setData.insert) {
-      filters.variant = ['insert'];
-      filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
-      if (filters.variantName === 'None') {
-        filters.variant = ['parallel'];
-        filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
-      }
-    } else if (setData.parallel) {
+    const api = await login();
+    if (setData.parallel) {
       filters.variant = ['parallel'];
-      filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
-      if (filters.variantName === 'None') {
-        filters.variant = ['insert'];
-        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
-      }
+      filters.variantName = [setData.parallel];
+    } else if (setData.insert) {
+      filters.variant = ['insert'];
+      filters.variantName = [setData.insert];
     } else {
       filters.variant = ['base'];
     }
 
-    update(JSON.stringify(filters));
-
     try {
+      update(JSON.stringify(filters));
+      const { data: allPossibleListings } = await api.post('seller/bulk-upload/results', buildBody(filters));
+
+      if (!allPossibleListings.results || allPossibleListings.results.length === 0) {
+        throw new Error(`No listings found for ${JSON.stringify(filters)}`);
+      }
+    } catch (e) {
+      log(e);
+      filters = {
+        sport: [setData.sport.toLowerCase()],
+      };
+      const getNextFilter = async (text, filterType) => {
+        const filterOptions = await api.post('search/bulk-upload/filters', { filters });
+        if (filterOptions.aggregations) {
+          const response = await ask(text, undefined, {
+            selectOptions: [{ name: 'None', description: 'None of the options listed are correct' }].concat(
+              filterOptions.aggregations[filterType].map((variant) => ({
+                name: variant.label,
+                value: variant.slug,
+              })),
+            ),
+          });
+          return [response];
+        } else {
+          throw new Error('No filters found: ' + JSON.stringify(filterOptions));
+        }
+      };
+
+      filters.year = await getNextFilter('Which year would you like to update?', 'year');
+
+      filters.setName = await getNextFilter('Which set would you like to update?', 'setName');
+
+      if (setData.insert) {
+        filters.variant = ['insert'];
+        filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
+        if (filters.variantName === 'None') {
+          filters.variant = ['parallel'];
+          filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+        }
+      } else if (setData.parallel) {
+        filters.variant = ['parallel'];
+        filters.variantName = await getNextFilter('Which parallel is this?', 'variantName');
+        if (filters.variantName === 'None') {
+          filters.variant = ['insert'];
+          filters.variantName = await getNextFilter('Which insert is this?', 'variantName');
+        }
+      } else {
+        filters.variant = ['base'];
+      }
+
+      update(JSON.stringify(filters));
+
       const response = await api.post('seller/bulk-upload/results', buildBody(filters));
       allPossibleListings = response.data;
-    } catch (e) {
-      error(e);
-      throw e;
     }
+  } catch (e) {
+    error(e);
+    throw e;
   }
 
   finish();

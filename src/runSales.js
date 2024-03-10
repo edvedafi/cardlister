@@ -24,7 +24,7 @@ import chalkTable from 'chalk-table';
 import { getFileSales, getListingInfo, shutdownFirebase } from './listing-sites/firebase.js';
 import minimist from 'minimist';
 import open from 'open';
-import { pauseSpinners, useSpinners } from './utils/spinners.js';
+import { useSpinners } from './utils/spinners.js';
 import { ask } from './utils/ask.js';
 import initializeFirebase from './utils/firebase.js';
 import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
@@ -34,8 +34,7 @@ import { loadTeams } from './utils/teams.js';
 
 const args = minimist(process.argv.slice(2));
 
-const log = (...params) => console.log(chalk.cyan(...params));
-const { showSpinner, finishSpinner, errorSpinner } = useSpinners('sales', chalk.cyan);
+const { showSpinner, finishSpinner, errorSpinner, log } = useSpinners('sales', chalk.cyan);
 
 $.verbose = false;
 
@@ -57,13 +56,13 @@ const shutdown = async () => {
   });
 });
 
+const { update, error, finish } = showSpinner('top-level', 'Running sales processing');
 try {
   initializeFirebase();
   await Promise.all([loadTeams(), sportlotsLogin(), bscLogin(), mcpLogin()]);
 
   //gather sales
-  showSpinner('top-level', 'Running sales processing');
-  showSpinner('gathering', 'Gathering sales from sites');
+  update('Gathering sales from sites');
   const results = await Promise.all([
     getMySlabSales(),
     getFileSales(),
@@ -73,10 +72,10 @@ try {
     getSalesFromMyCardPost(),
   ]);
   const rawSales = results.reduce((s, result) => s.concat(result), []);
-  finishSpinner('gathering', `Found ${chalk.green(rawSales.length)} total sales`);
+  finishSpinner('found-count', `Found ${chalk.green(rawSales.length)} total sales`);
 
   //prep listings to remove
-  showSpinner('sales-info', 'Updating sales with listing info');
+  update('Updating sales with listing info');
   const openSalesSites = [];
 
   const sales = await getListingInfo(rawSales);
@@ -89,7 +88,7 @@ try {
     openSalesSites.push('https://www.buysportscards.com/sellers/orders');
   }
   if (sales.find((sale) => sale.platform.indexOf('MCP: ') > -1)) {
-    openSalesSites.push('https://mycardpost.com/edvedafi/orders');
+    openSalesSites.push('https://www.mycardpost.com/edvedafi/orders');
   }
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
@@ -97,10 +96,10 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('MySlabs') > -1)) {
     openSalesSites.push('https://www.myslabs.com/account/history/sold/');
   }
-  finishSpinner('sales-info', 'Completed adding listing info to cards');
+  update('Completed adding listing info to cards');
 
   //remove listings from sites
-  showSpinner('remove-all', 'Remove listings from sites');
+  update('Remove listings from sites');
   const removeListings = async (site, remove) => {
     let proceed = true;
     if (args.r) {
@@ -116,19 +115,16 @@ try {
   await removeListings('Shopify', () => removeFromShopify(sales));
   await removeListings('My Card Post', () => removeFromMyCardPost(sales));
   await removeListings('MySlabs', () => removeFromMySlabs(sales));
-  finishSpinner('remove-all', 'Completed removing listings from sites');
+  update('Completed removing listings from sites');
 
-  const { finish: launched } = showSpinner('launching', 'Launching all sales sites');
+  update('Launching all sales sites');
   for (const site of openSalesSites) {
     await open(site);
   }
-  // if (openSalesSites.length) {
-  //   await $`/Applications/Firefox.app/Contents/MacOS/firefox --new-window https://docs.google.com/spreadsheets/d/174IZ-g8QM3TRIL0LktfarBhQKtKam9Komwj5KSTHUfs/edit#gid=1681793300`;
-  // }
-  launched('Launching all sales sites');
+  update('Launching all sales sites');
 
   //output a pick list
-  finishSpinner('top-level', 'Completed sales processing');
+  finish('Completed sales processing');
   console.log(
     chalkTable(
       {
@@ -145,8 +141,7 @@ try {
     ),
   );
 } catch (e) {
-  errorSpinner('top-level', 'Failed to run sales processing');
-  pauseSpinners();
+  error(e);
   throw e;
 } finally {
   await shutdown();
