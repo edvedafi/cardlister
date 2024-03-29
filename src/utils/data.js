@@ -27,7 +27,7 @@ export const titleCase = (str) => {
       .map((word) => word[0]?.toUpperCase() + word.slice(1))
       .join("'");
   } catch (e) {
-    console.'error title casing', str);
+    console.log('error title casing', str);
     throw e;
   }
 };
