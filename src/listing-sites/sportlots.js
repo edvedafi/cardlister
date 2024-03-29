@@ -82,70 +82,55 @@ const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField)
 };
 
 const useSelectSet = (driver, selectBrand) => async (setInfo, foundAction) => {
-  showSpinner('selectSet', `${setInfo.skuPrefix}: Selecting Set`);
-  const spinner = (message) => updateSpinner('selectSet', `${setInfo.skuPrefix}: ${message}`);
+  const { update, finish, error } = showSpinner('selectSet', `${setInfo.skuPrefix}: Selecting Set`);
   const selectSet = async (setInfoForRun) => {
     // console.log('search for set', setInfoForRun);
     const setName = `${setInfoForRun.setName} ${setInfoForRun.insert || ''} ${setInfoForRun.parallel || ''}`
       .replace('  ', ' ')
       .trim();
-    spinner('selectSet', `Searching for [${setName}]`);
+    update(`Searching for [${setName}]`);
     const sport = { baseball: 'BB', football: 'FB', basketball: 'BK' }[setInfo.sport.toLowerCase()];
 
-    spinner('selectSet', `Searching for ${setInfoForRun.year} ${setName} in ${sport}`);
-    const selectDonruss = async () => {
-      if (setInfoForRun.setName.startsWith('Donruss')) {
-        const donrussManufactured = {
-          ...setInfoForRun,
-          manufacture: 'Donruss',
-          setName: setInfoForRun.setName.replace('Donruss', '').trim(),
-        };
-
-        spinner('selectSet', `Searching with Donruss Manufacture`);
-        await selectBrand(donrussManufactured);
-        return await selectSet(donrussManufactured);
-      } else {
-        errorSpinner('selectSet', `Could not find ${setInfo.skuPrefix}`);
-        setInfoForRun.found = false;
-        return setInfoForRun;
-      }
-    };
+    update(`Searching for ${setInfoForRun.year} ${setName} in ${sport}`);
     try {
       let found = false;
       await driver.sleep(500);
       // console.log(`Searching for [${setName}]`);
       const rows = await driver.findElements(By.xpath(`//*${caseInsensitive(setName)}`));
-      spinner('selectSet', `Found ${rows.length} rows`);
-      for (let row of rows) {
+      update(`Found ${rows.length} rows`);
+
+      for (let i = 0; !found && i < rows.length; i++) {
+        let row = rows[i];
         let fullSetText;
         try {
           const link = await row.findElement(By.xpath(`.//a`));
           fullSetText = await link.getText();
         } catch (e) {
+          error(e, `Faied on ${JSON.stringify(setInfoForRun)}`);
           fullSetText = await row.getText();
         }
         // if the fullSetText is numbers followed by a space followed by the value in the  setName variable
         // or if the fullSetText is numbers followed by a space followed by the setName followed by "Base Set"
         const pattern = `^\\d+( ${setInfoForRun.manufacture.toLowerCase()})? ${setName.toLowerCase()}( Base Set)?( ${sport}| ${sport.toLowerCase()})?$`;
         const regex = new RegExp(pattern);
-        spinner(`Testing: ${fullSetText.toLowerCase()} against ${pattern}`);
+        update(`Testing: ${fullSetText.toLowerCase()} against ${pattern}`);
         if (regex.test(fullSetText.toLowerCase())) {
-          // console.log('Found: ' + fullSetText);
+          log('Found: ' + fullSetText);
           foundAction && (await foundAction(fullSetText, row));
           found = true;
         }
       }
 
       if (!found) {
-        return await selectDonruss();
+        error(`Could not find ${setName}`);
       } else {
         setInfoForRun.found = true;
-        finishSpinner('selectSet');
-        return setInfoForRun;
+        finish();
       }
+      return setInfoForRun;
     } catch (e) {
-      // console.log(e);
-      return await selectDonruss();
+      error(e);
+      throw e;
     }
   };
 
