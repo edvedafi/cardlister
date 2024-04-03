@@ -699,26 +699,85 @@ export async function removeFromBuySportsCards(cardsToRemove) {
   finish();
 }
 
-export async function updateBSCSKU(setInfo) {
-  const { update, finish, error } = showSpinner('update-bsc-sku', `Updating BSC SKU for ${setInfo.linkText}`);
+export async function updateBSCSKU(setInfo, counts) {
+  const { update, finish, error } = showSpinner('update-bsc-sku', `Updating BSC SKU for ${setInfo.skuPrefix}`);
   update('Login');
   const api = await login();
+  // log(counts);
   update('Getting Listings');
   const listings = await api.post('seller/bulk-upload/results', setInfo.bscFilters);
   const cards = listings.data.results;
   let updated = 0;
   update('Updating Cards');
   for (const card of cards) {
-    const sku = `${setInfo.bin}|${card.card.cardNo}`;
-    // log(card.card.cardNo, card.availableQuantity, card.sellerSku, sku);
-    if (card.availableQuantity > 0 && card.sellerSku !== `${sku}`) {
-      card.sellerSku = sku;
+    // log(card.cardNo, card.availableQuantity, counts[card.cardNo]);
+    let count = counts[card.card.cardNo];
+    if (count || card.availableQuantity > 0) {
+      card.availableQuantity = count?.quantity || 0;
       updated++;
+    } else {
+      card.availableQuantity = 0;
     }
   }
-  if (updated > 0) {
-    update('Saving Updates');
-    await saveBulk(cards);
+  if (updated < counts.length) {
+    log(updated, counts.length);
+    const firstCardNumber = cards[0].card.cardNo;
+    //if the first card number contains any letters remove them
+    const updateByPrefix = (prefix) =>
+      prefix
+        ? cards.forEach((card) => {
+            const cardCount = counts[`${card.card.cardNo.substring(prefix.length, card.card.cardNo.length)}`];
+            if (cardCount) {
+              card.availableQuantity = cardCount.quantity || 0;
+              updated++;
+            } else {
+              card.availableQuantity = 0;
+            }
+          })
+        : false;
+
+    updateByPrefix(firstCardNumber.replace(/\d/g, ''));
+
+    if (updated < counts.length) {
+      updateByPrefix(
+        await ask(`No Cards found, is there a card number prefix (First Card Number: ${cards[0].card.cardNo})?`),
+      );
+
+      if (updated < counts.length) {
+        const cardOptions = [{ value: 'None' }].concat(
+          Object.values(counts).map((card) => ({
+            name: card.description,
+            description: card.description,
+            value: card.quantity,
+          })),
+        );
+        for (const card of cards) {
+          const response = await ask(`How many of ${card.card.cardNo} ${card.card.players}?`, undefined, {
+            selectOptions: cardOptions,
+          });
+          if (response !== 'None') {
+            card.availableQuantity = response || 0;
+            updated++;
+          }
+        }
+      }
+    }
   }
-  finish(`Updated ${updated} cards`);
+
+  update('Saving Updates');
+  if (updated > 0) {
+    await saveBulk(
+      cards.map((card) =>
+        card.availableQuantity > 0
+          ? {
+              ...card,
+              sellerSku: `${setInfo.bin}|${card.cardNo}`,
+            }
+          : card,
+      ),
+    );
+    finish(`Updated ${updated} cards`);
+  } else {
+    error('No cards updated');
+  }
 }

@@ -89,12 +89,12 @@ export async function assignIds() {
   update(`${complete}/${sets.length}`);
   for (const set of sets) {
     const { update: updateSet, error: errorSet, finish: finishSet } = showSpinner(set.linkText, set.linkText);
+    log(`Enter Data for ${set.linkText}`);
     try {
       updateSet('Firebase');
       setInfo = await getGroupBySportlotsId(set.sportlots.id);
       if (!setInfo) {
         updateSet('Finding SetInfo via BSC');
-        log(`Enter Data for ${set.linkText}`);
         setInfo = await findSetInfo(convertTitleToCard(set.linkText));
         if (setInfo.bscFilters) {
           updateSet('Saving to Firebase');
@@ -104,7 +104,6 @@ export async function assignIds() {
 
       if (!setInfo.bscFilters) {
         updateSet('Adding BSC Filters');
-        log(`Enter Data for ${set.linkText}`);
         setInfo = await findSetInfo(setInfo);
         if (setInfo.bscFilters) {
           updateSet('Saving to Firebase');
@@ -132,11 +131,11 @@ export async function assignIds() {
         };
       }
 
-      updateSet('Saving BSC updates');
-      await updateBSCSKU(setInfo);
-
       updateSet('Saving SportLots updates');
-      await updateSetBin(set.linkHref, setInfo);
+      const counts = await updateSetBin(set, setInfo);
+      // log(counts);
+      updateSet('Saving BSC updates');
+      await updateBSCSKU(setInfo, counts);
 
       complete++;
       finishSet(`${set.linkText} => ${setInfo.bin}`);

@@ -360,6 +360,7 @@ export const convertTitleToCard = (title) => {
   const sport = { BB: 'Baseball', FB: 'Football', BK: 'Basketball' }[title.slice(-2)];
   if (sport) {
     card.sport = sport;
+    setInfo = setInfo.substring(0, setInfo.length - 2).trim();
   }
 
   const manufacture = manufactures.find((m) => setInfoLower.indexOf(m) > -1);

@@ -12,6 +12,7 @@ import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
 import chalk from 'chalk';
+import { firstDifference } from '../utils/data.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('sportlots', chalk.blueBright);
 
@@ -880,37 +881,69 @@ export async function findSetList() {
   return linkList;
 }
 
-export async function updateSetBin(linkHref, setInfo) {
-  const { update, finish } = showSpinner('setInfo', 'Update Set Bin');
+export async function updateSetBin(set, setInfo) {
+  const { update, finish, error } = showSpinner('setInfo', 'Update Set Bin');
   const driver = await login();
   const waitForElement = useWaitForElement(driver);
   const clickSubmit = useClickSubmit(waitForElement);
 
-  await driver.get(`https://sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${setInfo.sportlots.id}`);
+  log(set.linkHref);
+  await driver.get(set.linkHref);
 
   const binTextBox = await waitForElement(By.xpath('//input[@name="minval"]'));
   await binTextBox.clear();
   await binTextBox.sendKeys(setInfo.bin);
+
+  const rows = await driver.findElements(By.xpath('//form[@action="/inven/dealbin/updpct.tpl"]/table/tbody/tr'));
+  const binCount = rows.length;
+  // log(binCount);
+  const cards = [];
+  const base = set.linkText.endsWith('FB') > 0 ? set.linkText.substring(0, set.linkText.length - 3) : set.linkText;
+  for (let i = 1; i < binCount; i++) {
+    try {
+      update(`${i}/${binCount}`);
+      const row = rows[i];
+      let description = false;
+      try {
+        const descriptionColumn = await row.findElements(By.xpath('.//td[starts-with(@class, "CardName")]'));
+        for (let column of descriptionColumn) {
+          const columnText = await column.getText();
+          if (columnText.indexOf(base) > -1) {
+            description = columnText;
+          }
+        }
+        // log(description);
+      } catch (e) {
+        const th = await row.findElement(By.xpath('.//th'));
+        const thText = await th.getText();
+        if (thText === 'Card Description') {
+          // log('Header Row');
+        } else {
+          throw 'No Description Found';
+        }
+      }
+      if (description) {
+        //find the column that has a class name that starts with qty
+        const quantityColumn = await row.findElement(By.xpath('.//input[starts-with(@name, "qty")]'));
+        const quantity = await quantityColumn.getAttribute('value');
+        cards.push({ description, quantity });
+      }
+    } catch (e) {
+      error(e, `Failed on row ${i}`);
+      throw e;
+    }
+  }
+  // log(cards);
+  //convert the cards array to a map keyed on quantity
+  const cardMap = cards
+    .map((card) => ({ ...card, cardNumber: firstDifference(card.description, base) }))
+    .reduce((acc, card) => {
+      acc[card.cardNumber] = card;
+      return acc;
+    }, {});
+  finish();
+  // log(cardMap);
+  // await ask('Press any key to continue...');
   await clickSubmit('Defaults Bin value');
-
-  finish('Sportlots');
-
-  // await driver.get(linkHref);
-  //
-  // const binFields = await driver.findElements(By.xpath("//input[@type='text' and starts-with(@name, 'bin')]"));
-  // const binCount = binFields.length;
-  // let counter = 0;
-  // update(`${counter}/${binCount}`);
-  // for (const binField of binFields) {
-  //   await binField.clear();
-  //   await binField.sendKeys(Key.BACK_SPACE);
-  //   await binField.sendKeys(Key.BACK_SPACE);
-  //   await binField.sendKeys(Key.BACK_SPACE);
-  //   await binField.sendKeys(Key.BACK_SPACE);
-  //   await binField.sendKeys(Key.BACK_SPACE);
-  //   await binField.sendKeys(setInfo.bin);
-  //   update(`${++counter}/${binCount}`);
-  // }
-  // await clickSubmit();
-  // finish(`Updated ${counter} cards`);
+  return cardMap;
 }

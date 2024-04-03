@@ -51,6 +51,17 @@ export const byCardNumber = (a, b) => {
   return a.player < b.player ? -1 : a.player > b.player ? 1 : 0;
 };
 
+export const firstDifference = (a, b) => {
+  //find the first word that is different between a and b
+  const aWords = a.split(' ');
+  const bWords = b.split(' ');
+  for (let i = 0; i < aWords.length; i++) {
+    if (aWords[i] !== bWords[i]) {
+      return aWords[i];
+    }
+  }
+};
+
 export const graders = [
   'PSA',
   'BCCG',

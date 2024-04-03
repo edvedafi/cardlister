@@ -3,12 +3,11 @@ import 'zx/globals';
 import minimist from 'minimist';
 import { login as sportlotsLogin, shutdownSportLots } from './listing-sites/sportlots.js';
 import { login as bscLogin, shutdownBuySportsCards } from './listing-sites/bsc.js';
-import { getGroupByBin, shutdownFirebase } from './listing-sites/firebase.js';
+import { shutdownFirebase } from './listing-sites/firebase.js';
 import { shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import initializeFirebase from './utils/firebase.js';
 import { loadTeams } from './utils/teams.js';
-import getSetData from './card-data/setData.js';
-import { ask } from './utils/ask.js';
+import { assignIds } from './card-data/setData.js';
 
 const args = minimist(process.argv.slice(2));
 
@@ -25,10 +24,12 @@ const shutdown = async () => {
 };
 
 ['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
-  process.on(signal, () =>
-    shutdown().then(() => {
-      process.exit();
-    }),
+  process.on(
+    signal,
+    async () =>
+      await shutdown().then(() => {
+        process.exit();
+      }),
   ),
 );
 
@@ -37,10 +38,7 @@ initializeFirebase();
 await Promise.all([loadTeams(), sportlotsLogin(), bscLogin()]);
 
 try {
-  const bin = await ask('Enter bin or leave blank to search');
-  const initialData = bin ? getGroupByBin(bin) : {};
-  const setData = await getSetData(initialData);
-  console.log(setData);
+  await assignIds();
 } finally {
   await shutdown();
 }
