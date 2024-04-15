@@ -354,7 +354,7 @@ export async function findSetInfo(defaultValues) {
         selectOptions: filterOptions.aggregations[filterType]
           .map((variant) => ({
             name: variant.label,
-            value: variant.slug,
+            value: variant,
           }))
           .concat([{ name: 'None', value: null, description: 'None of the options listed are correct' }]),
       });
@@ -362,8 +362,8 @@ export async function findSetInfo(defaultValues) {
       if (!response || response === 'None') {
         return;
       }
-      filters[filterType] = [response];
-      return response;
+      filters[filterType] = [response.slug];
+      return response.label;
     };
 
     setData.sport = await getNextFilter('Sport?', 'sport', setData.sport);
@@ -371,7 +371,10 @@ export async function findSetInfo(defaultValues) {
       return {
         bscFilters: { skip: true },
       };
+    } else {
+      setData.sport = setData.sport.toLowerCase();
     }
+    
     setData.year = await getNextFilter('Year?', 'year', setData.year);
     if (!setData.manufacture) {
       setData.manufacture = await ask('Manufacturer?');
@@ -382,13 +385,15 @@ export async function findSetInfo(defaultValues) {
       await getNextFilter('variantType?', 'variant', setData.variant);
 
       if (filters.variant.includes('insert')) {
-        const insert = await getNextFilter('Insert?', 'variantName', setData.insert);
-        setData.insert = setData.insert || insert;
+        setData.insert = await getNextFilter('Insert?', 'variantName', setData.insert);
+      } else {
+        setData.insert = null;
       }
 
       if (filters.variant.includes('parallel')) {
-        const parallel = await getNextFilter('Parallel?', 'variantName', setData.parallel);
-        setData.parallel = setData.parallel || parallel;
+        setData.parallel = await getNextFilter('Parallel?', 'variantName', setData.parallel);
+      } else {
+        setData.parallel = null;
       }
 
       setData.bscFilters = buildBody(filters);

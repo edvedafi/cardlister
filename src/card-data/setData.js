@@ -8,6 +8,7 @@ import chalk from 'chalk';
 import { convertTitleToCard } from '../listing-sites/uploads.js';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
+
 export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
   try {
@@ -26,10 +27,7 @@ export default async function getSetData(defaultValues, collectDetails = true) {
       }
       if (!setInfo.bscFilters) {
         update('BSC');
-        setInfo = {
-          ...setInfo,
-          ...(await findSetInfo(setInfo)),
-        };
+        setInfo = await findSetInfo(setInfo);
         if (setInfo.bscFilters) {
           if (!setInfo.bin) {
             setInfo = {
@@ -37,8 +35,9 @@ export default async function getSetData(defaultValues, collectDetails = true) {
               bscFilters: setInfo.bscFilters,
               sportlots: setInfo.sportlots,
             };
+          } else {
+            await updateGroup(setInfo);
           }
-          await updateGroup({ bin: setInfo.bin, bscFilters: setInfo.bscFilters });
         } else {
           throw new Error(`Unable to find set info for ${JSON.stringify(setInfo)}`);
         }
