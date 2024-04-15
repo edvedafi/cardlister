@@ -27,7 +27,6 @@ import open from 'open';
 import { useSpinners } from './utils/spinners.js';
 import { ask } from './utils/ask.js';
 import initializeFirebase from './utils/firebase.js';
-import { getMySlabSales, removeFromMySlabs } from './listing-sites/myslabs.js';
 import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
 import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { loadTeams } from './utils/teams.js';
@@ -64,7 +63,7 @@ try {
   //gather sales
   update('Gathering sales from sites');
   const results = await Promise.all([
-    getMySlabSales(),
+    // getMySlabSales(),
     getFileSales(),
     getEbaySales(),
     getBuySportsCardsSales(),
@@ -93,9 +92,9 @@ try {
   if (sales.find((sale) => sale.platform.indexOf('ebay: ') > -1)) {
     openSalesSites.push('https://www.ebay.com/sh/ord?filter=status:AWAITING_SHIPMENT');
   }
-  if (sales.find((sale) => sale.platform.indexOf('MySlabs') > -1)) {
-    openSalesSites.push('https://www.myslabs.com/account/history/sold/');
-  }
+  // if (sales.find((sale) => sale.platform.indexOf('MySlabs') > -1)) {
+  //   openSalesSites.push('https://www.myslabs.com/account/history/sold/');
+  // }
   update('Completed adding listing info to cards');
 
   //remove listings from sites
@@ -114,7 +113,7 @@ try {
   await removeListings('Buy Sports Cards', () => removeFromBuySportsCards(groupedCards));
   await removeListings('Shopify', () => removeFromShopify(sales));
   await removeListings('My Card Post', () => removeFromMyCardPost(sales));
-  await removeListings('MySlabs', () => removeFromMySlabs(sales));
+  // await removeListings('MySlabs', () => removeFromMySlabs(sales));
   update('Completed removing listings from sites');
 
   update('Launching all sales sites');

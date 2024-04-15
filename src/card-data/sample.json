@@ -1,0 +1,62 @@
+{
+  "sport": "football",
+  "quantity": 1,
+  "graded": "",
+  "autographed": "",
+  "setName": "Panini Prestige",
+  "year": "2023",
+  "insert": "Alma Maters",
+  "manufacture": "Panini",
+  "parallel": null,
+  "crop": {
+    "left": 0,
+    "top": 1224,
+    "width": 3071,
+    "height": 1735
+  },
+  "cropBack": {
+    "left": 0,
+    "top": 612,
+    "width": 3071,
+    "height": 2309
+  },
+  "player": "Trevor Lawrence",
+  "team": [
+    {
+      "team": "Browns",
+      "location": "Cleveland",
+      "display": "Cleveland Browns",
+      "sport": "football",
+      "league": "nfl"
+    },
+    {
+      "team": "Raiders",
+      "location": "Oakland",
+      "sport": "football",
+      "league": "nfl",
+      "display": "Oakland Raiders"
+    },
+    {
+      "team": "Jaguars",
+      "location": "Jacksonville",
+      "sport": "football",
+      "league": "nfl",
+      "display": "Jacksonville Jaguars"
+    }
+  ],
+  "cardNumber": "AM-11",
+  "teamDisplay": "Cleveland Browns | Oakland Raiders | Jacksonville Jaguars",
+  "features": "",
+  "printRun": "",
+  "size": "Standard",
+  "material": "Card Stock",
+  "thickness": "20pt",
+  "lbs": 0,
+  "oz": 1,
+  "length": 6,
+  "width": 4,
+  "depth": 1,
+  "longTitle": "2023 Panini Prestige Alma Maters Insert #AM-11 Trevor Lawrence Cleveland Browns | Oakland Raiders | Jacksonville Jaguars",
+  "title": "2023 Panini Prestige Alma Maters #AM-11 Trevor Lawrence Browns Raiders Jaguars",
+  "cardName": "2023 Panini Panini Prestige Alma Maters Trevor Lawrence"
+}

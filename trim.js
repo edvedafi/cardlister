@@ -5,10 +5,10 @@ import 'zx/globals';
 import { getFiles, getInputs } from './src/utils/inputs.js';
 import processSingles from './src/singles.js';
 import initializeFirebase from './src/utils/firebase.js';
-import { login as sportslotLogin, shutdownSportLots } from './src/listing-sites/sportlots.js';
-import { login as bscLogin, shutdownBuySportsCards } from './src/listing-sites/bsc.js';
+import { shutdownSportLots } from './src/listing-sites/sportlots.js';
+import { shutdownBuySportsCards } from './src/listing-sites/bsc.js';
 import { shutdownFirebase } from './src/listing-sites/firebase.js';
-import { login as mcpLogin, shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
+import { shutdownMyCardPost } from './src/listing-sites/mycardpost.js';
 import chalk from 'chalk';
 import { useSpinners } from './src/utils/spinners.js';
 
@@ -38,7 +38,10 @@ const { update, finish, error } = showSpinner('trim', 'Processing Singles');
 
 try {
   update('Logging in');
-  await Promise.all([loadTeams(initializeFirebase()), sportslotLogin(), bscLogin(), mcpLogin()]);
+  await Promise.all([
+    loadTeams(initializeFirebase()),
+    // sportslotLogin(), bscLogin(), mcpLogin()
+  ]);
 
   // Set up full run information
   update('Gathering Inputs');

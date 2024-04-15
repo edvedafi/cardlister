@@ -1,0 +1,17 @@
+I would like to catalog some sports cards. I have images of the front and back.
+Given the two images here please tell me as much information as you can about the card.
+If you are less than 80% certain of a value leave it blank.
+The most important values are Team, Player Name, and Card Number.
+The additional importance is the set that the card comes from.
+Team should be an array that only contains the teams for the players represented on the card.
+That data should be broken down into 5 fields. The year the card was made, Manufacture, The Set Name, If it comes from an insert within that set the name of the insert should be in the insert field, and if it is a parallel of the main set the name of the parallel should be in the parallel  field.
+If the card is autographed then the Autograph field should have “Label or Sticker” if the autograph is on a sticker or “On Card” if the autograph is directly on the card.
+Features should contain RC if the card is a Rookie Card.
+If the card is serial numbered then printRun should contain the number after the /.
+Crop should contain the values needed to crop to just the size of the card without any background and cropBack should have similar information for the back of the card.
+Material should be CardStock if it is a normal card or Acetate if the card is made of clear plastic.
+A standard card is 20pt thick.
+Do not include any additional text or formatting in the response. Return JSON only.
+An example of the json to return would be:
+{"sport":"football","quantity":1,"graded":"","autographed":"","setName":"Panini Prestige","year":"2023","insert":"Alma Maters","manufacture":"Panini","parallel":null,"crop":{"left":0,"top":1224,"width":3071,"height":1735},"cropBack":{"left":0,"top":612,"width":3071,"height":2309},"player":"Trevor Lawrence","team":[{"team":"Browns","location":"Cleveland","display":"Cleveland Browns","sport":"football","league":"nfl"},{"team":"Raiders","location":"Oakland","sport":"football","league":"nfl","display":"Oakland Raiders"},{"team":"Jaguars","location":"Jacksonville","sport":"football","league":"nfl","display":"Jacksonville Jaguars"}],"cardNumber":"AM-11","teamDisplay":"Cleveland Browns | Oakland Raiders | Jacksonville Jaguars","features":"","printRun":"","size":"Standard","material":"Card Stock","thickness":"20pt","lbs":0,"oz":1,"length":6,"width":4,"depth":1,"longTitle":"2023 Panini Prestige Alma Maters Insert #AM-11 Trevor Lawrence Cleveland Browns | Oakland Raiders | Jacksonville Jaguars","title":"2023 Panini Prestige Alma Maters #AM-11 Trevor Lawrence Browns Raiders Jaguars","cardName":"2023 Panini Panini Prestige Alma Maters Trevor Lawrence"}
+

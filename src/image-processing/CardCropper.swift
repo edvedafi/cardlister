@@ -9,8 +9,8 @@ import CoreImage
 import AppKit
 import Foundation
 
-print(CommandLine.arguments[1])
-print(CommandLine.arguments[2])
+//print(CommandLine.arguments[1])
+//print(CommandLine.arguments[2])
 
 let padding: CGFloat = 30
 
@@ -22,9 +22,10 @@ let currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirect
 
 // Create the image file URL
 let imageURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[1])
-print(imageURL)
-let outputURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[2])
-print(outputURL)
+// print(imageURL)
+// let outputURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[2])
+let outputURL = URL(fileURLWithPath: CommandLine.arguments[2])
+// print(outputURL)
 
 
 // Load the image from the file URL

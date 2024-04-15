@@ -20,7 +20,8 @@ let currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirect
 
 // Create the image file URL
 let imageURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[1])
-let outputURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[2])
+// let outputURL = currentDirectoryURL.appendingPathComponent(CommandLine.arguments[2])
+let outputURL = URL(fileURLWithPath: CommandLine.arguments[2])
 
 // Load the image from the file URL
 let inputImage = NSImage(contentsOf: imageURL)!

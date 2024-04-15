@@ -2,10 +2,11 @@ import { ask } from '../utils/ask.js';
 import terminalImage from 'terminal-image';
 import sharp from 'sharp';
 import fs from 'fs-extra';
-import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
+import { useSpinners } from '../utils/spinners.js';
 import chalk from 'chalk';
+import { removeBackgroundFromImageFile } from 'remove.bg';
 
-const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('images', chalk.white);
+const { showSpinner, log } = useSpinners('images', chalk.white);
 
 const output_directory = 'output/';
 const MAX_IMAGE_SIZE = 10 * 1000 * 1000; // slightly under 10MB
@@ -17,6 +18,7 @@ function getOutputFile(cardData) {
 }
 
 export const prepareImageFile = async (image, cardData, overrideImages) => {
+  const { update, error, finish } = showSpinner('crop', 'Preparing Image');
   const { outputLocation, outputFile } = getOutputFile(cardData);
   let input = image;
   // let rotation = await ask('Rotate', false);
@@ -30,7 +32,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
   // }
   //if the output file already exists, skip it
   if (!overrideImages && fs.existsSync(outputFile)) {
-    console.log('Image already exists, skipping');
+    log('Image already exists, skipping');
   } else {
     await $`mkdir -p ${outputLocation}`;
 
@@ -38,34 +40,48 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
       fs.removeSync(outputFile);
     }
 
-    let tempImage = 'output/temp/temp.jpg';
+    const tempDirectory = '/tmp/cardlister';
+    await fs.ensureDir(tempDirectory);
+    let tempImage = `${tempDirectory}/temp.jpg`;
 
     if (rotate) {
-      await $`magick ${input} -rotate ${rotate} ${output_directory}temp.rotated.jpg`;
-      input = `${output_directory}temp.rotated.jpg`;
+      await $`magick ${input} -rotate ${rotate} ${tempDirectory}/temp.rotated.jpg`;
+      input = `${tempDirectory}/temp.rotated.jpg`;
     }
 
     const cropAttempts = [
-      () => {
-        tempImage = 'output/temp/CC.rotate.jpg';
-        return $`./CardCropper.rotate ${input} ${tempImage}`;
-      },
-      () => {
-        tempImage = 'output/temp/sharp.extract.jpg';
-        return sharp(input).extract(cardData.crop).toFile(tempImage);
-      },
-      () => {
-        tempImage = 'output/temp/sharp.trimp.jpg';
-        return sharp(input).trim({ threshold: 50 }).toFile(tempImage);
-      },
-      () => {
-        tempImage = 'output/temp/CC.crop.jpg';
-        return $`./CardCropper ${input} ${tempImage}`;
+      async () => {
+        tempImage = `${tempDirectory}/CC.rotate.jpg`;
+        return await $`./CardCropper.rotate ${input} ${tempImage}`;
       },
       async () => {
-        tempImage = 'output/temp/manual.jpg';
-        await $`cp ${input} ${tempImage}`;
-        const openCommand = $`open -Wn ${tempImage}`;
+        tempImage = `${tempDirectory}/remove.bg.jpg`;
+        const result = await removeBackgroundFromImageFile({
+          path: input,
+          apiKey: process.env.REMOVE_BG_KEY,
+          size: 'regular',
+          type: 'other',
+          crop: true,
+          crop_margin: 10,
+          outputFile: tempImage,
+        });
+      },
+      async () => {
+        tempImage = `${tempDirectory}/sharp.extract.jpg`;
+        return await sharp(input).extract(cardData.crop).toFile(tempImage);
+      },
+      async () => {
+        tempImage = `${tempDirectory}/sharp.trimp.jpg`;
+        return await sharp(input).trim({ threshold: 50 }).toFile(tempImage);
+      },
+      async () => {
+        tempImage = `${tempDirectory}/CC.crop.jpg`;
+        return await $`./CardCropper ${input} ${tempImage}`;
+      },
+      async () => {
+        tempImage = `${tempDirectory}/manual.jpg`;
+        const openCommand = await $`cp ${input} ${tempImage}; open -Wn ${tempImage}`;
+        // const openCommand = $`open -Wn ${tempImage}`;
         process.on('SIGINT', () => openCommand?.kill());
         return openCommand;
       },
@@ -74,30 +90,33 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
     let i = 0;
     while (!found && i < cropAttempts.length) {
       try {
-        showSpinner('crop', `Attempting crop ${i}/${cropAttempts.length}`);
+        update(`Attempting crop ${i}/${cropAttempts.length}`);
         await cropAttempts[i]();
-        finishSpinner('crop');
-        pauseSpinners();
-        console.log(await terminalImage.file(tempImage, { height: 25 }));
+        log(await terminalImage.file(tempImage, { height: 25 }));
         found = await ask('Did Image render correct?', true);
-        resumeSpinners();
       } catch (e) {
-        resumeSpinners();
-        errorSpinner('crop', `Failed to crop image ${e.message}`);
+        log(e);
       }
       i++;
     }
 
-    const buffer = await sharp(tempImage).toBuffer();
-    if (buffer.length > MAX_IMAGE_SIZE) {
-      const compressionRatio = MAX_IMAGE_SIZE / buffer.length;
-      const outputQuality = Math.floor(compressionRatio * 100);
-      await sharp(buffer).jpeg({ quality: outputQuality }).toFile(outputFile);
-      await $`rm ${tempImage}`;
-    } else {
-      await $`mv ${tempImage} ${outputFile}`;
-    }
+    if (found) {
+      const buffer = await sharp(tempImage).toBuffer();
+      if (buffer.length > MAX_IMAGE_SIZE) {
+        const compressionRatio = MAX_IMAGE_SIZE / buffer.length;
+        const outputQuality = Math.floor(compressionRatio * 100);
+        await sharp(buffer).jpeg({ quality: outputQuality }).toFile(outputFile);
+        await $`rm ${tempImage}`;
+      } else {
+        await $`mv ${tempImage} ${outputFile}`;
+      }
 
-    return outputFile;
+      finish();
+      return outputFile;
+    } else {
+      const e = new Error('Failed to crop image');
+      error(e);
+      throw e;
+    }
   }
 };

@@ -7,12 +7,12 @@ import {
   useSetSelectValue,
   useWaitForElement,
 } from './uploads.js';
+import { firstDifference, sets as setNames } from '../utils/data.js';
 import { validateUploaded } from './validate.js';
 import { confirm } from '@inquirer/prompts';
 import { getGroupByBin, updateGroup } from './firebase.js';
 import { pauseSpinners, resumeSpinners, useSpinners } from '../utils/spinners.js';
 import chalk from 'chalk';
-import { firstDifference } from '../utils/data.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('sportlots', chalk.blueBright);
 
@@ -158,18 +158,31 @@ export async function login() {
     updateSpinner('login', 'Submitting login request');
     await useClickSubmit(waitForElement)();
     finishSpinner('login', 'Sportlots Logged In');
+  } else {
+    try {
+      await _driver.get('https://sportlots.com/cust/custbin/login.tpl?urlval=/index.tpl&qs=');
+    } catch (e) {
+      _driver = null;
+      return login();
+    }
   }
   return _driver;
 }
 
 export async function shutdownSportLots() {
-  showSpinner('shutdown', 'Shutting down SportLots');
+  const { finish, error } = showSpinner('shutdown', 'Shutting down SportLots');
   if (_driver) {
     const d = _driver;
     _driver = undefined;
-    await d.quit();
+    try {
+      await d.quit();
+      finish('Sportlots shutdown complete');
+    } catch (e) {
+      error('Sportslots shutdown errored');
+    }
+  } else {
+    finish();
   }
-  finishSpinner('shutdown', 'Sportlots shutdown complete');
 }
 
 async function enterIntoSportLotsWebsite(cardsToUpload) {
@@ -217,9 +230,10 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         await radioButton.click();
       };
       let found = false;
-      if (setInfo.sportlots.id) {
+      const slId = setInfo.sportlots.id || setInfo.sportlots.bin;
+      if (slId) {
         updateSet('Set - id');
-        const radioButton = await waitForElement(By.xpath(`//input[@value = '${setInfo.sportlots.id}']`));
+        const radioButton = await waitForElement(By.xpath(`//input[@value = '${slId}']`));
         await radioButton.click();
         found = true;
       } else {
@@ -703,7 +717,9 @@ export async function findSetId(defaultValues = {}) {
     const setNumber = fullSetText.substring(0, fullSetText.indexOf(' '));
     const setText = fullSetText.substring(fullSetText.indexOf(' ') + 1);
     let setName = setText;
-    if (!lastSet) {
+    // log(setNames);
+    // log(setText.toLowerCase());
+    if (!lastSet || setNames.includes(setText.toLowerCase())) {
       lastSet = setName;
       sets[setName] = {
         base: { name: setText, value: { sportlots: { bin: setNumber }, setName: setName }, description: fullSetText },
@@ -728,12 +744,14 @@ export async function findSetId(defaultValues = {}) {
               },
               parallels: [],
             };
+            // log(`Put ${setName} at sets[${setName}].inserts[${lastInsert}]`);
           } else {
             sets[setName].parallels.push({
               name: setText,
               value: { sportlots: { bin: setNumber }, setName: setName, parallel: lastInsert },
               description: fullSetText,
             });
+            // log(`Put ${setName} at sets[${setName}].parallels`);
           }
         } else {
           sets[setName].inserts[lastInsert].parallels.push({
@@ -746,6 +764,7 @@ export async function findSetId(defaultValues = {}) {
             },
             description: fullSetText,
           });
+          // log(`Put ${setName} at sets[${setName}].inserts[${lastInsert}].parallels`);
         }
       } else {
         lastSet = setName;
@@ -755,6 +774,7 @@ export async function findSetId(defaultValues = {}) {
           inserts: {},
           parallels: [],
         };
+        // log(`Put ${setName} at sets[${setName}]`);
       }
     }
   }

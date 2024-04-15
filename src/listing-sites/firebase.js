@@ -611,3 +611,18 @@ export const processImageFile = async (outputFile, filename) => {
     throw e;
   }
 };
+
+export const fixSLBins = async () => {
+  const { update, finish, error } = showSpinner('fixSLBins', 'Fixing SportLots Bins');
+  const db = getFirestore();
+  update('Querying Firebase');
+  const query = db.collection('SalesGroups').where('sportlots.bin', '>', '');
+  const queryResults = await query.get();
+  let count = 0;
+  for (const doc of queryResults.docs) {
+    update(`${count++}/${queryResults.size}`);
+    const data = doc.data();
+    await doc.ref.update({ sportlots: { ...data.sportlots, id: data.sportlots.bin } });
+  }
+  finish();
+};

@@ -29,9 +29,10 @@ export async function getMySlabSales() {
 }
 
 export async function uploadToMySlabs(cards) {
-  showSpinner('Uploading', 'Uploading to My Slabs');
+  const { update, error, finish } = showSpinner('Uploading', 'Uploading to My Slabs');
   let count = 0;
   const api = await login();
+  const errors = [];
   await Promise.all(
     Object.values(cards)
       .filter((card) => parseFloat(card.price) > 9.98)
@@ -45,10 +46,7 @@ export async function uploadToMySlabs(cards) {
             await updateFirebaseListing({ sku: card.sku, myslabs: slabResponse.data.id });
             finishSpinner(`upload-${card.sku}`, card.title);
           } else {
-            errorSpinner(
-              `upload-${card.sku}`,
-              `${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`,
-            );
+            errors.push(`${card.title} | ${slabResponse.status} ${slabResponse.statusText} ${slabResponse.data}`);
           }
         } catch (e) {
           errorSpinner(`upload-${card.sku}`, `${card.title} | ${e.message} ${JSON.stringify(e.response.data)}`);
@@ -90,7 +88,7 @@ export function buildCard(card) {
 }
 
 export async function login() {
-  showSpinner('login', 'Logging into MySlabs');
+  const { finish, error } = showSpinner('login', 'Logging into MySlabs');
   if (!_api) {
     try {
       const response = await axios.post(
@@ -113,11 +111,11 @@ export async function login() {
         },
       });
     } catch (e) {
-      errorSpinner('login', 'Failed to login to MySlabs');
+      error(e);
       throw e;
     }
   }
-  finishSpinner('login');
+  finish();
   return _api;
 }
 

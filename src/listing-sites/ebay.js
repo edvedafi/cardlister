@@ -561,6 +561,8 @@ export const getEbaySales = async () => {
     filter: 'orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}',
   });
   const cards = [];
+  const orders = [];
+
   response.orders.forEach((order) => {
     showSpinner('order', `Checking order for ${order.buyer.username}`);
     if (order.orderFulfillmentStatus === 'FULFILLED') {
