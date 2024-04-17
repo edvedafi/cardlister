@@ -73,15 +73,22 @@ const saveBulkAnswers = (cardData) => {
 };
 
 export const getSetData = async () => {
-  const isSet = await ask('Is this a complete set?', isYes(saveData.setData?.isSet));
+  const isSet = await ask('Is this a complete set?', saveData.setData?.isSet);
 
-  console.log('isSet', isSet);
-  if (isSet) {
-    saveData.setData = {
-      ...saveData.setData,
-      ...(await getFullSetData(saveData.setData)),
-      isSet: true,
-    };
+  if (isSet && !isNo(isSet)) {
+    //check to see if isSet contains numeric data
+    if (typeof isSet === 'number' || isSet.toString().match(/^\d+$/)) {
+      saveData.setData = {
+        ...(await getFullSetData({ bin: isSet })),
+        isSet: true,
+      };
+    } else {
+      saveData.setData = {
+        ...saveData.setData,
+        ...(await getFullSetData(saveData.setData)),
+        isSet: true,
+      };
+    }
   } else {
     saveData.setData = {};
   }
