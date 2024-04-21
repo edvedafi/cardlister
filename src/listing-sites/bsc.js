@@ -374,7 +374,7 @@ export async function findSetInfo(defaultValues) {
     } else {
       setData.sport = setData.sport.toLowerCase();
     }
-    
+
     setData.year = await getNextFilter('Year?', 'year', setData.year);
     if (!setData.manufacture) {
       setData.manufacture = await ask('Manufacturer?');
@@ -458,8 +458,9 @@ export async function uploadToBuySportsCards(cardsToUpload) {
           concurrency: 5,
         });
 
-        listings.map((listing) =>
+        listings.forEach((currentListing, i) =>
           queue.push(async () => {
+            let listing = currentListing;
             const {
               update: updateSKU,
               finish: finishSKU,
@@ -473,6 +474,66 @@ export async function uploadToBuySportsCards(cardsToUpload) {
             // log('card:', card);
             if (card) {
               try {
+                if (listings[i + 1]) {
+                  const options = [
+                    {
+                      name: `${listing.card.cardNo} ${listing.card.players} ${listing.card.playerAttribute}`,
+                      value: listing,
+                    },
+                  ];
+                  const letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+                  let checkNext = true;
+                  let letter = 0;
+                  while (i + 1 < listings.length && checkNext) {
+                    const next = listings[i + 1];
+                    if (next.card.cardNo === `${card.cardNumber}${letters[letter++]}`) {
+                      options.push({
+                        name: `${next.card.cardNo} ${next.card.players} ${next.card.playerAttribute}`,
+                        value: next,
+                      });
+                      checkNext = letter < letters.length;
+                    } else {
+                      checkNext = false;
+                    }
+                  }
+                  if (options.length > 1) {
+                    const answer = await ask(`Which listing is this? ${chalk.redBright(card.title)}`, undefined, {
+                      selectOptions: options,
+                    });
+                    if (answer) {
+                      listing = answer;
+                    }
+                  }
+                  //
+                  // const b = listings[i + 1];
+                  // if ( b ) {
+                  //   if (b && b.card.cardNo === `${card.cardNumber}b`) {
+                  //     options.push({
+                  //       name: `${b.card.cardNo} ${b.card.players} ${
+                  //         b.card.playerAttribute
+                  //       }`,
+                  //       value: b,
+                  //     });
+                  //   }
+                  //   const c = listings[i + 2];
+                  //   if (listings[i + 2].card.cardNo === `${card.cardNumber}c`) {
+                  //     options.push({
+                  //       name: `${listings[i + 2].card.cardNo} ${listings[i - 1].card.players} ${
+                  //         listings[i + 2].card.playerAttribute
+                  //       }`,
+                  //       value: listings[i + 2],
+                  //     });
+                  //   }
+                  //   if (options.length > 1) {
+                  //     const answer = await ask(`Which listing is this? ${chalk.redBright(card.title)}`, undefined, {
+                  //       selectOptions: options,
+                  //     });
+                  //     if (answer) {
+                  //       listing = answer;
+                  //     }
+                  //   }
+                  // }
+                }
                 const newListing = {
                   ...listing,
                   availableQuantity: card.quantity,
@@ -522,7 +583,7 @@ export async function uploadToBuySportsCards(cardsToUpload) {
 
         await new Promise((resolve) => queue.addEventListener('end', resolve));
 
-        const updates = queueResults.map((result) => result[0]).filter((result) => result);
+        const updates = queueResults.map((result) => (result ? result[0] : null)).filter((result) => result);
 
         if (updates.length > 0) {
           updateKey('Uploading Results');
@@ -539,6 +600,8 @@ export async function uploadToBuySportsCards(cardsToUpload) {
             errorKey(e, `Failed to save ${cardsToUpload[key].length} cards to ${key}`);
             notAdded.push(...cardsToUpload[key]);
           }
+        } else {
+          finishKey(`No new cards to upload to ${key}`);
         }
       } else {
         errorKey(`Could not find set ${key}`);

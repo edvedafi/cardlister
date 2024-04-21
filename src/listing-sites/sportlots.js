@@ -4,6 +4,7 @@ import {
   caseInsensitive,
   convertTitleToCard,
   getSelectOptions,
+  hasCssClass,
   useSetSelectValue,
   useWaitForElement,
 } from './uploads.js';
@@ -204,168 +205,204 @@ async function enterIntoSportLotsWebsite(cardsToUpload) {
         finish: finishSet,
         error: errorSet,
       } = showSpinner(`upload-${key}`, `Uploading ${key}`);
-      updateSet('Get Group Info');
-      const setInfo = await getGroupByBin(key);
+      try {
+        updateSet('Get Group Info');
+        const setInfo = await getGroupByBin(key);
 
-      if (setInfo.sportlots?.skip) {
-        finishSet(`Skipping ${key}`);
-        continue;
-      }
+        if (setInfo.sportlots?.skip) {
+          finishSet(`Skipping ${key}`);
+          continue;
+        }
 
-      if (setInfo.sportlots) {
-        setInfo.sportlots.manufacture = 'All Brands';
-      } else {
-        setInfo.sportlots = {};
-      }
+        if (setInfo.sportlots) {
+          setInfo.sportlots.manufacture = 'All Brands';
+        } else {
+          setInfo.sportlots = {};
+        }
 
-      let cardsAdded = 0;
+        let cardsAdded = 0;
 
-      updateSet('Brand');
-      await selectBrand(setInfo);
-      const onFoundSet = async (fullSetText, row) => {
-        const fullSetNumbers = fullSetText.split(' ')[0];
-        setInfo.sportlots.id = fullSetNumbers;
-        //find the radio button where the value is fullSetNumbers
-        const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-        await radioButton.click();
-      };
-      let found = false;
-      const slId = setInfo.sportlots.id || setInfo.sportlots.bin;
-      if (slId) {
-        updateSet('Set - id');
-        const radioButton = await waitForElement(By.xpath(`//input[@value = '${slId}']`));
-        await radioButton.click();
-        found = true;
-      } else {
-        updateSet('Set - lookup');
-        found = (await selectSet(setInfo, onFoundSet)).found;
-      }
-      if (found) {
-        updateSet('Update Group');
-        await updateGroup(setInfo);
-        await clickSubmit();
-      } else {
-        updateSet('Set - not found');
-        const inputYear = setInfo.sportlots.year || setInfo.year;
-        const selectedYear = await ask('Year?', inputYear);
-        if (selectedYear !== inputYear) {
-          setInfo.sportlots.year = selectedYear;
-          setInfo.sportlots.manufacture = await ask('Manufacturer?', undefined, {
-            selectOptions: Object.values(brands),
-          });
-          await selectBrand(setInfo);
+        updateSet('Brand');
+        await selectBrand(setInfo);
+        const onFoundSet = async (fullSetText, row) => {
+          const fullSetNumbers = fullSetText.split(' ')[0];
+          setInfo.sportlots.id = fullSetNumbers;
+          //find the radio button where the value is fullSetNumbers
+          const radioButton = await row.findElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+          await radioButton.click();
+        };
+        let found = false;
+        const slId = setInfo.sportlots.id || setInfo.sportlots.bin;
+        if (slId) {
+          updateSet('Set - id');
+          const radioButton = await waitForElement(By.xpath(`//input[@value = '${slId}']`));
+          await radioButton.click();
+          found = true;
+        } else {
+          updateSet('Set - lookup');
           found = (await selectSet(setInfo, onFoundSet)).found;
         }
         if (found) {
+          updateSet('Update Group');
           await updateGroup(setInfo);
           await clickSubmit();
         } else {
-          const tds = await driver.findElements(
-            By.xpath(`//input[@type='radio' and @name='selset']/../following-sibling::td`),
-          );
-          const radioButtonValues = await Promise.all(
-            tds.map(async (td) => {
-              const buttonText = await td.getText();
-              return {
-                value: buttonText.split(' ')[0],
-                name: buttonText,
-              };
-            }),
-          );
+          updateSet('Set - not found');
+          const inputYear = setInfo.sportlots.year || setInfo.year;
+          const selectedYear = await ask('Year?', inputYear);
+          if (selectedYear !== inputYear) {
+            setInfo.sportlots.year = selectedYear;
+            setInfo.sportlots.manufacture = await ask('Manufacturer?', undefined, {
+              selectOptions: Object.values(brands),
+            });
+            await selectBrand(setInfo);
+            found = (await selectSet(setInfo, onFoundSet)).found;
+          }
+          if (found) {
+            await updateGroup(setInfo);
+            await clickSubmit();
+          } else {
+            const tds = await driver.findElements(
+              By.xpath(`//input[@type='radio' and @name='selset']/../following-sibling::td`),
+            );
+            const radioButtonValues = await Promise.all(
+              tds.map(async (td) => {
+                const buttonText = await td.getText();
+                return {
+                  value: buttonText.split(' ')[0],
+                  name: buttonText,
+                };
+              }),
+            );
 
-          const fullSetNumbers = await ask('Which set is this?', undefined, { selectOptions: radioButtonValues });
+            const fullSetNumbers = await ask('Which set is this?', undefined, { selectOptions: radioButtonValues });
 
-          const radioButton = await waitForElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
-          radioButton.click();
-          await clickSubmit();
-          found = true;
+            const radioButton = await waitForElement(By.xpath(`//input[@value = '${fullSetNumbers}']`));
+            radioButton.click();
+            await clickSubmit();
+            found = true;
 
-          setInfo.sportlots.id = fullSetNumbers;
-          await updateGroup(setInfo);
+            setInfo.sportlots.id = fullSetNumbers;
+            await updateGroup(setInfo);
+          }
         }
-      }
 
-      if (found) {
-        updateSet('Upload Cards');
-        while ((await driver.getCurrentUrl()).includes('listcards.tpl')) {
-          const addedCards = [];
-          let rows = await driver.findElements({
-            css: 'table > tbody > tr:first-child > td:first-child > form > table > tbody > tr',
-          });
+        if (found) {
+          updateSet('Upload Cards');
+          while ((await driver.getCurrentUrl()).includes('listcards.tpl')) {
+            const addedCards = [];
+            let rows = await driver.findElements({
+              css: 'table > tbody > tr:first-child > td:first-child > form > table > tbody > tr',
+            });
 
-          let firstCardNumber, lastCardNumber;
-          for (let row of rows) {
-            // Find the columns of the current row.
-            let columns = await row.findElements({ css: 'td' });
+            let firstCardNumber, lastCardNumber;
+            for (let i = 0; i < rows.length; i++) {
+              let row = rows[i];
+              // Find the columns of the current row.
+              let columns = await row.findElements({ css: 'td' });
 
-            if (columns && columns.length > 1) {
-              // Extract the text from the second column.
-              let tableCardNumber = await columns[1].getText();
-              if (!firstCardNumber) {
-                firstCardNumber = Number.parseInt(tableCardNumber);
-              }
-              lastCardNumber = Number.parseInt(tableCardNumber);
+              if (columns && columns.length > 1) {
+                // Extract the text from the second column.
+                let tableCardNumber = await columns[1].getText();
+                if (!firstCardNumber) {
+                  firstCardNumber = Number.parseInt(tableCardNumber);
+                }
+                lastCardNumber = Number.parseInt(tableCardNumber);
 
-              const card = cardsToUpload[key].find(
-                (card) =>
-                  card.cardNumber.toString() === tableCardNumber ||
-                  (card.card_number_prefix &&
-                    card.cardNumber.substring(card.card_number_prefix.length) === tableCardNumber),
-              );
+                const card = cardsToUpload[key].find(
+                  (card) =>
+                    card.cardNumber.toString() === tableCardNumber ||
+                    (card.card_number_prefix &&
+                      card.cardNumber.substring(card.card_number_prefix.length) === tableCardNumber),
+                );
 
-              if (card) {
-                updateSet(`Adding ${tableCardNumber}`);
-                let cardNumberTextBox = await columns[0].findElement({ css: 'input' });
-                await cardNumberTextBox.sendKeys(card.quantity);
+                if (card) {
+                  if (card.features?.toLowerCase().indexOf('variation') > -1) {
+                    // if (await hasCssClass(columns[1], 'smallcolorleft')) {
+                    const options = [
+                      {
+                        name: 'Base',
+                        value: columns,
+                      },
+                    ];
+                    let isVariation = true;
+                    while (i + 1 < rows.length && isVariation) {
+                      let nextRow = rows[i + 1];
+                      let nextColumns = await nextRow.findElements({ css: 'td' });
+                      if (nextColumns.length === 0) {
+                        i++; //this is a header row
+                      } else {
+                        if (await hasCssClass(nextColumns[1], 'smallcolorleft')) {
+                          isVariation = true;
+                          options.push({
+                            name: await nextColumns[2].getText(),
+                            value: nextColumns,
+                          });
+                          i++;
+                        } else {
+                          isVariation = false;
+                        }
+                      }
+                    }
+                    columns = await ask(`Which SportLots listing is this? ${chalk.redBright(card.title)}`, undefined, {
+                      selectOptions: options,
+                    });
+                  }
+                  updateSet(`Adding ${tableCardNumber}`);
+                  let cardNumberTextBox = await columns[0].findElement({ css: 'input' });
+                  await cardNumberTextBox.sendKeys(card.quantity);
 
-                const priceTextBox = await columns[3].findElement({ css: 'input' });
-                priceTextBox.clear();
-                await priceTextBox.sendKeys(card.slPrice);
-                addedCards.push(card);
-                const binTextBox = await columns[5].findElement({ css: 'input' });
-                await binTextBox.sendKeys(card.sku || card.bin);
-                updateSet(`Added ${tableCardNumber}`);
+                  const priceTextBox = await columns[3].findElement({ css: 'input' });
+                  priceTextBox.clear();
+                  await priceTextBox.sendKeys(card.slPrice);
+                  addedCards.push(card);
+                  const binTextBox = await columns[5].findElement({ css: 'input' });
+                  await binTextBox.sendKeys(card.sku || card.bin);
+                  updateSet(`Added ${tableCardNumber}`);
+                }
               }
             }
-          }
 
-          //in the case where 'Skip to Page' exists we know that there are multiple pages, so we should only be counting
-          //the cards that fit within the current range. Otherwise, we should be counting all cards.
-          updateSet('Validating');
-          const skipToPage = await driver.findElements(By.xpath(`//*[contains(text(), 'Skip to Page')]`));
-          let expectedCards;
-          if (skipToPage.length > 0) {
-            expectedCards = Object.values(cardsToUpload[key]).filter((card) => {
-              return card.cardNumber >= firstCardNumber && card.cardNumber <= lastCardNumber;
-            });
-          } else {
-            expectedCards = Object.values(cardsToUpload[key]);
-          }
+            //in the case where 'Skip to Page' exists we know that there are multiple pages, so we should only be counting
+            //the cards that fit within the current range. Otherwise, we should be counting all cards.
+            updateSet('Validating');
+            const skipToPage = await driver.findElements(By.xpath(`//*[contains(text(), 'Skip to Page')]`));
+            let expectedCards;
+            if (skipToPage.length > 0) {
+              expectedCards = Object.values(cardsToUpload[key]).filter((card) => {
+                return card.cardNumber >= firstCardNumber && card.cardNumber <= lastCardNumber;
+              });
+            } else {
+              expectedCards = Object.values(cardsToUpload[key]);
+            }
 
-          await validateUploaded(expectedCards, addedCards, 'slPrice');
+            await validateUploaded(expectedCards, addedCards, 'slPrice');
 
-          updateSet('Submit');
-          await clickSubmit();
-          updateSet('Wait for Results');
-          const resultHeader = await driver.wait(
-            until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)),
-          );
-          const resultText = await resultHeader.getText();
-          const cardsAddedText = resultText.match(/(\d+) cards added/);
-          if (cardsAddedText) {
-            cardsAdded += parseInt(cardsAddedText[0]);
+            updateSet('Submit');
+            await clickSubmit();
+            updateSet('Wait for Results');
+            const resultHeader = await driver.wait(
+              until.elementLocated(By.xpath(`//h2[contains(text(), 'cards added')]`)),
+            );
+            const resultText = await resultHeader.getText();
+            const cardsAddedText = resultText.match(/(\d+) cards added/);
+            if (cardsAddedText) {
+              cardsAdded += parseInt(cardsAddedText[0]);
+            }
           }
+          finishSet(`Added ${cardsAdded} cards to ${key}`);
+        } else {
+          errorSet(`Could not find ${setInfo.skuPrefix}`);
+          await ask('Press any key to continue...');
         }
-        finishSet(`Added ${cardsAdded} cards to ${key}`);
-      } else {
-        errorSet(`Could not find ${setInfo.skuPrefix}`);
-        await ask('Press any key to continue...');
+      } catch (e) {
+        finishSet(`Failed uploading ${key}`);
+        throw e;
       }
     }
     finish('Sportlots');
   } catch (e) {
     error(e);
-    await ask('Press any key to continue...');
   }
 }
 

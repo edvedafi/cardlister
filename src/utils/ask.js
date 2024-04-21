@@ -1,11 +1,37 @@
 //comment out the body of this to be prompted
-import { select, confirm as confirmPrompt, input } from '@inquirer/prompts';
+import { confirm as confirmPrompt, input } from '@inquirer/prompts';
 import { isNo, isYes } from './data.js';
 import filterSelectPrompt from './filterSelectPrompt.js';
-import chalkTable from 'chalk-table';
 import { pauseSpinners, resumeSpinners } from './spinners.js';
+import Queue from 'queue';
+
+const queueResults = [];
+
+const queue = new Queue({
+  results: queueResults,
+  autostart: true,
+  concurrency: 1,
+});
+
+let running = [];
 
 export const ask = async (
+  questionText,
+  defaultAnswer = undefined,
+  { maxLength, selectOptions, isYN, cancellable = false } = {},
+) => {
+  return await new Promise((resolve) => {
+    queue.push(async () => {
+      if (cancellable) {
+        resolve(askInternal(questionText, defaultAnswer, { maxLength, selectOptions, isYN, cancellable }));
+      } else {
+        resolve(await askInternal(questionText, defaultAnswer, { maxLength, selectOptions, isYN, cancellable }));
+      }
+    });
+  });
+};
+
+const askInternal = async (
   questionText,
   defaultAnswer = undefined,
   { maxLength, selectOptions, isYN, cancellable = false } = {},

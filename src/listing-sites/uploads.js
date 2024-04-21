@@ -130,6 +130,11 @@ export const caseInsensitive = (text) =>
 export const buttonByText = (text) => By.xpath(`//button[descendant::text()${caseInsensitive(text.toLowerCase())}]`);
 export const inputByPlaceholder = (text) => By.xpath(`//input[@placeholder='${text}']`);
 
+export async function hasCssClass(element, cssClass) {
+  const classes = await element.getAttribute('class');
+  return classes.split(' ').includes(cssClass);
+}
+
 export const frontImage = (card) => `${process.cwd()}/output/${card.directory}${card.frontImage}`;
 export const backImage = (card) => `${process.cwd()}/output/${card.directory}${card.backImage}`;
 
