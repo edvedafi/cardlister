@@ -6,12 +6,6 @@ import { ask } from './utils/ask.js';
 dotenv.config();
 
 const medusa = new Medusa({ baseUrl: process.env.MEDUSA_BACKEND_URL, maxRetries: 3 });
-//
-// const loginResponse = await medusa.auth.authenticate({
-//   email: 'jburich@gmail.com',
-//   password: 'LpX!9hqDi1$WKrW*@uQ2',
-// });
-// console.log(loginResponse);
 
 await medusa.admin.auth.getToken({
   email: await ask('Email: '),

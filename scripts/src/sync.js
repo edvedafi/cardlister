@@ -39,6 +39,8 @@ dotenv.config();
 
 // Install the JS Client in your storefront project: @medusajs/medusa-js
 
-const medusa = new Medusa({ publishableApiKey: process.env.MEDUSA_API_KEY });
+const medusa = new Medusa({
+  publishableApiKey: process.env.MEDUSA_API_KEY,
+});
 const response = await medusa.products.retrieve('prod_01HWANPETHK5QFZ4WTESQ5EYBS');
 console.log(response.product.id);
