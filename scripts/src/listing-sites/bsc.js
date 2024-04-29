@@ -849,3 +849,47 @@ export async function updateBSCSKU(setInfo, counts) {
     error('No cards updated');
   }
 }
+
+const getNextFilter = async (filters, text, filterType, defaultValue) => {
+  const { finish, error } = showSpinner('setFilter', `Getting BSC Variant Name Filter`);
+  try {
+    const api = await login();
+    const { data: filterOptions } = await api.post('search/bulk-upload/filters', filters);
+    const filteredFilterOptions = filterOptions.aggregations[filterType].filter((option) => option.count > 0);
+    if (filteredFilterOptions.length > 1) {
+      const response = await ask(text, defaultValue, {
+        selectOptions: filteredFilterOptions.map((variant) => ({
+          name: variant.label,
+          value: variant,
+        })),
+      });
+      finish();
+      return { name: response.label, filter: [response.slug] };
+    } else if (filteredFilterOptions.length === 1) {
+      finish();
+      return { name: filteredFilterOptions[0].label, filter: [filteredFilterOptions[0].slug] };
+    }
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+};
+
+export const buildBSCFilters = (searchInfo) => ({
+  filters: {
+    sport: searchInfo.sport?.metadata?.bsc,
+    year: searchInfo.year?.metadata?.bsc,
+    setName: searchInfo.set?.metadata?.bsc,
+    variant: searchInfo.variantType?.metadata?.bsc,
+    variantName: searchInfo.variantName?.metadata?.bsc,
+  },
+});
+
+export const getBSCSportFilter = async (searchSport) =>
+  getNextFilter(buildBSCFilters({}), 'BSC Sport', 'sport', searchSport);
+export const getBSCYearFilter = (searchYear) => [searchYear];
+export const getBSCSetFilter = async (searchInfo) => getNextFilter(buildBSCFilters(searchInfo), 'BSC Set', 'setName');
+export const getBSCVariantTypeFilter = async (searchInfo) =>
+  getNextFilter(buildBSCFilters(searchInfo), 'BSC Variant Type', 'variant');
+export const getBSCVariantNameFilter = async (searchInfo) =>
+  getNextFilter(buildBSCFilters(searchInfo), 'BSC Variant Name', 'variantName');

@@ -1,13 +1,189 @@
 import { getGroup, getGroupByBin, getGroupBySportlotsId, updateGroup } from '../listing-sites/firebase.js';
-import { findSetId, findSetList, updateSetBin } from '../listing-sites/sportlots.js';
+import {
+  findSetId,
+  findSetList,
+  getSLBrand,
+  getSLSet,
+  getSLSport,
+  getSLYear,
+  updateSetBin,
+} from '../listing-sites/sportlots.js';
 import { useSpinners } from '../utils/spinners.js';
-import { findSetInfo, updateBSCSKU } from '../listing-sites/bsc.js';
+import {
+  buildBSCFilters,
+  findSetInfo,
+  getBSCSetFilter,
+  getBSCSportFilter,
+  getBSCVariantNameFilter,
+  getBSCVariantTypeFilter,
+  getBSCYearFilter,
+  updateBSCSKU,
+} from '../listing-sites/bsc.js';
 import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
 import { convertTitleToCard } from '../listing-sites/uploads.js';
+import { createCategory, getCategories, updateCategory } from '../listing-sites/medusa.js';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
+
+const askNew = async (display, options) => {
+  options?.push({ value: 'New', name: 'New' });
+  const response = await ask(display, undefined, { selectOptions: options });
+  if (response === 'New') {
+    return null;
+  }
+  return response;
+};
+
+export async function getCategoriesAsOptions(parent_category_id) {
+  const categories = await getCategories(parent_category_id);
+  return categories.map((category) => ({
+    value: category,
+    name: category.name,
+  }));
+}
+
+export async function findSet() {
+  const { update, finish, error } = showSpinner('findSet', 'Finding Set');
+  let setInfo = { handle: '' };
+  try {
+    update('Sport');
+    const sportCategories = await getCategoriesAsOptions(process.env.MEDUSA_ROOT_CATEGORY);
+    if (sportCategories.length > 0) {
+      setInfo.sport = await askNew('Sport', sportCategories);
+    }
+    if (setInfo.sport) {
+      setInfo.handle = setInfo.sport.handle;
+    } else {
+      update('New Sport');
+      const sportlots = await getSLSport();
+      setInfo.handle = sportlots.name;
+      setInfo.sport = await createCategory(sportlots.name, process.env.MEDUSA_ROOT_CATEGORY, setInfo.handle, {
+        sportlots: sportlots.key,
+      });
+    }
+    if (!setInfo.sport.metadata?.sportlots) {
+      update('Add SportLots to Sport');
+      const slSport = await getSLSport(setInfo.sport.name);
+      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, sportlots: slSport.key });
+    }
+    if (!setInfo.sport.metadata?.bsc) {
+      update('Add BSC to Sport');
+      const bscSport = await getBSCSportFilter(setInfo.sport.name);
+      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, bsc: bscSport.filter });
+    }
+
+    update('Brand');
+    const brandCategories = await getCategoriesAsOptions(setInfo.sport.id);
+    if (brandCategories.length > 0) {
+      setInfo.brand = await askNew('brand', brandCategories);
+    }
+    if (setInfo.brand) {
+      setInfo.handle = setInfo.brand.handle;
+    } else {
+      update('New brand');
+      const slBrand = await getSLBrand();
+      setInfo.handle = `${setInfo.sport.handle}-${slBrand.name}`;
+      setInfo.brand = await createCategory(slBrand.name, setInfo.sport.id, setInfo.handle, { sportlots: slBrand.key });
+    }
+    if (!setInfo.brand.metadata?.sportlots) {
+      update('Add SportLots to brand');
+      const slBrand = await getSLBrand(setInfo.brand);
+      setInfo.brand = await updateCategory(setInfo.brand.id, { ...setInfo.brand.metadata, sportlots: slBrand.key });
+    }
+
+    update('Year');
+    const years = await getCategoriesAsOptions(setInfo.brand.id);
+    if (years.length > 0) {
+      setInfo.year = await askNew('Year', years);
+    }
+    if (setInfo.year) {
+      setInfo.handle = setInfo.year.handle;
+    } else {
+      update('New Year');
+      const newYear = await ask('New Year');
+      setInfo.handle = `${setInfo.brand.handle}-${newYear}`;
+      setInfo.year = await createCategory(newYear, setInfo.brand.id, setInfo.handle, {
+        sportlots: getSLYear(newYear),
+        bsc: getBSCYearFilter(newYear),
+      });
+    }
+
+    update('Set');
+    const setCategories = await getCategoriesAsOptions(setInfo.year.id);
+    if (setCategories.length > 0) {
+      setInfo.set = await askNew('Set', setCategories);
+    }
+    if (setInfo.set) {
+      setInfo.handle = setInfo.set.handle;
+    } else {
+      update('New Set');
+      const bscSet = await getBSCSetFilter(setInfo);
+      setInfo.handle = `${setInfo.year.handle}-${bscSet.name}`;
+      setInfo.set = await createCategory(bscSet.name, setInfo.year.id, setInfo.handle, { bsc: bscSet.filter });
+    }
+
+    update('Variant Type');
+    const variantTypeCategories = await getCategoriesAsOptions(setInfo.set.id);
+    if (variantTypeCategories.length > 0) {
+      setInfo.variantType = await askNew('Variant Type', variantTypeCategories);
+    }
+    if (setInfo.variantType) {
+      setInfo.handle = setInfo.variantType.handle;
+    } else {
+      update('New Variant Type');
+      const bscVariantType = await getBSCVariantTypeFilter(setInfo);
+      setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}`;
+      setInfo.variantType = await createCategory(bscVariantType.name, setInfo.set.id, setInfo.handle, {
+        bsc: bscVariantType.filter,
+      });
+    }
+
+    if (setInfo.variantType.handle.endsWith('-base')) {
+      if (!setInfo.variantType.metadata?.bsc) {
+        setInfo.variantType = await updateCategory(setInfo.variantType.id, {
+          ...setInfo.variantType.metadata,
+          bsc: buildBSCFilters(setInfo),
+        });
+      }
+      if (!setInfo.variantType.metadata?.sportlots) {
+        setInfo.variantType = await updateCategory(setInfo.variantType.id, {
+          ...setInfo.variantType.metadata,
+          sportlots: await getSLSet(setInfo),
+        });
+      }
+    } else {
+      update('Variant Name');
+      const variantNameCategories = await getCategoriesAsOptions(setInfo.variantType.id);
+      if (variantNameCategories.length > 0) {
+        setInfo.variantName = await askNew('Variant Name', variantNameCategories);
+      }
+      if (setInfo.variantName) {
+        setInfo.handle = setInfo.variantName.handle;
+      } else {
+        update('New Variant Name');
+        const bscVariantName = await getBSCVariantNameFilter(setInfo);
+        setInfo.handle = `${setInfo.variantType.handle}-${bscVariantName.name}`;
+        setInfo.variantName = await createCategory(bscVariantName.name, setInfo.variantType.id, setInfo.handle, {
+          bsc: buildBSCFilters(setInfo),
+        });
+      }
+      if (!setInfo.variantName.metadata?.sportlots) {
+        setInfo.variantName = await updateCategory(setInfo.variantName.id, {
+          ...setInfo.variantName.metadata,
+          sportlots: await getSLSet(setInfo),
+        });
+      }
+    }
+
+    finish();
+    return setInfo;
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+}
 
 export default async function getSetData(defaultValues, collectDetails = true) {
   const { update, finish, error } = showSpinner('getSetData', 'Getting set data');
@@ -145,3 +321,5 @@ export async function assignIds() {
   }
   finish('Found All Set IDS');
 }
+
+export async function buildSet(setInfo) {}

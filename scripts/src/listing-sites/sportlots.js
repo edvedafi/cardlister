@@ -1004,3 +1004,86 @@ export async function updateSetBin(set, setInfo) {
   await clickSubmit('Defaults Bin value');
   return cardMap;
 }
+
+export async function getSLSport(defaultName) {
+  const { finish } = showSpinner('setInfo', 'Get Sport');
+  const driver = await login();
+  const waitForElement = useWaitForElement(driver);
+
+  await driver.get(`https://sportlots.com/inven/dealbin/newinven.tpl`);
+
+  const sportOptions = await getSelectOptions(await waitForElement(By.name('sprt')));
+  const sport = await ask('SportLots Sport', defaultName, {
+    selectOptions: sportOptions.map((option) => ({
+      name: option.name,
+      value: { name: option.name, key: option.value },
+    })),
+  });
+
+  finish();
+  return sport;
+}
+
+export async function getSLBrand(defaultName) {
+  const { finish } = showSpinner('showSpinner', 'Get Brand');
+  const driver = await login();
+  const waitForElement = useWaitForElement(driver);
+
+  await driver.get(`https://sportlots.com/inven/dealbin/newinven.tpl`);
+
+  const options = await getSelectOptions(await waitForElement(By.name('brd')));
+  const selected = await ask('SportLots Brand', defaultName, {
+    selectOptions: options.map((option) => ({
+      name: option.name,
+      value: { name: option.name, key: option.value },
+    })),
+  });
+  finish();
+  return selected;
+}
+
+export function getSLYear(year) {
+  return year;
+}
+
+export async function getSLSet(setInfo) {
+  const { finish, error } = showSpinner('getSLSet', 'Get Set');
+  try {
+    const driver = await login();
+    const waitForElement = useWaitForElement(driver);
+    const clickSubmit = useClickSubmit(waitForElement);
+    const setSelectValue = useSetSelectValue(driver);
+
+    await driver.get(`https://sportlots.com/inven/dealbin/newinven.tpl`);
+
+    await setSelectValue('sprt', setInfo.sport.metadata.sportlots);
+    await setSelectValue('yr', setInfo.year.metadata.sportlots);
+    await setSelectValue('brd', setInfo.brand.metadata.sportlots);
+    await clickSubmit();
+
+    //find the table and iterate through the rows
+    const allSets = [];
+    const table = await waitForElement(By.xpath(`//th[contains(text(), 'Set Name')]`));
+    const rows = await table.findElements(By.xpath(`../../tr`));
+    for (let row of rows) {
+      const columns = await row.findElements(By.xpath(`./td`));
+      if (columns.length > 1) {
+        const fullSetText = await columns[1].getText();
+        const setNumber = fullSetText.substring(0, fullSetText.indexOf(' '));
+        const setText = fullSetText.substring(fullSetText.indexOf(' ') + 1);
+        allSets.push({ name: setText, value: setNumber });
+      }
+    }
+
+    let defaultAnswer = `${setInfo.brand.name} ${setInfo.set.name}`;
+    if (setInfo.variantName) {
+      defaultAnswer = `${defaultAnswer} ${setInfo.variantName.name}`;
+    }
+    const selected = await ask('SportLots Brand', defaultAnswer, { selectOptions: allSets });
+    finish();
+    return selected;
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+}
