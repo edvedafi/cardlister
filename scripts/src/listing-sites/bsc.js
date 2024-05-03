@@ -773,7 +773,12 @@ export async function updateBSCSKU(setInfo, counts) {
   const api = await login();
   // log(counts);
   update('Getting Listings');
-  const listings = await api.post('seller/bulk-upload/results', setInfo.bscFilters);
+  const listings = await api.post('seller/bulk-upload/results', {
+    currentListings: true,
+    condition: 'near_mint',
+    productType: 'raw',
+    filters: setInfo.bscFilters,
+  });
   const cards = listings.data.results;
   let updated = 0;
   update('Updating Cards');
@@ -858,13 +863,26 @@ const getNextFilter = async (filters, text, filterType, defaultValue) => {
     const filteredFilterOptions = filterOptions.aggregations[filterType].filter((option) => option.count > 0);
     if (filteredFilterOptions.length > 1) {
       const response = await ask(text, defaultValue, {
-        selectOptions: filteredFilterOptions.map((variant) => ({
-          name: variant.label,
-          value: variant,
-        })),
+        selectOptions: filteredFilterOptions
+          .map((variant) => ({
+            name: variant.label,
+            value: variant,
+          }))
+          .sort((a, b) => b.name.localeCompare(a.name)),
       });
       finish();
-      return { name: response.label, filter: [response.slug] };
+      return {
+        name: response.label,
+        filter:
+          response.label === 'Base' || filterType === 'variantName'
+            ? {
+                filters: {
+                  ...filters.filters,
+                  [filterType]: [response.slug],
+                },
+              }
+            : [response.slug],
+      };
     } else if (filteredFilterOptions.length === 1) {
       finish();
       return { name: filteredFilterOptions[0].label, filter: [filteredFilterOptions[0].slug] };
@@ -875,15 +893,15 @@ const getNextFilter = async (filters, text, filterType, defaultValue) => {
   }
 };
 
-export const buildBSCFilters = (searchInfo) => ({
-  filters: {
-    sport: searchInfo.sport?.metadata?.bsc,
-    year: searchInfo.year?.metadata?.bsc,
-    setName: searchInfo.set?.metadata?.bsc,
-    variant: searchInfo.variantType?.metadata?.bsc,
-    variantName: searchInfo.variantName?.metadata?.bsc,
-  },
-});
+export const buildBSCFilters = (searchInfo) =>
+  searchInfo.variantName?.metadata?.bsc || {
+    filters: {
+      sport: searchInfo.sport?.metadata?.bsc,
+      year: searchInfo.year?.metadata?.bsc,
+      setName: searchInfo.set?.metadata?.bsc,
+      variant: searchInfo.variantType?.metadata?.bsc,
+    },
+  };
 
 export const getBSCSportFilter = async (searchSport) =>
   getNextFilter(buildBSCFilters({}), 'BSC Sport', 'sport', searchSport);
@@ -893,3 +911,34 @@ export const getBSCVariantTypeFilter = async (searchInfo) =>
   getNextFilter(buildBSCFilters(searchInfo), 'BSC Variant Type', 'variant');
 export const getBSCVariantNameFilter = async (searchInfo) =>
   getNextFilter(buildBSCFilters(searchInfo), 'BSC Variant Name', 'variantName');
+
+export async function getBSCCards(setInfo) {
+  const { update, finish, error } = showSpinner('get-bsc-cards', `Getting BSC Cards for ${setInfo.handle}`);
+  const api = await login();
+  update('Getting Listings');
+
+  const response = await api.post(`search/seller/results`, {
+    condition: 'all',
+    myInventory: 'false',
+    page: 0,
+    sellerId: 'cf987f7871',
+    size: 50,
+    sort: 'default',
+    ...setInfo.metadata.bsc,
+  });
+  const cards = response.data.results;
+  if (cards.length === 0) {
+    log({
+      condition: 'all',
+      myInventory: 'false',
+      page: 1,
+      // sellerId: 'cf987f7871',
+      size: 500,
+      sort: 'default',
+      ...setInfo.metadata.bsc,
+    });
+    log(response.data);
+  }
+  finish(`Found ${cards.length} cards`);
+  return cards;
+}

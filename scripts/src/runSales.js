@@ -28,7 +28,6 @@ import { useSpinners } from './utils/spinners.js';
 import { ask } from './utils/ask.js';
 import initializeFirebase from './utils/firebase.js';
 import { getEbaySales, removeFromEbay } from './listing-sites/ebay.js';
-import { removeFromShopify } from './listing-sites/shopifyUpload.js';
 import { loadTeams } from './utils/teams.js';
 
 const args = minimist(process.argv.slice(2));
@@ -111,7 +110,6 @@ try {
   await removeListings('Ebay', () => removeFromEbay(sales));
   await removeListings('Sportlots', () => removeFromSportLots(groupedCards));
   await removeListings('Buy Sports Cards', () => removeFromBuySportsCards(groupedCards));
-  await removeListings('Shopify', () => removeFromShopify(sales));
   await removeListings('My Card Post', () => removeFromMyCardPost(sales));
   // await removeListings('MySlabs', () => removeFromMySlabs(sales));
   update('Completed removing listings from sites');

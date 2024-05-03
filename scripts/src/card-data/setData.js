@@ -10,8 +10,8 @@ import {
 } from '../listing-sites/sportlots.js';
 import { useSpinners } from '../utils/spinners.js';
 import {
-  buildBSCFilters,
   findSetInfo,
+  getBSCCards,
   getBSCSetFilter,
   getBSCSportFilter,
   getBSCVariantNameFilter,
@@ -23,13 +23,20 @@ import { ask } from '../utils/ask.js';
 import { findLeague, getTeamSelections } from '../utils/teams.js';
 import chalk from 'chalk';
 import { convertTitleToCard } from '../listing-sites/uploads.js';
-import { createCategory, getCategories, updateCategory } from '../listing-sites/medusa.js';
+import {
+  createCategory,
+  createCategoryActive,
+  getCategories,
+  setCategoryActive,
+  updateCategory,
+} from '../listing-sites/medusa.js';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
 
 const askNew = async (display, options) => {
-  options?.push({ value: 'New', name: 'New' });
-  const response = await ask(display, undefined, { selectOptions: options });
+  const selectOptions = options.sort((a, b) => a.name.localeCompare(b.name));
+  selectOptions.push({ value: 'New', name: 'New' });
+  const response = await ask(display, undefined, { selectOptions: selectOptions });
   if (response === 'New') {
     return null;
   }
@@ -135,25 +142,28 @@ export async function findSet() {
       update('New Variant Type');
       const bscVariantType = await getBSCVariantTypeFilter(setInfo);
       setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}`;
-      setInfo.variantType = await createCategory(bscVariantType.name, setInfo.set.id, setInfo.handle, {
-        bsc: bscVariantType.filter,
-      });
+      if (bscVariantType.name === 'Base') {
+        setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}-base`;
+        const description =
+          setInfo.variantType?.description || (await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name}`));
+        setInfo.variantType = await createCategoryActive(
+          bscVariantType.name,
+          description,
+          setInfo.set.id,
+          setInfo.handle,
+          {
+            bsc: bscVariantType.filter,
+            sportlots: await getSLSet(setInfo),
+          },
+        );
+      } else {
+        setInfo.variantType = await createCategory(bscVariantType.name, setInfo.set.id, setInfo.handle, {
+          bsc: bscVariantType.filter,
+        });
+      }
     }
 
-    if (setInfo.variantType.handle.endsWith('-base')) {
-      if (!setInfo.variantType.metadata?.bsc) {
-        setInfo.variantType = await updateCategory(setInfo.variantType.id, {
-          ...setInfo.variantType.metadata,
-          bsc: buildBSCFilters(setInfo),
-        });
-      }
-      if (!setInfo.variantType.metadata?.sportlots) {
-        setInfo.variantType = await updateCategory(setInfo.variantType.id, {
-          ...setInfo.variantType.metadata,
-          sportlots: await getSLSet(setInfo),
-        });
-      }
-    } else {
+    if (!setInfo.variantType.handle.endsWith('-base')) {
       update('Variant Name');
       const variantNameCategories = await getCategoriesAsOptions(setInfo.variantType.id);
       if (variantNameCategories.length > 0) {
@@ -166,13 +176,22 @@ export async function findSet() {
         const bscVariantName = await getBSCVariantNameFilter(setInfo);
         setInfo.handle = `${setInfo.variantType.handle}-${bscVariantName.name}`;
         setInfo.variantName = await createCategory(bscVariantName.name, setInfo.variantType.id, setInfo.handle, {
-          bsc: buildBSCFilters(setInfo),
+          bsc: bscVariantName.filter,
         });
       }
+      const updates = {};
       if (!setInfo.variantName.metadata?.sportlots) {
-        setInfo.variantName = await updateCategory(setInfo.variantName.id, {
+        updates.sportlots = await getSLSet(setInfo);
+      }
+      let description;
+      if (!setInfo.variantName.description) {
+        description = await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name} ${setInfo.variantName.name}`);
+      }
+
+      if (Object.keys(updates).length > 0 || description || !setInfo.variantName.is_active) {
+        setInfo.variantName = await setCategoryActive(setInfo.variantName.id, description, {
           ...setInfo.variantName.metadata,
-          sportlots: await getSLSet(setInfo),
+          ...updates,
         });
       }
     }
@@ -322,4 +341,15 @@ export async function assignIds() {
   finish('Found All Set IDS');
 }
 
-export async function buildSet(setInfo) {}
+export async function buildSet(category) {
+  const { update, finish, error } = showSpinner('buildSet', 'Building Set');
+  try {
+    update('Building Set');
+    const cards = await getBSCCards(category);
+    log(cards);
+    finish('Set Built');
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+}

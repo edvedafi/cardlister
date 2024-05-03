@@ -599,53 +599,50 @@ export const getEbaySales = async () => {
 };
 
 export const removeFromEbayItemNumber = async (itemNumber, quantity, title) => {
-  showSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Login to eBay`);
+  const { update, error, finish } = showSpinner(`ebay-card-${itemNumber}-details`, `Removing ${itemNumber}`);
+  update('Login');
+  const result = { title, quantity, removed: false };
   const ebay = await loginEbayAPI();
-  updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Getting Item Details`);
-  const item = await ebay.trading.GetItem({ ItemID: itemNumber });
-  const updatedQuantity = parseInt(item.Item.Quantity) - parseInt(quantity);
-  const result = { title, quantity, updatedQuantity, removed: false };
-  if (updatedQuantity <= 0) {
-    try {
-      updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Ending the Item`);
-      await ebay.trading.EndFixedPriceItem({ ItemID: itemNumber, EndingReason: 'NotAvailable' });
-      result.removed = true;
-    } catch (e) {
-      if (e.meta?.Errors?.ErrorCode === 1047) {
-        updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Was already ended on Ebay`);
+  try {
+    update('Getting Item Details');
+    const item = await ebay.trading.GetItem({ ItemID: itemNumber });
+    const updatedQuantity = parseInt(item.Item.Quantity) - parseInt(quantity);
+    result.updatedQuantity = updatedQuantity;
+    if (updatedQuantity <= 0) {
+      try {
+        update('Ending the Item');
+        await ebay.trading.EndFixedPriceItem({ ItemID: itemNumber, EndingReason: 'NotAvailable' });
         result.removed = true;
-      } else {
-        result.removed = false;
-        updateSpinner(
-          `ebay-card-${itemNumber}-details`,
-          `${itemNumber}: Failed to remove ${e.meta?.Errors?.ErrorCode || e.message}`,
-        );
-        result.error = e.meta?.Errors?.ErrorCode || e.message;
+      } catch (e) {
+        if (e.meta?.Errors?.ErrorCode === 1047) {
+          finish();
+          result.removed = true;
+        } else {
+          result.removed = false;
+          error(e, e.meta?.Errors?.ErrorCode || e.message);
+          result.error = e.meta?.Errors?.ErrorCode || e.message;
+        }
+      }
+    } else {
+      try {
+        update(`Setting quantity to ${updatedQuantity}`);
+        await ebay.trading.ReviseInventoryStatus({
+          InventoryStatus: {
+            ItemID: itemNumber,
+            Quantity: updatedQuantity,
+          },
+        });
+        finish();
+        result.removed = true;
+      } catch (e) {
+        error(e, e.meta?.Errors?.ErrorCode || e.message);
+        result.error = e.meta.Errors.ErrorCode;
       }
     }
-  } else {
-    try {
-      updateSpinner(`ebay-card-${itemNumber}-details`, `${itemNumber}: Setting quantity to ${updatedQuantity}`);
-      await ebay.trading.ReviseInventoryStatus({
-        InventoryStatus: {
-          ItemID: itemNumber,
-          Quantity: updatedQuantity,
-        },
-      });
-      updateSpinner(
-        `ebay-card-${itemNumber}-details`,
-        `${itemNumber}: Successfully set quantity to ${updatedQuantity}`,
-      );
-      result.removed = true;
-    } catch (e) {
-      updateSpinner(
-        `ebay-card-${itemNumber}-details`,
-        `${itemNumber}: Failed to quantity to ${updatedQuantity}. ${e.meta?.Errors?.ErrorCode || e.message}`,
-      );
-      result.error = e.meta.Errors.ErrorCode;
-    }
+  } catch (e) {
+    error(e, e.meta?.Errors?.ErrorCode || e.message);
+    result.error = e.meta.Errors.ErrorCode;
   }
-  finishSpinner(`ebay-card-${itemNumber}-details`);
   return result;
 };
 
