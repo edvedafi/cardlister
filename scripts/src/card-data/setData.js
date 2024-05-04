@@ -154,6 +154,16 @@ export async function findSet() {
           {
             bsc: bscVariantType.filter,
             sportlots: await getSLSet(setInfo),
+            bin: (
+              await getGroup({
+                sport: setInfo.sport.name,
+                manufacture: setInfo.brand.name,
+                year: setInfo.year.name,
+                setName: setInfo.set.name,
+              })
+            ).bin,
+            isInsert: false,
+            isParallel: false,
           },
         );
       } else {
@@ -173,10 +183,27 @@ export async function findSet() {
         setInfo.handle = setInfo.variantName.handle;
       } else {
         update('New Variant Name');
+        let isInsert = setInfo.variantType.name === 'Insert';
+        let isParallel = setInfo.variantType.name === 'Parallel';
         const bscVariantName = await getBSCVariantNameFilter(setInfo);
+        if (isInsert && !isParallel) {
+          isParallel = await ask('Is this a parallel of an insert?', false);
+        }
         setInfo.handle = `${setInfo.variantType.handle}-${bscVariantName.name}`;
         setInfo.variantName = await createCategory(bscVariantName.name, setInfo.variantType.id, setInfo.handle, {
           bsc: bscVariantName.filter,
+          isInsert,
+          isParallel,
+          bin: (
+            await getGroup({
+              sport: setInfo.sport.name,
+              manufacture: setInfo.brand.name,
+              year: setInfo.year.name,
+              setName: setInfo.set.name,
+              insert: setInfo.variantType.name === 'Insert' ? bscVariantName.name : null,
+              parallel: setInfo.variantType.name === 'Parallel' ? bscVariantName.name : null,
+            })
+          ).bin,
         });
       }
       const updates = {};
@@ -341,12 +368,33 @@ export async function assignIds() {
   finish('Found All Set IDS');
 }
 
+export function buildProducts(cards, category) {
+  return cards.map((card) => {
+    // const card = {};
+    // if (category.)
+    const players = card.players;
+    const teams = card.teamName;
+    return {
+      title: card.title,
+      description: card.description,
+      price: card.price,
+      sku: card.sku,
+      quantity: card.quantity,
+      images: card.images,
+      options: {
+        player: players,
+        team: teams,
+      },
+    };
+  });
+}
+
 export async function buildSet(category) {
   const { update, finish, error } = showSpinner('buildSet', 'Building Set');
   try {
     update('Building Set');
     const cards = await getBSCCards(category);
-    log(cards);
+    const products = buildProducts(cards, category);
     finish('Set Built');
   } catch (e) {
     error(e);

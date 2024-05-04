@@ -646,3 +646,62 @@ export const getLotData = async (imageDefaults, allCards) => {
 
   return output;
 };
+
+///***********
+
+// Here starts the Commerce Engine Code
+
+///***********
+
+//try to get to the best 80 character title that we can
+async function getTitles(card, set) {
+  const maxTitleLength = 80;
+
+  let insert = add(card.insert, 'Insert');
+  let parallel = add(card.parallel, 'Parallel');
+  let features = add(card.features).replace('|', '');
+  let printRun = card.printRun ? ` /${card.printRun}` : '';
+  let setName = set.description;
+  let teamDisplay = card.teamName.join(' | ');
+  let graded = isYes(card.graded) ? ` ${card.grader} ${card.grade} ${psaGrades[card.grade]}` : '';
+
+  card.longTitle = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  let title = card.longTitle;
+  if (title.length > maxTitleLength && ['Panini', 'Leaf'].includes(card.manufacture)) {
+    setName = card.setName;
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    teamDisplay = card.team.map((team) => team.team).join(' | ');
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    teamDisplay = card.team.map((team) => team.team).join(' ');
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    insert = add(card.insert);
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    parallel = add(card.parallel);
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player}${features}${printRun}${graded}`;
+  }
+  if (title.length > maxTitleLength) {
+    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player}${printRun}${graded}`;
+  }
+
+  title = title.replace(/ {2}/g, ' ');
+
+  if (title.length > maxTitleLength) {
+    title = await ask(`Title`, card.longTitle, { maxLength: maxTitleLength });
+  }
+
+  return title;
+}
