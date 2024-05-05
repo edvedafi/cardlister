@@ -554,7 +554,10 @@ export const getTeam = async (defaults) => {
 };
 
 export const getTeamDisplay = (teams) =>
-  teams?.reduce((display, team) => (display?.length > 0 ? `${display} | ${team.display}` : team.display), undefined);
+  teams?.reduce(
+    (display, team) => (display?.length > 0 ? `${display} | ${team.display || team}` : team.display || team),
+    undefined,
+  );
 
 export const cardDataExistsForRawImage = (rawImage, allCards) => {
   if (rawImage && !saveData.setData.reprocessImages) {
@@ -653,32 +656,113 @@ export const getLotData = async (imageDefaults, allCards) => {
 
 ///***********
 
+export async function buildProductFromBSCCard(card, set) {
+  let product = {
+    year: set.metadata.year,
+    sport: set.metadata.sport,
+    brand: set.metadata.brand,
+    setName: set.metadata.setName,
+    insert: set.metadata.insert,
+    parallel: set.metadata.parallel,
+    cardNumber: card.cardNo,
+    player: card.players,
+    teams: card.teamName || 'Unknown',
+    sku: `${set.metadata.bin}|${card.cardNo}`,
+    type: 'Card',
+    categories: set,
+    weight: 1,
+    length: 4,
+    width: 6,
+    height: 1,
+    origin_country: 'US',
+    material: 'Card Stock',
+
+    //images: need to add via image upload api
+    // tags: need to get form BSC and asking
+    metadata: {
+      size: 'Standard',
+      thickness: '20pt',
+      bsc: card.id,
+      // printRun: card.printRun,
+      // autograph: card.autograph,
+    },
+  };
+  const titles = await getTitles(product, set);
+  product.name = titles.title;
+  product.description = titles.longTitle;
+
+  const askFor = async (text, propName = text.toLowerCase(), options = {}) =>
+    await addCardData(text, product, propName, product, options);
+
+  log('Product Info: ', product);
+
+  let useSetInfo = true; //await ask('Use Set Info?', true);
+  if (useSetInfo) {
+    product.teamDisplay = getTeamDisplay(product.team);
+  } else {
+    await askFor('Player/Card Name', 'player');
+    product.team = await getTeam(product);
+    //   product.teamDisplay = getTeamDisplay(product.team);
+    await askFor('Features (RC, etc)', 'features');
+    await askFor('Print Run', 'printRun');
+    await askFor('Autograph', 'autograph', {
+      selectOptions: ['Not Autographed', 'Label or Sticker', 'On Card', 'Cut Signature'],
+    });
+
+    useSetInfo = await ask('Use Standard Card Size/Shipping?', true);
+  }
+  if (useSetInfo) {
+    product.size = 'Standard';
+    product.material = 'Card Stock';
+    product.thickness = '20pt';
+    product.lbs = 0;
+    product.oz = 1;
+    product.length = 6;
+    product.width = 4;
+    product.depth = 1;
+  } else {
+    // noinspection DuplicatedCode
+    await askFor('Size', 'size');
+    await askFor('Material', 'material');
+    await askFor('Thickness', 'thickness');
+    await askFor('Weight (lbs)', 'lbs');
+    await askFor('Weight (oz)', 'oz');
+    await askFor('Length (in)', 'length');
+    await askFor('Width (in)', 'width');
+    await askFor('Depth (in)', 'depth');
+  }
+
+  return product;
+}
+
 //try to get to the best 80 character title that we can
-async function getTitles(card, set) {
+export async function getTitles(card, set) {
   const maxTitleLength = 80;
+
+  const titles = {};
 
   let insert = add(card.insert, 'Insert');
   let parallel = add(card.parallel, 'Parallel');
-  let features = add(card.features).replace('|', '');
+  let features = add(card.features).replace(' | ', '');
   let printRun = card.printRun ? ` /${card.printRun}` : '';
-  let setName = set.description;
-  let teamDisplay = card.teamName.join(' | ');
+  let setName = card.setName;
+  let teamDisplay = card.teams.join(' | ');
   let graded = isYes(card.graded) ? ` ${card.grader} ${card.grade} ${psaGrades[card.grade]}` : '';
 
-  card.longTitle = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
-  let title = card.longTitle;
-  if (title.length > maxTitleLength && ['Panini', 'Leaf'].includes(card.manufacture)) {
+  titles.longTitle = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  let title = titles.longTitle;
+  if (title.length > maxTitleLength && ['Panini', 'Leaf'].includes(card.brand)) {
     setName = card.setName;
     title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
   }
-  if (title.length > maxTitleLength) {
-    teamDisplay = card.team.map((team) => team.team).join(' | ');
-    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
-  }
-  if (title.length > maxTitleLength) {
-    teamDisplay = card.team.map((team) => team.team).join(' ');
-    title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
-  }
+  // if (title.length > maxTitleLength) {
+  //   teamDisplay = card.team.map((team) => team.team).join(' | ');
+  //   title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  // }
+  // if (title.length > maxTitleLength) {
+  //   teamDisplay = card.team.map((team) => team.team).join(' ');
+  //   title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
+  // }
   if (title.length > maxTitleLength) {
     insert = add(card.insert);
     title = `${card.year} ${setName}${insert}${parallel} #${card.cardNumber} ${card.player} ${teamDisplay}${features}${printRun}${graded}`;
@@ -702,6 +786,7 @@ async function getTitles(card, set) {
   if (title.length > maxTitleLength) {
     title = await ask(`Title`, card.longTitle, { maxLength: maxTitleLength });
   }
+  titles.title = title;
 
-  return title;
+  return titles;
 }

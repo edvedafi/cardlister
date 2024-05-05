@@ -1,6 +1,7 @@
 import { ask } from '../utils/ask.js';
 import { addCardData, getTeam, getTeamDisplay, mockSavedSetData } from './cardData.js';
 import fs from 'fs-extra';
+import { describe } from 'node:test';
 
 jest.mock('../utils/ask.js');
 jest.mock('../utils/spinners.js');
@@ -178,3 +179,22 @@ describe('getTeamDisplay', () => {
     expect(getTeamDisplay([])).toBeUndefined();
   });
 });
+//
+// describe('getTitles', () => {
+//   it('should return an array of titles', () => {
+//     expect(
+//       getTitles([
+//         {
+//           title: 'Title 1',
+//           startYear: '2020',
+//           endYear: '2021',
+//         },
+//         {
+//           title: 'Title 2',
+//           startYear: '2022',
+//           endYear: '2023',
+//         },
+//       ]),
+//     ).toEqual(['Title 1', 'Title 2']);
+//   });
+// });

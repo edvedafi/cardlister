@@ -30,6 +30,7 @@ import {
   setCategoryActive,
   updateCategory,
 } from '../listing-sites/medusa.js';
+import { buildProductFromBSCCard } from './cardData.js';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
 
@@ -49,186 +50,6 @@ export async function getCategoriesAsOptions(parent_category_id) {
     value: category,
     name: category.name,
   }));
-}
-
-export async function findSet() {
-  const { update, finish, error } = showSpinner('findSet', 'Finding Set');
-  let setInfo = { handle: '' };
-  try {
-    update('Sport');
-    const sportCategories = await getCategoriesAsOptions(process.env.MEDUSA_ROOT_CATEGORY);
-    if (sportCategories.length > 0) {
-      setInfo.sport = await askNew('Sport', sportCategories);
-    }
-    if (setInfo.sport) {
-      setInfo.handle = setInfo.sport.handle;
-    } else {
-      update('New Sport');
-      const sportlots = await getSLSport();
-      setInfo.handle = sportlots.name;
-      setInfo.sport = await createCategory(sportlots.name, process.env.MEDUSA_ROOT_CATEGORY, setInfo.handle, {
-        sportlots: sportlots.key,
-      });
-    }
-    if (!setInfo.sport.metadata?.sportlots) {
-      update('Add SportLots to Sport');
-      const slSport = await getSLSport(setInfo.sport.name);
-      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, sportlots: slSport.key });
-    }
-    if (!setInfo.sport.metadata?.bsc) {
-      update('Add BSC to Sport');
-      const bscSport = await getBSCSportFilter(setInfo.sport.name);
-      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, bsc: bscSport.filter });
-    }
-
-    update('Brand');
-    const brandCategories = await getCategoriesAsOptions(setInfo.sport.id);
-    if (brandCategories.length > 0) {
-      setInfo.brand = await askNew('brand', brandCategories);
-    }
-    if (setInfo.brand) {
-      setInfo.handle = setInfo.brand.handle;
-    } else {
-      update('New brand');
-      const slBrand = await getSLBrand();
-      setInfo.handle = `${setInfo.sport.handle}-${slBrand.name}`;
-      setInfo.brand = await createCategory(slBrand.name, setInfo.sport.id, setInfo.handle, { sportlots: slBrand.key });
-    }
-    if (!setInfo.brand.metadata?.sportlots) {
-      update('Add SportLots to brand');
-      const slBrand = await getSLBrand(setInfo.brand);
-      setInfo.brand = await updateCategory(setInfo.brand.id, { ...setInfo.brand.metadata, sportlots: slBrand.key });
-    }
-
-    update('Year');
-    const years = await getCategoriesAsOptions(setInfo.brand.id);
-    if (years.length > 0) {
-      setInfo.year = await askNew('Year', years);
-    }
-    if (setInfo.year) {
-      setInfo.handle = setInfo.year.handle;
-    } else {
-      update('New Year');
-      const newYear = await ask('New Year');
-      setInfo.handle = `${setInfo.brand.handle}-${newYear}`;
-      setInfo.year = await createCategory(newYear, setInfo.brand.id, setInfo.handle, {
-        sportlots: getSLYear(newYear),
-        bsc: getBSCYearFilter(newYear),
-      });
-    }
-
-    update('Set');
-    const setCategories = await getCategoriesAsOptions(setInfo.year.id);
-    if (setCategories.length > 0) {
-      setInfo.set = await askNew('Set', setCategories);
-    }
-    if (setInfo.set) {
-      setInfo.handle = setInfo.set.handle;
-    } else {
-      update('New Set');
-      const bscSet = await getBSCSetFilter(setInfo);
-      setInfo.handle = `${setInfo.year.handle}-${bscSet.name}`;
-      setInfo.set = await createCategory(bscSet.name, setInfo.year.id, setInfo.handle, { bsc: bscSet.filter });
-    }
-
-    update('Variant Type');
-    const variantTypeCategories = await getCategoriesAsOptions(setInfo.set.id);
-    if (variantTypeCategories.length > 0) {
-      setInfo.variantType = await askNew('Variant Type', variantTypeCategories);
-    }
-    if (setInfo.variantType) {
-      setInfo.handle = setInfo.variantType.handle;
-    } else {
-      update('New Variant Type');
-      const bscVariantType = await getBSCVariantTypeFilter(setInfo);
-      setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}`;
-      if (bscVariantType.name === 'Base') {
-        setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}-base`;
-        const description =
-          setInfo.variantType?.description || (await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name}`));
-        setInfo.variantType = await createCategoryActive(
-          bscVariantType.name,
-          description,
-          setInfo.set.id,
-          setInfo.handle,
-          {
-            bsc: bscVariantType.filter,
-            sportlots: await getSLSet(setInfo),
-            bin: (
-              await getGroup({
-                sport: setInfo.sport.name,
-                manufacture: setInfo.brand.name,
-                year: setInfo.year.name,
-                setName: setInfo.set.name,
-              })
-            ).bin,
-            isInsert: false,
-            isParallel: false,
-          },
-        );
-      } else {
-        setInfo.variantType = await createCategory(bscVariantType.name, setInfo.set.id, setInfo.handle, {
-          bsc: bscVariantType.filter,
-        });
-      }
-    }
-
-    if (!setInfo.variantType.handle.endsWith('-base')) {
-      update('Variant Name');
-      const variantNameCategories = await getCategoriesAsOptions(setInfo.variantType.id);
-      if (variantNameCategories.length > 0) {
-        setInfo.variantName = await askNew('Variant Name', variantNameCategories);
-      }
-      if (setInfo.variantName) {
-        setInfo.handle = setInfo.variantName.handle;
-      } else {
-        update('New Variant Name');
-        let isInsert = setInfo.variantType.name === 'Insert';
-        let isParallel = setInfo.variantType.name === 'Parallel';
-        const bscVariantName = await getBSCVariantNameFilter(setInfo);
-        if (isInsert && !isParallel) {
-          isParallel = await ask('Is this a parallel of an insert?', false);
-        }
-        setInfo.handle = `${setInfo.variantType.handle}-${bscVariantName.name}`;
-        setInfo.variantName = await createCategory(bscVariantName.name, setInfo.variantType.id, setInfo.handle, {
-          bsc: bscVariantName.filter,
-          isInsert,
-          isParallel,
-          bin: (
-            await getGroup({
-              sport: setInfo.sport.name,
-              manufacture: setInfo.brand.name,
-              year: setInfo.year.name,
-              setName: setInfo.set.name,
-              insert: setInfo.variantType.name === 'Insert' ? bscVariantName.name : null,
-              parallel: setInfo.variantType.name === 'Parallel' ? bscVariantName.name : null,
-            })
-          ).bin,
-        });
-      }
-      const updates = {};
-      if (!setInfo.variantName.metadata?.sportlots) {
-        updates.sportlots = await getSLSet(setInfo);
-      }
-      let description;
-      if (!setInfo.variantName.description) {
-        description = await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name} ${setInfo.variantName.name}`);
-      }
-
-      if (Object.keys(updates).length > 0 || description || !setInfo.variantName.is_active) {
-        setInfo.variantName = await setCategoryActive(setInfo.variantName.id, description, {
-          ...setInfo.variantName.metadata,
-          ...updates,
-        });
-      }
-    }
-
-    finish();
-    return setInfo;
-  } catch (e) {
-    error(e);
-    throw e;
-  }
 }
 
 export default async function getSetData(defaultValues, collectDetails = true) {
@@ -368,25 +189,200 @@ export async function assignIds() {
   finish('Found All Set IDS');
 }
 
-export function buildProducts(cards, category) {
-  return cards.map((card) => {
-    // const card = {};
-    // if (category.)
-    const players = card.players;
-    const teams = card.teamName;
-    return {
-      title: card.title,
-      description: card.description,
-      price: card.price,
-      sku: card.sku,
-      quantity: card.quantity,
-      images: card.images,
-      options: {
-        player: players,
-        team: teams,
-      },
-    };
-  });
+///***********
+
+// Here starts the Commerce Engine Code
+
+///***********
+
+export async function findSet() {
+  const { update, finish, error } = showSpinner('findSet', 'Finding Set');
+  let setInfo = { handle: '' };
+  try {
+    update('Sport');
+    const sportCategories = await getCategoriesAsOptions(process.env.MEDUSA_ROOT_CATEGORY);
+    if (sportCategories.length > 0) {
+      setInfo.sport = await askNew('Sport', sportCategories);
+    }
+    if (setInfo.sport) {
+      setInfo.handle = setInfo.sport.handle;
+    } else {
+      update('New Sport');
+      const sportlots = await getSLSport();
+      setInfo.handle = sportlots.name;
+      setInfo.sport = await createCategory(sportlots.name, process.env.MEDUSA_ROOT_CATEGORY, setInfo.handle, {
+        sportlots: sportlots.key,
+      });
+    }
+    if (!setInfo.sport.metadata?.sportlots) {
+      update('Add SportLots to Sport');
+      const slSport = await getSLSport(setInfo.sport.name);
+      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, sportlots: slSport.key });
+    }
+    if (!setInfo.sport.metadata?.bsc) {
+      update('Add BSC to Sport');
+      const bscSport = await getBSCSportFilter(setInfo.sport.name);
+      setInfo.sport = await updateCategory(setInfo.sport.id, { ...setInfo.sport.metadata, bsc: bscSport.filter });
+    }
+
+    update('Brand');
+    const brandCategories = await getCategoriesAsOptions(setInfo.sport.id);
+    if (brandCategories.length > 0) {
+      setInfo.brand = await askNew('brand', brandCategories);
+    }
+    if (setInfo.brand) {
+      setInfo.handle = setInfo.brand.handle;
+    } else {
+      update('New brand');
+      const slBrand = await getSLBrand();
+      setInfo.handle = `${setInfo.sport.handle}-${slBrand.name}`;
+      setInfo.brand = await createCategory(slBrand.name, setInfo.sport.id, setInfo.handle, { sportlots: slBrand.key });
+    }
+    if (!setInfo.brand.metadata?.sportlots) {
+      update('Add SportLots to brand');
+      const slBrand = await getSLBrand(setInfo.brand);
+      setInfo.brand = await updateCategory(setInfo.brand.id, { ...setInfo.brand.metadata, sportlots: slBrand.key });
+    }
+
+    update('Year');
+    const years = await getCategoriesAsOptions(setInfo.brand.id);
+    if (years.length > 0) {
+      setInfo.year = await askNew('Year', years);
+    }
+    if (setInfo.year) {
+      setInfo.handle = setInfo.year.handle;
+    } else {
+      update('New Year');
+      const newYear = await ask('New Year');
+      setInfo.handle = `${setInfo.brand.handle}-${newYear}`;
+      setInfo.year = await createCategory(newYear, setInfo.brand.id, setInfo.handle, {
+        sportlots: getSLYear(newYear),
+        bsc: getBSCYearFilter(newYear),
+      });
+    }
+
+    update('Set');
+    const setCategories = await getCategoriesAsOptions(setInfo.year.id);
+    if (setCategories.length > 0) {
+      setInfo.set = await askNew('Set', setCategories);
+    }
+    if (setInfo.set) {
+      setInfo.handle = setInfo.set.handle;
+    } else {
+      update('New Set');
+      const bscSet = await getBSCSetFilter(setInfo);
+      setInfo.handle = `${setInfo.year.handle}-${bscSet.name}`;
+      setInfo.set = await createCategory(bscSet.name, setInfo.year.id, setInfo.handle, { bsc: bscSet.filter });
+    }
+
+    update('Variant Type');
+    const variantTypeCategories = await getCategoriesAsOptions(setInfo.set.id);
+    if (variantTypeCategories.length > 0) {
+      setInfo.variantType = await askNew('Variant Type', variantTypeCategories);
+    }
+    if (setInfo.variantType) {
+      setInfo.handle = setInfo.variantType.handle;
+    } else {
+      update('New Variant Type');
+      const bscVariantType = await getBSCVariantTypeFilter(setInfo);
+      setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}`;
+      if (bscVariantType.name === 'Base') {
+        setInfo.handle = `${setInfo.set.handle}-${bscVariantType.name}-base`;
+        const description =
+          setInfo.variantType?.description || (await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name}`));
+        setInfo.variantType = await createCategoryActive(
+          bscVariantType.name,
+          description,
+          setInfo.set.id,
+          setInfo.handle,
+          {
+            bsc: bscVariantType.filter,
+            sportlots: await getSLSet(setInfo),
+            bin: (
+              await getGroup({
+                sport: setInfo.sport.name,
+                manufacture: setInfo.brand.name,
+                year: setInfo.year.name,
+                setName: setInfo.set.name,
+              })
+            ).bin,
+            isInsert: false,
+            isParallel: false,
+            sport: setInfo.sport.name,
+            brand: setInfo.brand.name,
+            year: setInfo.year.name,
+            setName: setInfo.set.name,
+          },
+        );
+      } else {
+        setInfo.variantType = await createCategory(bscVariantType.name, setInfo.set.id, setInfo.handle, {
+          bsc: bscVariantType.filter,
+        });
+      }
+    }
+
+    if (!setInfo.variantType.handle.endsWith('-base')) {
+      update('Variant Name');
+      const variantNameCategories = await getCategoriesAsOptions(setInfo.variantType.id);
+      if (variantNameCategories.length > 0) {
+        setInfo.variantName = await askNew('Variant Name', variantNameCategories);
+      }
+      if (setInfo.variantName) {
+        setInfo.handle = setInfo.variantName.handle;
+      } else {
+        update('New Variant Name');
+        let isInsert = setInfo.variantType.name === 'Insert';
+        let isParallel = setInfo.variantType.name === 'Parallel';
+        const bscVariantName = await getBSCVariantNameFilter(setInfo);
+        if (isInsert && !isParallel) {
+          isParallel = await ask('Is this a parallel of an insert?', false);
+        }
+        setInfo.handle = `${setInfo.variantType.handle}-${bscVariantName.name}`;
+        setInfo.variantName = await createCategory(bscVariantName.name, setInfo.variantType.id, setInfo.handle, {
+          bsc: bscVariantName.filter,
+          isInsert,
+          isParallel,
+          bin: (
+            await getGroup({
+              sport: setInfo.sport.name,
+              manufacture: setInfo.brand.name,
+              year: setInfo.year.name,
+              setName: setInfo.set.name,
+              insert: isInsert ? bscVariantName.name : null,
+              parallel: isParallel ? bscVariantName.name : null,
+            })
+          ).bin,
+          sport: setInfo.sport.name,
+          brand: setInfo.brand.name,
+          year: setInfo.year.name,
+          setName: setInfo.set.name,
+          insert: isInsert ? bscVariantName.name : null,
+          parallel: isParallel ? bscVariantName.name : null,
+        });
+      }
+      const updates = {};
+      if (!setInfo.variantName.metadata?.sportlots) {
+        updates.sportlots = await getSLSet(setInfo);
+      }
+      let description;
+      if (!setInfo.variantName.description) {
+        description = await ask('Set Title', `${setInfo.year.name} ${setInfo.set.name} ${setInfo.variantName.name}`);
+      }
+
+      if (Object.keys(updates).length > 0 || description || !setInfo.variantName.is_active) {
+        setInfo.variantName = await setCategoryActive(setInfo.variantName.id, description, {
+          ...setInfo.variantName.metadata,
+          ...updates,
+        });
+      }
+    }
+
+    finish();
+    return setInfo;
+  } catch (e) {
+    error(e);
+    throw e;
+  }
 }
 
 export async function buildSet(category) {
@@ -394,7 +390,9 @@ export async function buildSet(category) {
   try {
     update('Building Set');
     const cards = await getBSCCards(category);
-    const products = buildProducts(cards, category);
+    const cards = await getSLCards(category);
+    const products = await Promise.all(cards.map((card) => buildProductFromBSCCard(card, category)));
+    console.log(products);
     finish('Set Built');
   } catch (e) {
     error(e);

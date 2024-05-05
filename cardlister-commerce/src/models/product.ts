@@ -3,8 +3,8 @@ import { Product as MedusaProduct } from '@medusajs/medusa';
 
 @Entity()
 export class Product extends MedusaProduct {
-  @Column()
-  card_number: string;
+  @Column({ name: 'card_number' })
+  cardNumber: string;
 
   @Column('text', { array: true })
   player: string[];
