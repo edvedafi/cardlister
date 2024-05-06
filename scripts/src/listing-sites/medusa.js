@@ -58,3 +58,28 @@ export async function getCategory(id) {
   const response = await medusa.admin.productCategories.retrieve(id);
   return response.product_category;
 }
+
+export async function createProduct(product) {
+  const response = await medusa.admin.products.create({
+    title: product.title,
+    description: product.description,
+    weight: product.weight,
+    length: product.length,
+    width: product.width,
+    height: product.height,
+    origin_country: product.origin_country,
+    material: product.material,
+    metadata: product.metadata,
+    categories: [{ id: product.categories.id }],
+    tags: product.features,
+  });
+  return response.product;
+}
+
+export async function getProducts(category) {
+  const response = await medusa.admin.products.list({
+    category_id: [category],
+    fields: 'metadata',
+  });
+  return response.products ? response.products.map((product) => product.metadata.cardNumber) : [];
+}

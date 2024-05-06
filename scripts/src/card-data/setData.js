@@ -27,7 +27,9 @@ import { convertTitleToCard } from '../listing-sites/uploads.js';
 import {
   createCategory,
   createCategoryActive,
+  createProduct,
   getCategories,
+  getProducts,
   setCategoryActive,
   updateCategory,
 } from '../listing-sites/medusa.js';
@@ -427,7 +429,15 @@ async function buildProducts(category, bscCards, slCards) {
         return card;
       }),
     );
-    const products = await Promise.all(cards.map((card) => buildProductFromBSCCard(card, category)));
+    const existing = await getProducts(category.id);
+    const products = await Promise.all(
+      cards
+        .filter((card) => !existing.includes(card.cardNo))
+        .map(async (card) => {
+          const product = await buildProductFromBSCCard(card, category);
+          return await createProduct(product);
+        }),
+    );
     finish('Products Built');
     return products;
   } catch (e) {

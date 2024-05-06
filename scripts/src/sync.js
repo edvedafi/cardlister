@@ -7,7 +7,6 @@ import { shutdownFirebase } from './listing-sites/firebase.js';
 import { shutdownMyCardPost } from './listing-sites/mycardpost.js';
 import { useSpinners } from './utils/spinners.js';
 import { buildSet, findSet } from './card-data/setData.js';
-import { ask } from './utils/ask.js';
 import initializeFirebase from './utils/firebase.js';
 
 const args = minimist(process.argv.slice(2));
@@ -44,7 +43,7 @@ try {
   const set = await findSet();
   // const set = await getCategory('pcat_01HWQACW0A7Q9XBEN1W84TJX3H');
   log(set);
-  const shouldBuildSet = await ask('Continue?', false);
+  const shouldBuildSet = true; //await ask('Continue?', false);
   if (shouldBuildSet) {
     await buildSet(set);
   }

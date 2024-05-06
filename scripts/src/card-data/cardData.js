@@ -658,16 +658,12 @@ export const getLotData = async (imageDefaults, allCards) => {
 
 export async function buildProductFromBSCCard(card, set) {
   let product = {
-    year: set.metadata.year,
-    sport: set.metadata.sport,
-    brand: set.metadata.brand,
-    setName: set.metadata.setName,
-    insert: set.metadata.insert,
-    parallel: set.metadata.parallel,
-    cardNumber: card.cardNo,
-    player: card.players,
-    teams: card.teamName || 'Unknown',
-    sku: `${set.metadata.bin}|${card.cardNo}`,
+    // year: set.metadata.year,
+    // sport: set.metadata.sport,
+    // brand: set.metadata.brand,
+    // setName: set.metadata.setName,
+    // insert: set.metadata.insert,
+    // parallel: set.metadata.parallel,
     type: 'Card',
     categories: set,
     weight: 1,
@@ -680,6 +676,10 @@ export async function buildProductFromBSCCard(card, set) {
     //images: need to add via image upload api
     // tags: need to get form BSC and asking
     metadata: {
+      cardNumber: card.cardNo,
+      player: card.players,
+      teams: card.teamName || 'Unknown',
+      sku: `${set.metadata.bin}|${card.cardNo}`,
       size: 'Standard',
       thickness: '20pt',
       bsc: card.id,
@@ -690,8 +690,8 @@ export async function buildProductFromBSCCard(card, set) {
   if (card.sportlots) {
     product.metadata.sportlots = card.sportlots;
   }
-  const titles = await getTitles(product, set);
-  product.name = titles.title;
+  const titles = await getTitles({ ...product, ...set.metadata, ...product.metadata });
+  product.title = titles.title;
   product.description = titles.longTitle;
 
   const askFor = async (text, propName = text.toLowerCase(), options = {}) =>
@@ -739,7 +739,7 @@ export async function buildProductFromBSCCard(card, set) {
 }
 
 //try to get to the best 80 character title that we can
-export async function getTitles(card, set) {
+export async function getTitles(card) {
   const maxTitleLength = 80;
 
   const titles = {};
