@@ -1087,3 +1087,48 @@ export async function getSLSet(setInfo) {
     throw e;
   }
 }
+
+export async function getSLCards(setInfo, category) {
+  const { finish, error } = showSpinner('getSLCards', 'Get Cards');
+  try {
+    const driver = await login();
+    const waitForElement = useWaitForElement(driver);
+    const clickSubmit = useClickSubmit(waitForElement);
+    const setSelectValue = useSetSelectValue(driver);
+
+    await driver.get(`https://sportlots.com/inven/dealbin/newinven.tpl`);
+
+    await setSelectValue('sprt', setInfo.sport.metadata.sportlots);
+    await setSelectValue('yr', setInfo.year.metadata.sportlots);
+    await setSelectValue('brd', setInfo.brand.metadata.sportlots);
+    await clickSubmit();
+
+    const radioButton = await waitForElement(By.xpath(`//input[@value = '${category.metadata.sportlots}']`));
+    radioButton.click();
+    await clickSubmit();
+
+    const cards = [];
+    while ((await driver.getCurrentUrl()).includes('listcards.tpl')) {
+      const rows = await driver.findElements({
+        css: 'table > tbody > tr:first-child > td:first-child > form > table > tbody > tr',
+      });
+      for (let row of rows) {
+        // Find the columns of the current row.
+        let columns = await row.findElements({ css: 'td' });
+
+        if (columns && columns.length > 1) {
+          // Extract the text from the second column.
+          const cardNumber = await columns[1].getText();
+          const title = await columns[2].getText();
+          cards.push({ cardNumber, title });
+        }
+      }
+      await clickSubmit();
+    }
+    finish();
+    return cards;
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+}

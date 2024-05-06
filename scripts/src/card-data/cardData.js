@@ -687,6 +687,9 @@ export async function buildProductFromBSCCard(card, set) {
       // autograph: card.autograph,
     },
   };
+  if (card.sportlots) {
+    product.metadata.sportlots = card.sportlots;
+  }
   const titles = await getTitles(product, set);
   product.name = titles.title;
   product.description = titles.longTitle;

@@ -3,6 +3,7 @@ import {
   findSetId,
   findSetList,
   getSLBrand,
+  getSLCards,
   getSLSet,
   getSLSport,
   getSLYear,
@@ -385,15 +386,50 @@ export async function findSet() {
   }
 }
 
-export async function buildSet(category) {
+export async function buildSet(setInfo) {
   const { update, finish, error } = showSpinner('buildSet', 'Building Set');
   try {
     update('Building Set');
+    const category = setInfo.variantName || setInfo.variantType;
     const cards = await getBSCCards(category);
-    const cards = await getSLCards(category);
-    const products = await Promise.all(cards.map((card) => buildProductFromBSCCard(card, category)));
+    const slCards = await getSLCards(setInfo, category);
+    const products = await buildProducts(category, cards, slCards);
     console.log(products);
     finish('Set Built');
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+}
+
+async function buildProducts(category, bscCards, slCards) {
+  const { update, finish, error } = showSpinner('buildProducts', 'Building Products');
+  try {
+    update('Building Products');
+    const slCardOptions = slCards.map((card) => ({
+      value: card.cardNumber,
+      name: `${card.cardNumber} - ${card.title}`,
+    }));
+    const cards = await Promise.all(
+      bscCards.map(async (card) => {
+        const slCard = slCards.find((slCard) => slCard.cardNumber === card.cardNo);
+        if (slCard) {
+          return card;
+        } else {
+          card.sportlots = await ask(
+            `Which Sportlots Card maps to ${card.year} ${card.setName} ${card.variantName} #${
+              card.cardNo
+            } ${card.players.join(' ')}?`,
+            card.players[0],
+            { selectOptions: slCardOptions },
+          );
+        }
+        return card;
+      }),
+    );
+    const products = await Promise.all(cards.map((card) => buildProductFromBSCCard(card, category)));
+    finish('Products Built');
+    return products;
   } catch (e) {
     error(e);
     throw e;

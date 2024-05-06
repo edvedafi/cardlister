@@ -46,7 +46,7 @@ try {
   log(set);
   const shouldBuildSet = await ask('Continue?', false);
   if (shouldBuildSet) {
-    await buildSet(set.variantName || set.variantType);
+    await buildSet(set);
   }
 } finally {
   await shutdown();
