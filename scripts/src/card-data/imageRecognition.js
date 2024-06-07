@@ -5,7 +5,7 @@ import { HfInference } from '@huggingface/inference';
 import dotenv from 'dotenv';
 import { useSpinners } from '../utils/spinners.js';
 
-const { showSpinner, finishSpinner, updateSpinner } = useSpinners('firebase', '#f4d02e');
+const { showSpinner } = useSpinners('firebase', '#f4d02e');
 
 dotenv.config();
 // import { readFileSync } from 'fs'
@@ -24,182 +24,190 @@ const detectionFeatures = [
 ];
 
 async function getTextFromImage(front, back = undefined, setData = {}) {
-  showSpinner(`image-recognition-${front}`, `Image Recognition ${front}`);
-  const spin = (message) => updateSpinner(`image-recognition-${front}`, `Image Recognition ${front}: ${message}`);
+  const { update, error, finish } = showSpinner(`image-recognition-${front}`, `Image Recognition ${front}`);
 
-  let defaults = { ...setData };
-  defaults.raw = [front, back];
+  let defaults = {
+    sport: setData.metadata?.sport,
+    setName: setData.metadata?.setName,
+    manufacture: setData.metadata?.manufacture,
+    year: setData.metadata?.year,
+    insert: setData.metadata?.insert,
+    raw: [front, back],
+  };
 
-  spin('Loading Google Vision');
-  const client = new vision.ImageAnnotatorClient();
+  try {
+    update('Loading Google Vision');
+    const client = new vision.ImageAnnotatorClient();
 
-  spin(`Running Vision API on ${front}`);
-  const [frontResult] = await client.annotateImage({
-    image: {
-      source: {
-        filename: front,
-      },
-    },
-    features: detectionFeatures,
-    imageContext: {
-      cropHintsParams: {
-        aspectRatios: [1.390625, 0.7191011236],
-      },
-    },
-  });
-
-  spin(`Running Vision API on ${back}`);
-  const [backResult] = back
-    ? await client.annotateImage({
-        image: {
-          source: {
-            filename: back,
-          },
+    update(`Running Vision API on ${front}`);
+    const [frontResult] = await client.annotateImage({
+      image: {
+        source: {
+          filename: front,
         },
-        features: detectionFeatures,
-      })
-    : [];
+      },
+      features: detectionFeatures,
+      imageContext: {
+        cropHintsParams: {
+          aspectRatios: [1.390625, 0.7191011236],
+        },
+      },
+    });
 
-  spin(`Gathering Crop Hints`);
-  defaults = {
-    ...defaults,
-    crop: await getCropHints(client, front),
-    cropBack: back ? await getCropHints(client, back) : undefined,
-  };
+    update(`Running Vision API on ${back}`);
+    const [backResult] = back
+      ? await client.annotateImage({
+          image: {
+            source: {
+              filename: back,
+            },
+          },
+          features: detectionFeatures,
+        })
+      : [];
 
-  /**
-   * Array of searchable data
-   *
-   * Confidence ratings, higher sorts first:
-   *
-   * 602.x: Logos on the front of the card
-   * 601.x: Logos on the back of the card
-   *
-   * 302.x: Text on the front of the card
-   * 301.x: Text on the back of the card
-   *
-   * 102.x: Labels on the front of the card
-   * 101.x: Labels on the back of the card
-   *
-   * @type {*[]}
-   *  word: The string to search
-   *  words: Broken into separate words if appropriate
-   *  wordCount: The number of words in the string
-   *  confidence: The confidence of the word being correct, used for sorting
-   *  isFront: Whether the word is from the front or back of the card
-   *  isNumber: Whether the word is a number
-   *  lowerCase: The word in lower case
-   */
-  let searchParagraphs = [];
-  const addLabelsToSearch = (labelAnnotations, isFront) => {
-    if (labelAnnotations) {
-      searchParagraphs.concat(
-        labelAnnotations.map((label) => {
-          const searchValue = {
-            word: label.description,
-            words: label.description.split(' '),
-            confidence: (isFront ? 102 : 101) + label.score,
-            isFront,
-          };
-          searchValue.wordCount = searchValue.words.length;
-          searchValue.isNumber = !isNaN(searchValue.word);
-          searchValue.lowerCase = searchValue.word.toLowerCase();
-          searchParagraphs.push(searchValue);
-        }),
-      );
-    }
-  };
-  spin(`Adding Labels for ${front}`);
-  addLabelsToSearch(frontResult.labelAnnotations, true);
-  spin(`Adding Labels for ${back}`);
-  addLabelsToSearch(backResult?.labelAnnotations, false);
+    update(`Gathering Crop Hints`);
+    defaults = {
+      ...defaults,
+      crop: await getCropHints(client, front),
+      cropBack: back ? await getCropHints(client, back) : undefined,
+    };
 
-  const addLogosToSearch = (logoAnnotations, isFront) => {
-    if (logoAnnotations) {
-      searchParagraphs.concat(
-        logoAnnotations.map((logo) => {
-          const searchValue = {
-            word: logo.description,
-            words: logo.description.split(' '),
-            confidence: (isFront ? 602 : 601) + logo.score,
-            isFront,
-          };
-          searchValue.wordCount = searchValue.words.length;
-          searchValue.isNumber = !isNaN(searchValue.word);
-          searchValue.lowerCase = searchValue.word.toLowerCase();
-          searchParagraphs.push(searchValue);
-        }),
-      );
-    }
-  };
-  spin(`Adding Logos for ${front}`);
-  addLogosToSearch(frontResult.logoAnnotations, true);
-  spin(`Adding Logos for ${back}`);
-  addLogosToSearch(backResult?.logoAnnotations, false);
+    /**
+     * Array of searchable data
+     *
+     * Confidence ratings, higher sorts first:
+     *
+     * 602.x: Logos on the front of the card
+     * 601.x: Logos on the back of the card
+     *
+     * 302.x: Text on the front of the card
+     * 301.x: Text on the back of the card
+     *
+     * 102.x: Labels on the front of the card
+     * 101.x: Labels on the back of the card
+     *
+     * @type {*[]}
+     *  word: The string to search
+     *  words: Broken into separate words if appropriate
+     *  wordCount: The number of words in the string
+     *  confidence: The confidence of the word being correct, used for sorting
+     *  isFront: Whether the word is from the front or back of the card
+     *  isNumber: Whether the word is a number
+     *  lowerCase: The word in lower case
+     */
+    let searchParagraphs = [];
+    const addLabelsToSearch = (labelAnnotations, isFront) => {
+      if (labelAnnotations) {
+        searchParagraphs.concat(
+          labelAnnotations.map((label) => {
+            const searchValue = {
+              word: label.description,
+              words: label.description.split(' '),
+              confidence: (isFront ? 102 : 101) + label.score,
+              isFront,
+            };
+            searchValue.wordCount = searchValue.words.length;
+            searchValue.isNumber = !isNaN(searchValue.word);
+            searchValue.lowerCase = searchValue.word.toLowerCase();
+            searchParagraphs.push(searchValue);
+          }),
+        );
+      }
+    };
+    update(`Adding Labels for ${front}`);
+    addLabelsToSearch(frontResult.labelAnnotations, true);
+    update(`Adding Labels for ${back}`);
+    addLabelsToSearch(backResult?.labelAnnotations, false);
 
-  const addSearch = async (textResult, isFront) => {
-    if (textResult) {
-      const textBlocks =
-        textResult.fullTextAnnotation?.pages[0]?.blocks?.filter((block) => block.blockType === 'TEXT') || [];
+    const addLogosToSearch = (logoAnnotations, isFront) => {
+      if (logoAnnotations) {
+        searchParagraphs.concat(
+          logoAnnotations.map((logo) => {
+            const searchValue = {
+              word: logo.description,
+              words: logo.description.split(' '),
+              confidence: (isFront ? 602 : 601) + logo.score,
+              isFront,
+            };
+            searchValue.wordCount = searchValue.words.length;
+            searchValue.isNumber = !isNaN(searchValue.word);
+            searchValue.lowerCase = searchValue.word.toLowerCase();
+            searchParagraphs.push(searchValue);
+          }),
+        );
+      }
+    };
+    update(`Adding Logos for ${front}`);
+    addLogosToSearch(frontResult.logoAnnotations, true);
+    update(`Adding Logos for ${back}`);
+    addLogosToSearch(backResult?.logoAnnotations, false);
 
-      const blocks = await Promise.all(
-        textBlocks.map(async (block) => {
-          return await Promise.all(
-            block.paragraphs?.map(async (paragraph) => {
-              const searchValue = {
-                word: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')).join(' '),
-                words: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')),
-                wordCount: paragraph.words.length,
-                confidence: (isFront ? 302 : 301) + block.confidence,
-                isFront,
-              };
-              searchValue.isNumber = !isNaN(searchValue.word);
-              searchValue.lowerCase = searchValue.word.toLowerCase();
-              return searchValue;
-            }),
-          );
-        }),
-      );
-      searchParagraphs = searchParagraphs.concat(blocks.reduce((acc, val) => acc.concat(val), []));
-    }
-  };
-  spin('Adding the full text of the card to the searchable data');
-  await Promise.all([addSearch(frontResult, true), addSearch(backResult, false)]);
+    const addSearch = async (textResult, isFront) => {
+      if (textResult) {
+        const textBlocks =
+          textResult.fullTextAnnotation?.pages[0]?.blocks?.filter((block) => block.blockType === 'TEXT') || [];
 
-  defaults = await extractData(searchParagraphs, defaults, setData, spin);
+        const blocks = await Promise.all(
+          textBlocks.map(async (block) => {
+            return await Promise.all(
+              block.paragraphs?.map(async (paragraph) => {
+                const searchValue = {
+                  word: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')).join(' '),
+                  words: paragraph.words.map((word) => word.symbols.map((symbol) => symbol.text).join('')),
+                  wordCount: paragraph.words.length,
+                  confidence: (isFront ? 302 : 301) + block.confidence,
+                  isFront,
+                };
+                searchValue.isNumber = !isNaN(searchValue.word);
+                searchValue.lowerCase = searchValue.word.toLowerCase();
+                return searchValue;
+              }),
+            );
+          }),
+        );
+        searchParagraphs = searchParagraphs.concat(blocks.reduce((acc, val) => acc.concat(val), []));
+      }
+    };
+    update('Adding the full text of the card to the searchable data');
+    await Promise.all([addSearch(frontResult, true), addSearch(backResult, false)]);
 
-  finishSpinner(`image-recognition-${front}`, `Image Recognition ${front} converted to ${JSON.stringify(defaults)}`);
+    defaults = await extractData(searchParagraphs, defaults, setData.metadata, update);
 
+    finish(`image-recognition-${front}`, `Image Recognition ${front} converted to ${JSON.stringify(defaults)}`);
+  } catch (e) {
+    error(e);
+  }
   return defaults;
 }
 
-export const extractData = async (searchParagraphs, defaults, setData, spin) => {
+export const extractData = async (searchParagraphs, defaults, setData, update) => {
   let result = { ...defaults };
-  spin('Sorting Searchable Data');
+  update('Sorting Searchable Data');
   searchParagraphs = searchParagraphs.sort((a, b) => b.confidence - a.confidence);
 
-  spin('Checking for Panini Match');
+  update('Checking for Panini Match');
   result = {
     ...result,
     ...paniniMatch(searchParagraphs, setData),
   };
 
-  spin('Running NLP');
+  update('Running NLP');
   result = {
     ...result,
-    ...(await runNLP(searchParagraphs, setData, spin)),
+    ...(await runNLP(searchParagraphs, setData, update)),
   };
 
-  spin('First pass only check for near exact matches');
+  update('First pass only check for near exact matches');
   result = await runFirstPass(searchParagraphs, result, setData);
 
-  spin('Second pass, lets check things that are a little less exact');
+  update('Second pass, lets check things that are a little less exact');
   result = await runSecondPass(searchParagraphs, result, setData);
 
-  spin('Third pass, lets get really fuzzy');
+  update('Third pass, lets get really fuzzy');
   result = await fuzzyMatch(searchParagraphs, result, setData);
 
-  spin('Clean Up data');
+  update('Clean Up data');
   if (result.cardNumber) {
     result.cardNumber = result.cardNumber.replaceAll(' ', '');
   }
@@ -223,12 +231,12 @@ export let callNLP = async (text) => {
     inputs: text,
   });
 };
-export const runNLP = async (text, setData, spin) => {
+export const runNLP = async (text, setData, update) => {
   if (setData.player) {
-    spin('Skipping NLP because player is already set');
+    update('Skipping NLP because player is already set');
     return { player: setData.player };
   } else {
-    spin('Searching for a player name');
+    update('Searching for a player name');
     const countWords = (word) => {
       if (word) {
         const search = word.toLowerCase();
@@ -240,17 +248,17 @@ export const runNLP = async (text, setData, spin) => {
     const wordCount = (name) => name.split(' ').length;
     const results = {};
     const textBlock = text.map((block) => block.word).join('. ');
-    spin('Calling NLP engine');
+    update('Calling NLP engine');
     const segments = await callNLP(textBlock);
-    spin('Filtering results for PER type');
+    update('Filtering results for PER type');
     const persons = segments.filter((segment) => segment.entity_group === 'PER');
-    spin(`Found ${persons.length} PER type results`);
+    update(`Found ${persons.length} PER type results`);
 
     if (persons.length === 1) {
       results.player = titleCase(persons[0].word);
-      spin(`Found player ${results.player}`);
+      update(`Found player ${results.player}`);
     } else if (persons.length > 1) {
-      spin(`Found ${persons.length} PER type results, filtering for names`);
+      update(`Found ${persons.length} PER type results, filtering for names`);
       const names = persons
         //replace # with wildcard regex search for letters only of the text input
         .map((person) => {
@@ -302,7 +310,7 @@ export const runNLP = async (text, setData, spin) => {
         //remove any team names
         .filter((name) => !isTeam(name));
 
-      spin(`Checking ${names.length} names for a match`);
+      update(`Checking ${names.length} names for a match`);
       if (names[0]?.includes(' ')) {
         results.player = titleCase(names[0]);
       } else if (names[1]?.includes(' ')) {
@@ -335,7 +343,7 @@ export const runNLP = async (text, setData, spin) => {
         }
       }
     }
-    spin(`Found player ${results.player}`);
+    update(`Found player ${results.player}`);
 
     return results;
   }

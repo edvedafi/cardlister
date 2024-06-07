@@ -131,7 +131,10 @@ export async function matchOldStyle(db, card) {
   try {
     //now try a fairly specific search
     update(`Set up collection query`);
-    let query = db.collection('OldSales').where('year', '==', updatedCard.year);
+    let query = db.collection('OldSales');
+    if (updatedCard.year) {
+      query = query.where('year', '==', updatedCard.year);
+    }
     if (updatedCard.sport) {
       query = query.where('sport', '==', titleCase(updatedCard.sport));
     }

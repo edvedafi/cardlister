@@ -1,0 +1,177 @@
+import { useSpinners } from './utils/spinners.js';
+import chalk from 'chalk';
+import Queue from 'queue';
+import { getCardData } from './card-data/cardData.js';
+import imageRecognition from './card-data/imageRecognition.js';
+import terminalImage from 'terminal-image';
+import { prepareImageFile } from './image-processing/imageProcessor.js';
+import { processImageFile } from './listing-sites/firebase.js';
+import { getProducts, updateProduct } from './listing-sites/medusa.js';
+
+const { showSpinner, log } = useSpinners('list-set', chalk.cyan);
+
+const listings = [];
+const queueReadImage = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 1,
+});
+const queueGatherData = new Queue({
+  results: [],
+  autostart: true,
+  concurrency: 1,
+});
+const queueImageFiles = new Queue({
+  results: listings,
+  autostart: true,
+  concurrency: 1,
+});
+
+const preProcessPair = async (front, back, setData) => {
+  const { update, finish, error } = showSpinner(`singles-preprocess-${front}`, `Pre-Processing ${front}/${back}`);
+  try {
+    update(`Getting image recognition data`);
+    const imageDefaults = await imageRecognition(front, back, setData);
+    update(`Queueing next step`);
+    queueGatherData.push(() => processPair(front, back, imageDefaults, setData));
+    finish();
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+};
+
+const processPair = async (front, back, imageDefaults, setData) => {
+  try {
+    log(await terminalImage.file(front, { height: 25 }));
+    if (back) {
+      log(await terminalImage.file(back, { height: 25 }));
+    }
+
+    const listing = await getCardData(setData, imageDefaults);
+    const images = [];
+    const frontImage = await processImage(listing, front, setData, 1);
+    if (frontImage) {
+      images.push(`https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${frontImage}?alt=media`);
+    }
+    if (back) {
+      const backImage = await processImage(listing, back, setData, 2);
+      if (backImage) {
+        images.push(`https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${backImage}?alt=media`);
+      }
+    }
+
+    await updateProduct({
+      id: listing.product.id,
+      images: images,
+    });
+
+    return listing;
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+const processImage = async (listing, image, setData, imageNumber) => {
+  try {
+    const outputFile = await prepareImageFile(image, listing, setData, imageNumber);
+    if (outputFile) {
+      const uploadedFileName = `${listing.product.handle}${imageNumber}.jpg`;
+      queueImageFiles.push(() => processImageFile(outputFile, uploadedFileName));
+      return uploadedFileName;
+    }
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+export async function processSet(setData, files) {
+  const {
+    update: updateSpinner,
+    finish: finishSpinner,
+    error: errorSpinner,
+  } = showSpinner('list-set', `Processing Images`);
+  let count = files.length / 2;
+  let current = 0;
+  queueReadImage.addEventListener('success', () => {
+    current++;
+    updateSpinner(`${current}/${count}`);
+  });
+
+  updateSpinner('Prepping Queues for AI');
+  try {
+    let i = 0;
+    log(setData);
+    log(files);
+
+    setData.products = await getProducts(setData.category.id);
+
+    while (i < files.length - 1) {
+      const front = files[i++];
+      let back;
+      if (i < files.length) {
+        back = files[i++];
+      }
+      queueReadImage.push(() => preProcessPair(front, back, setData));
+    }
+
+    let hasQueueError = false;
+    const watchForError = (name, queue) =>
+      queue.addEventListener('error', (error, job) => {
+        hasQueueError = true;
+        log(`${name} Queue error: `, error, job);
+        queueReadImage.stop();
+        queueGatherData.stop();
+        queueImageFiles.stop();
+        throw new Error('Queue Error');
+      });
+    watchForError('Read', queueReadImage);
+    watchForError('Gather', queueGatherData);
+    watchForError('Process Images', queueImageFiles);
+
+    const { finish: finishImage, error: errorImage } = showSpinner('image', `Waiting for Image Queue to finish`);
+    if (queueReadImage.length > 0 && !hasQueueError) {
+      await new Promise((resolve) => queueReadImage.addEventListener('end', resolve));
+      finishImage();
+    } else if (hasQueueError) {
+      errorImage(`Image Queue errored`);
+    } else {
+      finishImage();
+    }
+
+    const { finish: finishData, error: errorData } = showSpinner('data', `Waiting for Data Queue to finish`);
+    if (queueGatherData.length > 0 && !hasQueueError) {
+      await new Promise((resolve) => queueGatherData.addEventListener('end', resolve));
+      finishData();
+    } else if (hasQueueError) {
+      errorData(`Data Queue errored`);
+    } else {
+      finishData();
+    }
+
+    const { finish: finishFile, error: errorFile } = showSpinner('file', `Waiting for File Queue to finish`);
+    if (queueImageFiles.length > 0 && !hasQueueError) {
+      await new Promise((resolve) => queueImageFiles.addEventListener('end', resolve));
+      finishFile();
+    } else if (hasQueueError) {
+      errorFile(`File Queue errored`);
+    } else {
+      finishFile();
+    }
+
+    //write the output
+    if (hasQueueError) {
+      errorSpinner(hasQueueError);
+    } else {
+      updateSpinner(`Writing output files`);
+
+      // const bulk = await collectBulkListings(savedAnswers, setData);
+      // await writeOutputFiles(allCards, bulk);
+    }
+    finishSpinner('Completed Set Processing');
+  } catch (error) {
+    errorSpinner(error);
+  }
+}

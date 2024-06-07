@@ -5,7 +5,8 @@ import fs from 'fs-extra';
 import { getGroup } from '../listing-sites/firebase.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
-import getFullSetData from './setData.js';
+import getFullSetData, { findSet } from './setData.js';
+import { getCategory, getInventory, getProductVariant, updateInventory } from '../listing-sites/medusa.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('trim', chalk.white);
 
@@ -85,7 +86,7 @@ export const getSetData = async () => {
     } else {
       saveData.setData = {
         ...saveData.setData,
-        ...(await getFullSetData(saveData.setData)),
+        ...(await findSet(saveData.setData)),
         isSet: true,
       };
     }
@@ -401,7 +402,67 @@ async function getNewCardData(cardNumber, defaults = {}, resetAll) {
 }
 
 let cardNumber = 1;
-export const getCardData = async (allCards, imageDefaults) => {
+
+export async function matchCard(products, imageDefaults) {
+  // log(products);
+  let card = products.find(
+    (product) =>
+      product.metadata.cardNumber === imageDefaults.cardNumber &&
+      product.metadata.player.includes(imageDefaults.player),
+  );
+  if (card) {
+    return card;
+  }
+  card = products.find((product) => product.metadata.cardNumber === imageDefaults.cardNumber);
+  if (card) {
+    log(card.metadata);
+    const isCard = await ask(`Is this the correct card?`, true);
+    if (isCard) {
+      return card;
+    }
+  }
+  card = await ask('Which card is this?', undefined, {
+    selectOptions: products.map((product) => ({
+      name: `${product.metadata.cardNumber} ${product.metadata.players.join(', ')}`,
+      value: product,
+    })),
+  });
+  if (card) {
+    return card;
+  }
+  throw new Error('No card found');
+}
+
+export async function saveListing(productVariant) {
+  const listing = await getInventory(productVariant);
+  const quantity = await ask('Quantity', 1);
+  await updateInventory(listing, quantity);
+
+  //set prices
+  return listing;
+}
+
+export async function getCardData(setData, imageDefaults) {
+  const product = await matchCard(setData.products, imageDefaults);
+  let productVariantId;
+  if (product.variants.length === 1) {
+    productVariantId = product.variants[0].id;
+  } else {
+    productVariantId = await ask('Which variant is this?', undefined, {
+      selectOptions: product.variants.map((variant) => ({
+        name: `${variant.title}`,
+        value: variant.id,
+      })),
+    });
+  }
+  const productVariant = await getProductVariant(productVariantId);
+
+  await saveListing(productVariant);
+
+  return productVariant;
+}
+
+export const getCardDataOld = async (allCards, imageDefaults) => {
   //first kick out if we already have data saved for this image
 
   //find the card number
@@ -697,7 +758,7 @@ export async function buildProductFromBSCCard(card, set) {
   const askFor = async (text, propName = text.toLowerCase(), options = {}) =>
     await addCardData(text, product, propName, product, options);
 
-  log('Product Info: ', product);
+  // log('Product Info: ', product);
 
   let useSetInfo = true; //await ask('Use Set Info?', true);
   if (useSetInfo) {
@@ -793,3 +854,27 @@ export async function getTitles(card) {
 
   return titles;
 }
+
+export const getSetDataCommerce = async () => {
+  const isSet = await ask('Is this a complete set?', saveData.setData?.isSet || 'Y');
+
+  if (isSet && !isNo(isSet)) {
+    //check to see if isSet contains numeric data
+    if (typeof isSet === 'number' || isSet.toString().match(/^\d+$/)) {
+      saveData.setData = {
+        ...(await getCategory(isSet)),
+        isSet: true,
+      };
+    } else {
+      saveData.setData = {
+        ...saveData.setData,
+        ...(await findSet()),
+        isSet: true,
+      };
+    }
+  } else {
+    saveData.setData = {};
+  }
+  saveAnswers();
+  return saveData.setData;
+};

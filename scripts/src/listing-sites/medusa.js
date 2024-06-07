@@ -72,6 +72,21 @@ export async function createProduct(product) {
     metadata: product.metadata,
     categories: [{ id: product.categories.id }],
     tags: product.features,
+    variants: [
+      {
+        title: 'base',
+        sku: product.metadata.sku,
+        manage_inventory: true,
+        prices: [{ currency_code: 'usd', amount: 99 }],
+      },
+    ],
+  });
+  return response.product;
+}
+
+export async function updateProduct(product) {
+  const response = await medusa.admin.products.update(product.id, {
+    images: product.images,
   });
   return response.product;
 }
@@ -81,5 +96,51 @@ export async function getProducts(category) {
     category_id: [category],
     fields: 'metadata',
   });
+  return response.products;
+}
+
+export async function getProductVariant(variantId) {
+  const response = await medusa.admin.variants.retrieve(variantId);
+  return response.variant;
+}
+
+export async function getProductCardNumbers(category) {
+  const response = await medusa.admin.products.list({
+    category_id: [category],
+    fields: 'metadata',
+  });
   return response.products ? response.products.map((product) => product.metadata.cardNumber) : [];
+}
+
+export async function getInventory(productVariant) {
+  const response = await medusa.admin.inventoryItems.list({ sku: productVariant.sku });
+  let inventoryItem = response.inventory_items?.[0];
+
+  if (!inventoryItem) {
+    const createResponse = await medusa.admin.inventoryItems.create({
+      variant_id: productVariant.id,
+      sku: productVariant.sku,
+    });
+    inventoryItem = createResponse.inventory_item;
+  }
+
+  if (!inventoryItem.location_levels?.find((level) => level.location_id === process.env.MEDUSA_LOCATION_ID)) {
+    const levelResponse = await medusa.admin.inventoryItems.createLocationLevel(inventoryItem.id, {
+      location_id: process.env.MEDUSA_LOCATION_ID,
+      stocked_quantity: 0,
+    });
+  }
+
+  return inventoryItem;
+}
+
+export async function updateInventory(inventoryItem, quantity) {
+  const response = await medusa.admin.inventoryItems.updateLocationLevel(
+    inventoryItem.id,
+    process.env.MEDUSA_LOCATION_ID,
+    {
+      stocked_quantity: parseInt(quantity),
+    },
+  );
+  return response.inventory_item;
 }

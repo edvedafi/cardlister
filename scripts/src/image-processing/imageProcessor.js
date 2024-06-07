@@ -11,15 +11,24 @@ const { showSpinner, log } = useSpinners('images', chalk.white);
 const output_directory = 'output/';
 const MAX_IMAGE_SIZE = 10 * 1000 * 1000; // slightly under 10MB
 
-function getOutputFile(cardData) {
-  const outputLocation = `${output_directory}${cardData.directory}`;
-  const outputFile = `${outputLocation}${cardData.filename}`;
+function getOutputFile(listing, setInfo, imageNumber) {
+  const category = setInfo.metadata;
+  let outputLocation = `${output_directory}${category.sport}/${category.year}/${category.setName}`;
+  if (category.insert) {
+    outputLocation = `${outputLocation}/${category.insert}`;
+  }
+  if (category.parallel) {
+    outputLocation = `${outputLocation}/${category.parallel}`;
+  }
+  const outputFile = `${outputLocation}/${listing.product.metadata.cardNumber}-${listing.product.metadata.player.reduce(
+    (names, name) => `${names}-${name.toLowerCase().replace(/\s/g, '-')}`,
+  )}-${imageNumber}.jpg`;
   return { outputLocation, outputFile };
 }
 
-export const prepareImageFile = async (image, cardData, overrideImages) => {
+export const prepareImageFile = async (image, listing, setInfo, imageNumber) => {
   const { update, error, finish } = showSpinner('crop', 'Preparing Image');
-  const { outputLocation, outputFile } = getOutputFile(cardData);
+  const { outputLocation, outputFile } = getOutputFile(listing, setInfo, imageNumber);
   let input = image;
   // let rotation = await ask('Rotate', false);
   let rotate;
@@ -31,7 +40,7 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
   //   rotate = rotation || 0;
   // }
   //if the output file already exists, skip it
-  if (!overrideImages && fs.existsSync(outputFile)) {
+  if (fs.existsSync(outputFile)) {
     log('Image already exists, skipping');
   } else {
     await $`mkdir -p ${outputLocation}`;
@@ -110,13 +119,13 @@ export const prepareImageFile = async (image, cardData, overrideImages) => {
       } else {
         await $`mv ${tempImage} ${outputFile}`;
       }
-
-      finish();
-      return outputFile;
     } else {
       const e = new Error('Failed to crop image');
       error(e);
       throw e;
     }
   }
+
+  finish();
+  return outputFile;
 };

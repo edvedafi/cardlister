@@ -29,11 +29,12 @@ import {
   createCategoryActive,
   createProduct,
   getCategories,
-  getProducts,
+  getProductCardNumbers,
   setCategoryActive,
   updateCategory,
 } from '../listing-sites/medusa.js';
 import { buildProductFromBSCCard } from './cardData.js';
+import Queue from 'queue';
 
 const { showSpinner, log } = useSpinners('setData', chalk.white);
 
@@ -380,6 +381,9 @@ export async function findSet() {
       }
     }
 
+    setInfo.category = setInfo.variantName || setInfo.variantType;
+    setInfo.metadata = setInfo.category.metadata;
+
     finish();
     return setInfo;
   } catch (e) {
@@ -396,7 +400,6 @@ export async function buildSet(setInfo) {
     const cards = await getBSCCards(category);
     const slCards = await getSLCards(setInfo, category);
     const products = await buildProducts(category, cards, slCards);
-    console.log(products);
     finish('Set Built');
   } catch (e) {
     error(e);
@@ -429,16 +432,39 @@ async function buildProducts(category, bscCards, slCards) {
         return card;
       }),
     );
-    const existing = await getProducts(category.id);
-    const products = await Promise.all(
-      cards
-        .filter((card) => !existing.includes(card.cardNo))
-        .map(async (card) => {
+    const existing = await getProductCardNumbers(category.id);
+    const products = [];
+    const queue = new Queue({ concurrency: 1, results: products, autostart: true });
+    let hasQueueError = false;
+
+    queue.addEventListener('error', (error, job) => {
+      hasQueueError = error;
+      log(`${name} Queue error: `, error, job);
+      queue.stop();
+    });
+
+    let count = 0;
+
+    cards
+      .filter((card) => !existing.includes(card.cardNo))
+      .forEach((card) =>
+        queue.push(async () => {
           const product = await buildProductFromBSCCard(card, category);
-          return await createProduct(product);
+          const result = await createProduct(product);
+          update(`Saving Product ${++count}/${cards.length}`);
+          return result;
         }),
-    );
-    finish('Products Built');
+      );
+
+    if (queue.length > 0 && !hasQueueError) {
+      await new Promise((resolve) => queue.addEventListener('end', resolve));
+      finish('Products Built');
+    } else if (hasQueueError) {
+      throw new Error(hasQueueError);
+    } else {
+      finish('Products Built');
+    }
+
     return products;
   } catch (e) {
     error(e);
