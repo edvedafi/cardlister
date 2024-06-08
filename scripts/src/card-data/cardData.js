@@ -6,7 +6,14 @@ import { getGroup } from '../listing-sites/firebase.js';
 import chalk from 'chalk';
 import { useSpinners } from '../utils/spinners.js';
 import getFullSetData, { findSet } from './setData.js';
-import { getCategory, getInventory, getProductVariant, updateInventory } from '../listing-sites/medusa.js';
+import {
+  getCategory,
+  getInventory,
+  getProductVariant,
+  getRegion,
+  updateInventory,
+  updateProductVariant,
+} from '../listing-sites/medusa.js';
 
 const { showSpinner, finishSpinner, errorSpinner, updateSpinner, log } = useSpinners('trim', chalk.white);
 
@@ -438,7 +445,9 @@ export async function saveListing(productVariant) {
   const quantity = await ask('Quantity', 1);
   await updateInventory(listing, quantity);
 
-  //set prices
+  // log('Pricing: ', product.variants[0].prices);
+  // await ask('Proceed with listing?', true);
+  await updateProductVariant(productVariant);
   return listing;
 }
 
@@ -457,9 +466,35 @@ export async function getCardData(setData, imageDefaults) {
   }
   const productVariant = await getProductVariant(productVariantId);
 
+  const isCommon = await ask('Use common card pricing', true);
+  if (isCommon) {
+    productVariant.prices = await getCommonPricing();
+  } else {
+    productVariant.prices = [
+      { amount: await ask('ebay price', 99), region_id: await getRegion('ebay') },
+      { amount: await ask('MCP Price', 99), region_id: await getRegion('MCP') },
+      { amount: await ask('BSC Price', 25), region_id: await getRegion('BSC') },
+      { amount: await ask('SportLots Price', 18), region_id: await getRegion('SportLots') },
+    ];
+  }
+
   await saveListing(productVariant);
 
   return productVariant;
+}
+
+let commonPricing;
+
+export async function getCommonPricing() {
+  if (!commonPricing) {
+    commonPricing = [
+      { amount: 99, region_id: await getRegion('ebay') },
+      { amount: 99, region_id: await getRegion('MCP') },
+      { amount: 25, region_id: await getRegion('BSC') },
+      { amount: 18, region_id: await getRegion('SportLots') },
+    ];
+  }
+  return commonPricing;
 }
 
 export const getCardDataOld = async (allCards, imageDefaults) => {

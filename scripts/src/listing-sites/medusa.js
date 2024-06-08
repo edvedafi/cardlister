@@ -91,6 +91,14 @@ export async function updateProduct(product) {
   return response.product;
 }
 
+export async function updateProductVariant(productVariant) {
+  console.log(productVariant);
+  const response = await medusa.admin.products.updateVariant(productVariant.product.id, productVariant.id, {
+    prices: productVariant.prices,
+  });
+  return response.product;
+}
+
 export async function getProducts(category) {
   const response = await medusa.admin.products.list({
     category_id: [category],
@@ -143,4 +151,17 @@ export async function updateInventory(inventoryItem, quantity) {
     },
   );
   return response.inventory_item;
+}
+
+let regionCache;
+
+export async function getRegion(regionName) {
+  if (!regionCache) {
+    const response = await medusa.admin.regions.list();
+    regionCache = response.regions.reduce((acc, region) => {
+      acc[region.name] = region.id;
+      return acc;
+    }, {});
+  }
+  return regionCache[regionName];
 }
