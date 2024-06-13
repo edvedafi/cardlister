@@ -12,6 +12,7 @@ import {
   getProductVariant,
   getRegion,
   updateInventory,
+  updateProduct,
   updateProductVariant,
 } from '../listing-sites/medusa.js';
 
@@ -430,7 +431,7 @@ export async function matchCard(products, imageDefaults) {
   }
   card = await ask('Which card is this?', undefined, {
     selectOptions: products.map((product) => ({
-      name: `${product.metadata.cardNumber} ${product.metadata.players.join(', ')}`,
+      name: `${product.metadata.cardNumber} ${product.metadata.player.join(', ')}`,
       value: product,
     })),
   });
@@ -440,14 +441,14 @@ export async function matchCard(products, imageDefaults) {
   throw new Error('No card found');
 }
 
-export async function saveListing(productVariant) {
+export async function saveListing(productVariant, images, quantity) {
   const listing = await getInventory(productVariant);
-  const quantity = await ask('Quantity', 1);
-  await updateInventory(listing, quantity);
-
-  // log('Pricing: ', product.variants[0].prices);
-  // await ask('Proceed with listing?', true);
+  await updateProduct({
+    id: productVariant.product.id,
+    images: images,
+  });
   await updateProductVariant(productVariant);
+  await updateInventory(listing, quantity);
   return listing;
 }
 
@@ -478,9 +479,9 @@ export async function getCardData(setData, imageDefaults) {
     ];
   }
 
-  await saveListing(productVariant);
+  const quantity = await ask('Quantity', 1);
 
-  return productVariant;
+  return { productVariant, quantity };
 }
 
 let commonPricing;
@@ -779,6 +780,7 @@ export async function buildProductFromBSCCard(card, set) {
       size: 'Standard',
       thickness: '20pt',
       bsc: card.id,
+      cardName: getCardNameNew(card, set),
       // printRun: card.printRun,
       // autograph: card.autograph,
     },
@@ -888,6 +890,53 @@ export async function getTitles(card) {
   titles.title = title;
 
   return titles;
+}
+
+function getCardNameNew(card, category) {
+  const add = (info, modifier) => {
+    if (info === undefined || info === null || info === '' || isNo(info)) {
+      return '';
+    } else if (modifier) {
+      return ` ${info} ${modifier}`;
+    } else {
+      return ` ${info}`;
+    }
+  };
+
+  //generate a 60 character card name
+  const maxCardNameLength = 60;
+  let cardName = card.title.replace(' | ', ' ');
+  let insert = add(category.metadata.insert);
+  let parallel = add(category.metadata.parallel);
+  if (cardName.length > maxCardNameLength) {
+    cardName =
+      `${category.metadata.year} ${category.metadata.brand} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(
+        ' | ',
+        ' ',
+      );
+  }
+  if (cardName.length > maxCardNameLength) {
+    cardName =
+      `${category.metadata.year} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(
+        ' | ',
+        ' ',
+      );
+  }
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${category.metadata.year} ${category.metadata.setName}${insert}${parallel}`;
+  }
+  if (cardName.length > maxCardNameLength) {
+    cardName = `${category.metadata.setName}${insert}${parallel}`;
+  }
+  cardName = cardName.replace(/ {2}/g, ' ').replace(' | ', ' ');
+  //
+  // if (cardName.length > maxCardNameLength) {
+  //   cardName = await ask('Card Name', cardName, {
+  //     maxLength: maxCardNameLength,
+  //   });
+  // }
+
+  return cardName;
 }
 
 export const getSetDataCommerce = async () => {

@@ -1,12 +1,12 @@
 import { useSpinners } from './utils/spinners.js';
 import chalk from 'chalk';
 import Queue from 'queue';
-import { getCardData } from './card-data/cardData.js';
+import { getCardData, saveListing } from './card-data/cardData.js';
 import imageRecognition from './card-data/imageRecognition.js';
 import terminalImage from 'terminal-image';
 import { prepareImageFile } from './image-processing/imageProcessor.js';
 import { processImageFile } from './listing-sites/firebase.js';
-import { getProducts, updateProduct } from './listing-sites/medusa.js';
+import { getProducts } from './listing-sites/medusa.js';
 
 const { showSpinner, log } = useSpinners('list-set', chalk.cyan);
 
@@ -14,7 +14,7 @@ const listings = [];
 const queueReadImage = new Queue({
   results: [],
   autostart: true,
-  concurrency: 1,
+  concurrency: 3,
 });
 const queueGatherData = new Queue({
   results: [],
@@ -24,7 +24,7 @@ const queueGatherData = new Queue({
 const queueImageFiles = new Queue({
   results: listings,
   autostart: true,
-  concurrency: 1,
+  concurrency: 3,
 });
 
 const preProcessPair = async (front, back, setData) => {
@@ -48,43 +48,44 @@ const processPair = async (front, back, imageDefaults, setData) => {
       log(await terminalImage.file(back, { height: 25 }));
     }
 
-    const listing = await getCardData(setData, imageDefaults);
+    const { productVariant, quantity } = await getCardData(setData, imageDefaults);
     const images = [];
-    const frontImage = await processImage(listing, front, setData, 1);
+    const frontImage = await prepareImageFile(front, productVariant, setData, 1);
     if (frontImage) {
-      images.push(`https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${frontImage}?alt=media`);
+      images.push({
+        file: frontImage,
+        url: `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${productVariant.product.handle}1.jpg}?alt=media`,
+      });
     }
     if (back) {
-      const backImage = await processImage(listing, back, setData, 2);
+      const backImage = await prepareImageFile(back, productVariant, setData, 2);
       if (backImage) {
-        images.push(`https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${backImage}?alt=media`);
+        images.push({
+          file: backImage,
+          url: `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${productVariant.product.handle}2.jpg}?alt=media`,
+        });
       }
     }
 
-    await updateProduct({
-      id: listing.product.id,
-      images: images,
-    });
+    queueImageFiles.push(() => processUploads(productVariant, images, quantity));
 
-    return listing;
+    return { productVariant, quantity, images };
   } catch (e) {
     console.error(e);
     throw e;
   }
 };
 
-const processImage = async (listing, image, setData, imageNumber) => {
-  try {
-    const outputFile = await prepareImageFile(image, listing, setData, imageNumber);
-    if (outputFile) {
-      const uploadedFileName = `${listing.product.handle}${imageNumber}.jpg`;
-      queueImageFiles.push(() => processImageFile(outputFile, uploadedFileName));
+const processUploads = async (productVariant, imageInfo, quantity) => {
+  const images = await Promise.all(
+    imageInfo.map(async (image, i) => {
+      const uploadedFileName = `${productVariant.product.handle}${i + 1}.jpg`;
+      await processImageFile(image.file, uploadedFileName);
       return uploadedFileName;
-    }
-  } catch (e) {
-    console.error(e);
-    throw e;
-  }
+    }),
+  );
+  await saveListing(productVariant, images, quantity);
+  return productVariant;
 };
 
 export async function processSet(setData, files) {

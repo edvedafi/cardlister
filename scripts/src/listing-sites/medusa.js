@@ -92,7 +92,7 @@ export async function updateProduct(product) {
 }
 
 export async function updateProductVariant(productVariant) {
-  console.log(productVariant);
+  // console.log(productVariant);
   const response = await medusa.admin.products.updateVariant(productVariant.product.id, productVariant.id, {
     prices: productVariant.prices,
   });
