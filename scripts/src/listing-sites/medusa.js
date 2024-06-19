@@ -165,3 +165,11 @@ export async function getRegion(regionName) {
   }
   return regionCache[regionName];
 }
+
+export async function startSync(categoryId) {
+  const response = medusa.admin.batchJobs.create({
+    type: 'publish-products',
+    context: { categoryId },
+    dry_run: true,
+  });
+}

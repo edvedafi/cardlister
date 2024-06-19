@@ -11,7 +11,7 @@ import { InventoryLevelService, InventoryService } from '@medusajs/inventory/dis
 export default async function inventoryUpdateHandler({
                                                        data, eventName, container, pluginOptions,
                                                      }: SubscriberArgs<Record<string, any>>) {
-  console.log('Inventory updated:', data);
+  // console.log('Inventory updated:', data);
 
   // const productService: ProductService = container.resolve(
   //   'inventoryService',
@@ -34,27 +34,33 @@ export default async function inventoryUpdateHandler({
 
   // @ts-ignore
   const [levels, count] = await inventoryService.listInventoryLevels({ id });
-  console.log('Inventory Level:', levels);
+  // console.log('Inventory Level:', levels);
   const inventoryItemId = levels[0].inventory_item_id;
   const quantity = await inventoryService.retrieveAvailableQuantity(inventoryItemId, [levels[0].location_id]);
 
   const variantInventory = await productVariantInventoryService.listByItem([inventoryItemId]);
   const associatedVariantIds = variantInventory.map((vi: ProductVariantInventoryItem) => vi.variant_id);
-  console.log('Variant IDs:', associatedVariantIds);
+  // console.log('Variant IDs:', associatedVariantIds);
   const pv = await productVariantService.retrieve(associatedVariantIds[0], { relations: ['prices'] });
-  console.log('PV:', pv);
+  // console.log('PV:', pv);
 
   const regions = await regionService.list();
   const ebayRegion = regions.find(r => r.name === 'ebay');
   const ebayPrice = pv.prices.find(p => p.region_id === ebayRegion.id);
   if (ebayPrice) {
-    console.log('Found ebay price: ', ebayPrice);
+    // console.log('Found ebay price: ', ebayPrice);
     await eventBusService.emit('ebay-listing-update', {
       variantId: pv.id,
       price: ebayPrice.amount,
-      quantity
+      quantity,
     });
   }
+
+  await eventBusService.emit('sportlots-update', {
+    variantId: pv.id,
+    price: ebayPrice.amount,
+    quantity,
+  });
 }
 
 export const config: SubscriberConfig = {

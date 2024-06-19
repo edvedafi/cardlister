@@ -38,15 +38,15 @@ const conditions = ['NM', 'EX/NM', 'EX', 'VG', 'GOOD'];
 
 const useClickSubmit =
   (waitForElement) =>
-  async (text = undefined) => {
-    showSpinner('clickSubmit', 'Looking for Submit button');
-    const submitButton = text
-      ? await waitForElement(By.xpath(`//input[(@type = 'submit' or @type = 'Submit') and @value='${text}']`))
-      : await waitForElement(By.xpath("//input[@type = 'submit' or @type = 'Submit']"));
-    updateSpinner('clickSubmit', 'Submitting');
-    await submitButton.click();
-    finishSpinner('clickSubmit');
-  };
+    async (text = undefined) => {
+      showSpinner('clickSubmit', 'Looking for Submit button');
+      const submitButton = text
+        ? await waitForElement(By.xpath(`//input[(@type = 'submit' or @type = 'Submit') and @value='${text}']`))
+        : await waitForElement(By.xpath("//input[@type = 'submit' or @type = 'Submit']"));
+      updateSpinner('clickSubmit', 'Submitting');
+      await submitButton.click();
+      finishSpinner('clickSubmit');
+    };
 
 const useSelectBrand = (driver, inventoryURL, yearField, sportField, brandField) => async (setInfo) => {
   showSpinner('selectBrand', 'Selecting Brand');

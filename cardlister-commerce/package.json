@@ -23,7 +23,8 @@
     "migrate": "cross-env medusa migrations run",
     "start": "cross-env npm run build && medusa start",
     "start:custom": "cross-env npm run build && node --preserve-symlinks --trace-warnings index.js",
-    "dev": "cross-env npm run build:server && medusa develop"
+    "dev": "cross-env npm run build:server && medusa develop",
+    "redis": "cross-env redis-stack-server"
   },
   "dependencies": {
     "@medusajs/admin": "latest",
@@ -36,6 +37,7 @@
     "@medusajs/medusa": "latest",
     "@medusajs/stock-location": "^1.11.5",
     "@tanstack/react-query": "4.22.0",
+    "@types/selenium-webdriver": "^4.1.23",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "dist": "link:../cardlister-commerce/dist/",
@@ -49,7 +51,9 @@
     "medusa-payment-manual": "latest",
     "medusa-payment-stripe": "latest",
     "prism-react-renderer": "^2.0.4",
-    "typeorm": "^0.3.16"
+    "selenium-webdriver": "^4.21.0",
+    "typeorm": "^0.3.16",
+    "webdriverio": "^8.38.2"
   },
   "devDependencies": {
     "@babel/cli": "^7.14.3",

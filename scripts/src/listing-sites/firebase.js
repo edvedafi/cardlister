@@ -262,25 +262,34 @@ export async function getListingInfo(cards) {
   const removals = [];
   for (let card of cards) {
     if (card.sku) {
+      const sku = card.sku.indexOf('|') > -1 ? card.sku : `${card.sku}|${card.cardNumber}`;
       const {
         update: updateSKU,
         finish: finishSKU,
         error: errorSKU,
-      } = showSpinner(card.sku, `Getting listing info from Firebase for ${card.title} via sku ${card.sku}`);
+      } = showSpinner(sku, `Getting listing info from Firebase for ${card.title} via sku ${sku}`);
       try {
-        const doc = await db.collection('CardSales').doc(card.sku).get();
+        log('looking for ', sku);
+        const doc = await db.collection('CardSales').doc(sku).get();
         if (doc.data() && doc.data().sku) {
-          updateSKU(card.sku, `Setting ${card.sku} to sold`);
-          await updateFirebaseListing({ sku: card.sku, sold: true });
+          updateSKU(`Setting ${sku} to sold`);
+          await updateFirebaseListing({ sku: sku, sold: true });
           removals.push(await mergeFirebaseResult(card, doc.data()));
-          finishSKU(card.sku);
+          finishSKU();
         } else {
-          const match = await matchOldStyle(db, card);
-          if (match) {
-            removals.push(match);
-            finishSKU(card.sku);
+          const bin = sku.split('|')[0];
+          const set = await getGroupByBin(bin);
+          if (set) {
+            removals.push(mergeFirebaseResult(card, set));
+            finishSKU();
           } else {
-            errorSKU(card.sku);
+            const match = await matchOldStyle(db, card);
+            if (match) {
+              removals.push(match);
+              finishSKU();
+            } else {
+              errorSKU(`Could not find listing in firebase for ${card.title} via sku ${sku}`);
+            }
           }
         }
       } catch (e) {
