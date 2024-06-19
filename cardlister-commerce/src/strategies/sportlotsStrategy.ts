@@ -207,7 +207,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
             const product = products.find((p) => p.metadata.cardNumber === cardNumber);
             const variant = product?.variants[0]; //TODO This will need to handle multiple variants
             if (variant) {
-              const [inventoryItems, count] = await this.inventoryModule.listInventoryItems({ sku: variant.sku });
+              const [inventoryItems] = await this.inventoryModule.listInventoryItems({ sku: variant.sku });
               const quantityFromService = await this.inventoryModule.retrieveAvailableQuantity(inventoryItems[0].id, [
                 'sloc_01HWNYZ3G2K7WEKZ3SAB7VJFK0', //TODO This will need to be dynamic
               ]);
