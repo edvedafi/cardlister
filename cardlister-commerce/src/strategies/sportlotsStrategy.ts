@@ -182,10 +182,6 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
     try {
       const browser = await this.login();
 
-      //first clear out the inventory
-      await this.removeAllInventory(category);
-
-      //now navigate to the add inventory screen and add it all back
       await this.loadAddInventoryScreen(
         category.metadata.year as string,
         category.metadata.brand as string,
@@ -256,8 +252,8 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
     try {
       await this.login();
 
-      // await this.removeAllInventory(category);
-      //
+      await this.removeAllInventory(category);
+
       await this.setInventory(products, category);
     } catch (e) {
       console.log('sportlots::syncProductsToSportlots::error', e);
