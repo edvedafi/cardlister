@@ -10,7 +10,6 @@ import {
 import { EntityManager } from 'typeorm';
 import { Locator, until, WebDriver } from 'selenium-webdriver';
 import { remote } from 'webdriverio';
-// import { InventoryItemService, InventoryService } from '@medusajs/inventory/dist/services';
 import { IInventoryService } from '@medusajs/types';
 import { InventoryService } from '@medusajs/inventory/dist/services';
 
@@ -21,7 +20,6 @@ type InjectedDependencies = {
   transactionManager: EntityManager;
   productVariantService: ProductVariantService;
   inventoryService: InventoryService;
-  // inventoryItemService: InventoryItemService;
 };
 
 class SportlotsStrategy extends AbstractBatchJobStrategy {
@@ -30,9 +28,6 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
   protected batchJobService_: BatchJobService;
   protected categoryService_: ProductCategoryService;
   protected productVariantService_: ProductVariantService;
-  // protected productService_: ProductService;
-  // protected inventoryService_: InventoryService;
-  // protected inventoryItemService_: InventoryItemService;
   private inventoryModule: IInventoryService;
 
   protected _driver: WebDriver;
@@ -184,9 +179,13 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
   }
 
   async setInventory(products: Product[], category: ProductCategory): Promise<void> {
-    // this.inventoryModule = await initializeInventoryModule({});
     try {
       const browser = await this.login();
+
+      //first clear out the inventory
+      await this.removeAllInventory(category);
+
+      //now navigate to the add inventory screen and add it all back
       await this.loadAddInventoryScreen(
         category.metadata.year as string,
         category.metadata.brand as string,
@@ -206,15 +205,9 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
           if (!isNaN(parseInt(cardNumber))) {
             console.log('sportlots::Checking Card Number', cardNumber);
             const product = products.find((p) => p.metadata.cardNumber === cardNumber);
-            // console.log('Product:', product);
             const variant = product?.variants[0]; //TODO This will need to handle multiple variants
             if (variant) {
               const [inventoryItems, count] = await this.inventoryModule.listInventoryItems({ sku: variant.sku });
-              // console.log('Inventory Items:', inventoryItems);
-              // console.log(
-              //   'Inventory Levels:',
-              //   await this.inventoryModule.listInventoryLevels({ inventory_item_id: inventoryItems[0].id }),
-              // );
               const quantityFromService = await this.inventoryModule.retrieveAvailableQuantity(inventoryItems[0].id, [
                 'sloc_01HWNYZ3G2K7WEKZ3SAB7VJFK0', //TODO This will need to be dynamic
               ]);
@@ -270,47 +263,8 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
       console.log('sportlots::syncProductsToSportlots::error', e);
     } finally {
       await this.browser.shutdown();
-      // await this._driver.quit();
     }
   }
 }
 
 export default SportlotsStrategy;
-
-
-// describe("AddInventory", () => {
-//   it("tests AddInventory", async () => {
-//     await browser.setWindowSize(2041, 1199)
-//     await browser.url("https://sportlots.com/s/ui/profile.tpl?ordertype=2")
-//     await expect(browser).toHaveUrl("https://sportlots.com/s/ui/profile.tpl?ordertype=2")
-//     await browser.$("aria/Stores").click()
-//     await browser.$("aria/Add Inventory").click()
-//     await expect(browser).toHaveUrl("https://sportlots.com/inven/dealbin/newinven.tpl")
-//     await browser.$("aria/2024").click()
-//     await browser.$("aria/2022").setValue("2022")
-//     await browser.$("aria/All Brands").click()
-//     await browser.$("aria/Panini").setValue("Panini")
-//     await browser.$("aria/Baseball").click()
-//     await browser.$("aria/Football").setValue("FB")
-//     await browser.$("aria/ Default to new pricing").click()
-//     await browser.$("aria/Next").click()
-//     await expect(browser).toHaveUrl("https://sportlots.com/inven/dealbin/dealsets.tpl")
-//     await browser.performActions([{
-//       type: 'key',
-//       id: 'keyboard',
-//       actions: [{ type: 'keyDown', value: '' }]
-//     }])
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[594]/td[1]/input").click()
-//     await browser.$("aria/Get Cards[role=\"button\"]").click()
-//     await expect(browser).toHaveUrl("https://sportlots.com/inven/dealbin/listcards.tpl")
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[3]/td[1]").click()
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[3]/td[1]/input").click()
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[3]/td[1]/input").setValue("2")
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[4]/td[1]/input").click()
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[4]/td[1]/input").setValue("4")
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[5]/td[1]/input").click()
-//     await browser.$("/html/body/div/table[2]/tbody/tr/td/form/table/tbody/tr[5]/td[1]/input").setValue("5")
-//     await browser.$("aria/Inventory Cards").click()
-//     await expect(browser).toHaveUrl("https://sportlots.com/inven/dealbin/addinven.tpl")
-//   });
-// });
