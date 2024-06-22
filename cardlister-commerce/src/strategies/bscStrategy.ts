@@ -13,9 +13,9 @@ import { remote } from 'webdriverio';
 import { IInventoryService } from '@medusajs/types';
 import { InventoryService } from '@medusajs/inventory/dist/services';
 import axios, { AxiosInstance } from 'axios';
-import * as fs from 'node:fs';
 import axiosRetry from 'axios-retry';
 import { getAvailableQuantity, getRegionPrice } from '../utils/data';
+import FormData from 'form-data';
 
 type InjectedDependencies = {
   batchJobService: BatchJobService;
@@ -175,26 +175,30 @@ class BscStrategy extends AbstractBatchJobStrategy {
     return this._api;
   }
 
-  async postImage(imagePath: string) {
-    const fileName = imagePath.substring(imagePath.lastIndexOf('/'));
-    const api = await this.login();
-
+  async postImage(image: string) {
     const formData = new FormData();
+    console.log('image', image);
 
-    // @ts-ignore
-    formData.append('attachment', fs.createReadStream(imagePath));
+    const response = await axios.get(
+      `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${image}?alt=media`,
+      { responseType: 'stream' },
+    );
+    formData.append('attachment', response.data, image);
+    const formHeaders = formData.getHeaders();
 
+    const api = await this.login();
     const { data: results } = await api.post(
       `https://api-prod.buysportscards.com/common/card/undefined/product/undefined/attachment`,
       formData,
       {
         headers: {
+          ...formHeaders,
           'Content-Type': 'multipart/form-data',
         },
       },
     );
     if (results.objectKey) {
-      return results;
+      return results.objectKey;
     } else {
       console.log('error uploading image', results); //TODO need to log this somewhere actionable
     }
@@ -214,23 +218,21 @@ class BscStrategy extends AbstractBatchJobStrategy {
 
       const updates = [];
 
-      let imageDirectory = `../scripts/output/${category.metadata.sport}/${category.metadata.year}/${category.metadata.setName}`;
-      if (category.metadata.insert) {
-        imageDirectory = `${imageDirectory}/${category.metadata.insert}`;
-      }
-      if (category.metadata.parallel) {
-        imageDirectory = `${imageDirectory}/${category.metadata.parallel}`;
-      }
-      imageDirectory = imageDirectory.replace(/\s/g, '\\ ');
-
       for (let listing of listings) {
         const product = products.find((product) => `${product.metadata.cardNumber}` === `${listing.card.cardNo}`);
         if (product) {
           const variant = product?.variants[0]; //TODO This will need to handle multiple variants
           const quantity = await getAvailableQuantity(variant.sku, this.inventoryModule); //TODO assumes no variations exist
 
-          if (quantity > 0) {
-            console.info('bsc::adding card ', listing.card.cardNo);
+          if (quantity !== listing.availableQuantity || (listing.sellerSku && listing.sellerSku !== variant.sku)) {
+            console.info(
+              'bsc::adding card ',
+              listing.card.cardNo,
+              quantity,
+              listing.availableQuantity,
+              variant.sku,
+              listing.sellerSku,
+            );
             let newListing: any = {
               ...listing,
               availableQuantity: quantity,
@@ -238,15 +240,18 @@ class BscStrategy extends AbstractBatchJobStrategy {
               sellerSku: variant.sku,
             };
 
-            //TODO Fix images
-            // if (product.images && product.images.length > 0 && !listing.sellerImgFront) {
-            //   console.info('bsc::Uploading Front Image');
-            //   newListing.sellerImgFront = await this.postImage(`${imageDirectory}/${product.images[0].url}`);
-            // }
-            // if (product.images && product.images.length > 1 && !listing.sellerImgBack) {
-            //   console.info('bsc::Uploading Back Image');
-            //   newListing.sellerImgBack = await this.postImage(`${imageDirectory}/${product.images[1].url}`);
-            // }
+            // TODO Fix images
+            if (product.images) {
+              const images = product.images.map((image) => image.url).sort();
+              if (images.length > 0 && listing.sellerImgFront.indexOf('Default') > -1) {
+                console.info('bsc::Uploading Front Image');
+                newListing.sellerImgFront = await this.postImage(`${images[0]}`);
+              }
+              if (images.length > 1 && listing.sellerImgBack.indexOf('Default') > -1) {
+                console.info('bsc::Uploading Back Image');
+                newListing.sellerImgBack = await this.postImage(`${images[1]}`);
+              }
+            }
             updates.push(newListing);
           }
         } else {
@@ -265,6 +270,8 @@ class BscStrategy extends AbstractBatchJobStrategy {
         } else {
           throw new Error(results);
         }
+      } else {
+        console.log('bsc::syncProductsTobsc::no updates to make');
       }
     } catch (e) {
       console.log('bsc::syncProductsTobsc::error', e?.response?.data || e?.data || e);

@@ -46,6 +46,7 @@
     "dotenv": "16.3.1",
     "ebay-api": "^8.7.1",
     "express": "^4.17.2",
+    "form-data": "^4.0.0",
     "fs-extra": "^11.2.0",
     "medusa-cli": "^0.5.5",
     "medusa-fulfillment-manual": "latest",
