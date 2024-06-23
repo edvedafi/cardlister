@@ -9,58 +9,58 @@ import {
 import { InventoryLevelService, InventoryService } from '@medusajs/inventory/dist/services';
 
 export default async function inventoryUpdateHandler({
-                                                       data, eventName, container, pluginOptions,
-                                                     }: SubscriberArgs<Record<string, any>>) {
-  // console.log('Inventory updated:', data);
+  data,
+  eventName,
+  container,
+  pluginOptions,
+}: SubscriberArgs<Record<string, any>>) {
+  try {
+    const { id } = data;
 
-  // const productService: ProductService = container.resolve(
-  //   'inventoryService',
-  // );
+    const inventoryService: InventoryService = container.resolve('inventoryService');
+    const productVariantInventoryService = container.resolve('productVariantInventoryService');
+    const productVariantService: ProductVariantService = container.resolve('productVariantService');
+    const regionService: RegionService = container.resolve('regionService');
+    const eventBusService: EventBusService = container.resolve('eventBusService');
 
-  const { id } = data;
+    // @ts-ignore
+    const [levels, count] = await inventoryService.listInventoryLevels({ id });
+    // console.log('Inventory Level:', levels);
+    const inventoryItemId = levels[0].inventory_item_id;
+    const quantity = await inventoryService.retrieveAvailableQuantity(inventoryItemId, [levels[0].location_id]);
 
-  // console.log(container.registrations);
-  // Object.keys(container.registrations).forEach((key) => {
-  //   if (key.toLowerCase().indexOf('inventory') > -1) {
-  //     console.log(key);
-  //   }
-  // });
-  const inventoryService: InventoryService = container.resolve('inventoryService');
-  const productVariantInventoryService = container.resolve('productVariantInventoryService');
-  const productVariantService: ProductVariantService = container.resolve('productVariantService');
-  const regionService: RegionService = container.resolve('regionService');
-  const eventBusService: EventBusService = container.resolve('eventBusService');
+    const variantInventory = await productVariantInventoryService.listByItem([inventoryItemId]);
+    const associatedVariantIds = variantInventory.map((vi: ProductVariantInventoryItem) => vi.variant_id);
+    // console.log('Variant IDs:', associatedVariantIds);
+    const pv = await productVariantService.retrieve(associatedVariantIds[0], { relations: ['prices'] });
+    // console.log('PV:', pv);
 
+    const regions = await regionService.list();
+    const ebayRegion = regions.find((r) => r.name === 'ebay');
+    const mcpRegion = regions.find((r) => r.name === 'MCP');
+    const ebayPrice = pv.prices.find((p) => p.region_id === ebayRegion.id);
+    const mcpPrice = pv.prices.find((p) => p.region_id === mcpRegion.id);
 
-  // @ts-ignore
-  const [levels, count] = await inventoryService.listInventoryLevels({ id });
-  // console.log('Inventory Level:', levels);
-  const inventoryItemId = levels[0].inventory_item_id;
-  const quantity = await inventoryService.retrieveAvailableQuantity(inventoryItemId, [levels[0].location_id]);
+    if (ebayPrice) {
+      await eventBusService.emit('ebay-listing-update', {
+        variantId: pv.id,
+        price: ebayPrice.amount,
+        quantity,
+      });
+    }
 
-  const variantInventory = await productVariantInventoryService.listByItem([inventoryItemId]);
-  const associatedVariantIds = variantInventory.map((vi: ProductVariantInventoryItem) => vi.variant_id);
-  // console.log('Variant IDs:', associatedVariantIds);
-  const pv = await productVariantService.retrieve(associatedVariantIds[0], { relations: ['prices'] });
-  // console.log('PV:', pv);
-
-  const regions = await regionService.list();
-  const ebayRegion = regions.find(r => r.name === 'ebay');
-  const ebayPrice = pv.prices.find(p => p.region_id === ebayRegion.id);
-  if (ebayPrice) {
-    // console.log('Found ebay price: ', ebayPrice);
-    await eventBusService.emit('ebay-listing-update', {
-      variantId: pv.id,
-      price: ebayPrice.amount,
-      quantity,
-    });
+    if (mcpPrice) {
+      await eventBusService.emit('mcp-listing-update', {
+        variantId: pv.id,
+        price: mcpPrice.amount,
+        quantity,
+      });
+    }
+    console.log('inventoryUpdateHandler::Complete');
+  } catch (error) {
+    console.error('inventoryUpdateHandler::error: ', error);
+    throw error;
   }
-
-  await eventBusService.emit('sportlots-update', {
-    variantId: pv.id,
-    price: ebayPrice.amount,
-    quantity,
-  });
 }
 
 export const config: SubscriberConfig = {
