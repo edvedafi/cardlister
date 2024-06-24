@@ -439,7 +439,7 @@ async function buildProducts(category, bscCards, slCards) {
 
     queue.addEventListener('error', (error, job) => {
       hasQueueError = error;
-      log(`${name} Queue error: `, error, job);
+      log(`Queue error: `, error, job);
       queue.stop();
     });
 
@@ -449,10 +449,15 @@ async function buildProducts(category, bscCards, slCards) {
       .filter((card) => !existing.includes(card.cardNo))
       .forEach((card) =>
         queue.push(async () => {
-          const product = await buildProductFromBSCCard(card, category);
-          const result = await createProduct(product);
-          update(`Saving Product ${++count}/${cards.length}`);
-          return result;
+          try {
+            const product = await buildProductFromBSCCard(card, category);
+            const result = await createProduct(product);
+            update(`Saving Product ${++count}/${cards.length}`);
+            return result;
+          } catch (e) {
+            error(e);
+            throw e;
+          }
         }),
       );
 

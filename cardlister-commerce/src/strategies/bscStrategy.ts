@@ -2,13 +2,13 @@ import {
   AbstractBatchJobStrategy,
   BatchJobService,
   CreateBatchJobInput,
+  Logger,
   Product,
   ProductCategory,
   ProductCategoryService,
   ProductVariantService,
 } from '@medusajs/medusa';
 import { EntityManager } from 'typeorm';
-import { Locator } from 'selenium-webdriver';
 import { remote } from 'webdriverio';
 import { IInventoryService } from '@medusajs/types';
 import { InventoryService } from '@medusajs/inventory/dist/services';
@@ -24,6 +24,7 @@ type InjectedDependencies = {
   transactionManager: EntityManager;
   productVariantService: ProductVariantService;
   inventoryService: InventoryService;
+  logger: Logger;
 };
 
 class BscStrategy extends AbstractBatchJobStrategy {
@@ -32,23 +33,25 @@ class BscStrategy extends AbstractBatchJobStrategy {
   protected batchJobService_: BatchJobService;
   protected categoryService_: ProductCategoryService;
   protected productVariantService_: ProductVariantService;
-  private inventoryModule: IInventoryService;
-
-  protected click: (locator: Locator | Locator[] | string) => Promise<void>;
+  private readonly inventoryModule: IInventoryService;
+  private readonly logger: Logger;
 
   protected constructor(
     __container__: InjectedDependencies,
     __configModule__?: Record<string, unknown> | undefined,
     __moduleDeclaration__?: Record<string, unknown> | undefined,
   ) {
+    let log: Logger | undefined;
     try {
       super(arguments[0]);
+      log = __container__.logger;
+      this.logger = log;
       this.batchJobService_ = __container__.batchJobService || this.batchJobService_;
       this.categoryService_ = __container__.productCategoryService;
       this.productVariantService_ = __container__.productVariantService;
       this.inventoryModule = __container__.inventoryService;
     } catch (e) {
-      console.log('error', e);
+      log ? log.error('sportlots::constructor::error', e) : console.log('error', e);
     }
   }
 
@@ -89,7 +92,7 @@ class BscStrategy extends AbstractBatchJobStrategy {
         });
       });
     } catch (e) {
-      console.log('bsc::preProcessBatchJob::error', e);
+      this.logger.error('bsc::preProcessBatchJob::error', e);
     }
   }
 
@@ -112,7 +115,7 @@ class BscStrategy extends AbstractBatchJobStrategy {
         });
       });
     } catch (e) {
-      console.log('bsc::processJob::error', e);
+      this.logger.error('bsc::processJob::error', e);
     }
   }
 
@@ -177,7 +180,6 @@ class BscStrategy extends AbstractBatchJobStrategy {
 
   async postImage(image: string) {
     const formData = new FormData();
-    console.log('image', image);
 
     const response = await axios.get(
       `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${image}?alt=media`,
@@ -200,7 +202,7 @@ class BscStrategy extends AbstractBatchJobStrategy {
     if (results.objectKey) {
       return results.objectKey;
     } else {
-      console.log('error uploading image', results); //TODO need to log this somewhere actionable
+      this.logger.error('error uploading image', results); //TODO need to log this somewhere actionable
     }
   }
 
@@ -255,26 +257,25 @@ class BscStrategy extends AbstractBatchJobStrategy {
             updates.push(newListing);
           }
         } else {
-          console.log('bsc::syncProductsTobsc::product not found', listing.card.cardNo); //TODO need to log this somewhere actionable
+          this.logger.error('bsc::syncProductsTobsc::product not found', listing.card.cardNo); //TODO need to log this somewhere actionable
         }
       }
 
       if (updates.length > 0) {
-        // console.log('bsc::syncProductsTobsc::updates', updates);
         const { data: results } = await api.put('seller/bulk-upload', {
           sellerId: 'cf987f7871',
           listings: updates,
         });
         if (results.result === 'Saved!') {
-          console.log('bsc::syncProductsTobsc::', results, updates.length);
+          this.logger.success('', `bsc::syncProductsTobsc::${results.result} ${updates.length}`);
         } else {
           throw new Error(results);
         }
       } else {
-        console.log('bsc::syncProductsTobsc::no updates to make');
+        this.logger.success('', 'bsc::syncProductsTobsc::no updates to make');
       }
     } catch (e) {
-      console.log('bsc::syncProductsTobsc::error', e?.response?.data || e?.data || e);
+      this.logger.error('bsc::syncProductsTobsc::error', e?.response?.data || e?.data || e);
     } finally {
       await this.browser.shutdown();
     }

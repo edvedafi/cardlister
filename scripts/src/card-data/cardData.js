@@ -800,7 +800,6 @@ export async function buildProductFromBSCCard(card, set) {
       size: 'Standard',
       thickness: '20pt',
       bsc: card.id,
-      cardName: getCardNameNew(card, set),
       // printRun: card.printRun,
       // autograph: card.autograph,
     },
@@ -811,6 +810,7 @@ export async function buildProductFromBSCCard(card, set) {
   const titles = await getTitles({ ...product, ...set.metadata, ...product.metadata });
   product.title = titles.title;
   product.description = titles.longTitle;
+  product.metadata.cardName = getCardNameNew(product, set);
 
   const askFor = async (text, propName = text.toLowerCase(), options = {}) =>
     await addCardData(text, product, propName, product, options);

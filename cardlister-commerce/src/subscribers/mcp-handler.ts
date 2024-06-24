@@ -38,6 +38,7 @@ export default async function mcpHandler({
     mcp = await login();
 
     logProgress('Getting Site Counts...');
+    await browser_.url('https://mycardpost.com/edvedafi?tab=shop');
     let siteCount: number;
     const countFiled = await mcp.$('h2.card-count');
     const showingAll = await countFiled.getText();
@@ -164,30 +165,58 @@ export default async function mcpHandler({
     logger?.error('mcpHandler::error: ', error);
     throw error;
   } finally {
-    if (mcp) {
-      await mcp.shutdown();
-    }
+    // if (mcp) {
+    //   await mcp.shutdown();
+    // }
   }
 }
 
+let browser_: WebdriverIO.Browser;
 export const login = async () => {
-  const browser = await remote({
-    capabilities: {
-      browserName: 'chrome',
-      'goog:chromeOptions': {
-        args: ['--no-sandbox', '--disable-dev-shm-usage'],
-      },
-    },
-    baseUrl: 'https://mycardpost.com/',
-    logLevel: 'error',
-  });
-
-  await browser.url('login');
-
-  await browser.$('input[type="email"]').setValue(process.env.MCP_EMAIL);
-  await browser.$('input[type="password"]').setValue(process.env.MCP_PASSWORD);
-  await browser.$('button=Login').click();
-  return browser;
+  const loginToSite = async () => {
+    if (!browser_) {
+      browser_ = await remote({
+        capabilities: {
+          browserName: 'chrome',
+          'goog:chromeOptions': {
+            args: ['--no-sandbox', '--disable-dev-shm-usage'],
+          },
+        },
+        baseUrl: 'https://mycardpost.com/',
+        logLevel: 'error',
+      });
+    }
+    await browser_.url('login');
+    await browser_.$('input[type="email"]').setValue(process.env.MCP_EMAIL);
+    await browser_.$('input[type="password"]').setValue(process.env.MCP_PASSWORD);
+    await browser_.$('button=Login').click();
+  };
+  if (!browser_) {
+    await loginToSite();
+  } else {
+    try {
+      try {
+        const url = await browser_.getUrl();
+        console.log('ur', url);
+        if (url.indexOf('mycardpost.com') === -1) {
+          await browser_.reloadSession();
+          await loginToSite();
+        }
+      } catch (e) {
+        await browser_.reloadSession();
+        await loginToSite();
+      }
+    } catch (e) {
+      try {
+        await browser_.shutdown();
+      } catch (e) {
+        //ignore
+      }
+      browser_ = null;
+      await loginToSite();
+    }
+  }
+  return browser_;
 };
 
 async function tempImage(image: string): Promise<string> {

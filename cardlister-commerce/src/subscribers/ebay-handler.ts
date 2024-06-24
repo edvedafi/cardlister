@@ -39,7 +39,12 @@ export default async function ebayHandler({
 
     const eBay = await loginEbayAPI();
 
-    const offers = await eBay.sell.inventory.getOffers({ sku: productVariant.sku });
+    let offers: any;
+    try {
+      offers = await eBay.sell.inventory.getOffers({ sku: productVariant.sku });
+    } catch (e) {
+      offers = undefined;
+    }
 
     if (offers && offers.offers && offers.offers.length > 0) {
       const offer = offers.offers[0];
@@ -440,41 +445,12 @@ export const loginEbayAPI = async () => {
   eBay.OAuth2.setScope(scopes);
 
   let token = await getRefreshToken();
-  console.log('token', token);
   if (!token) {
     throw new Error('No eBay Token Found');
-    //
-    // const app = express();
-    //
-    // let resolve;
-    // const authCode = new Promise((_resolve) => {
-    //   resolve = _resolve;
-    // });
-    // app.get('/oauth', function(req, res) {
-    //   resolve(req.query.code);
-    //   res.end('');
-    // });
-    // const server = app.listen(3000);
-    //
-    // // console.log(eBay.OAuth2.generateAuthUrl());
-    // await open(eBay.OAuth2.generateAuthUrl());
-    // const code = await authCode;
-    // // console.log('code', code);
-    //
-    // try {
-    //   token = await eBay.OAuth2.getToken(code);
-    //   await writeRefreshToken(token);
-    // } catch (e) {
-    //   console.error(e);
-    //   throw e;
-    // } finally {
-    //   server.close();
-    // }
   }
 
   eBay.OAuth2.setCredentials(token);
 
-  // console.log('Logged in successfully!');
   return eBay;
 };
 

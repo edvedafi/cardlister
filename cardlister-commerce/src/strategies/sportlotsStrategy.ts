@@ -2,6 +2,7 @@ import {
   AbstractBatchJobStrategy,
   BatchJobService,
   CreateBatchJobInput,
+  Logger,
   Product,
   ProductCategory,
   ProductCategoryService,
@@ -19,6 +20,7 @@ type InjectedDependencies = {
   transactionManager: EntityManager;
   productVariantService: ProductVariantService;
   inventoryService: InventoryService;
+  logger: Logger;
 };
 
 class SportlotsStrategy extends AbstractBatchJobStrategy {
@@ -28,6 +30,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
   protected categoryService_: ProductCategoryService;
   protected productVariantService_: ProductVariantService;
   private inventoryModule: IInventoryService;
+  private logger: Logger;
 
   private browser: WebdriverIO.Browser;
 
@@ -36,15 +39,17 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
     __configModule__?: Record<string, unknown> | undefined,
     __moduleDeclaration__?: Record<string, unknown> | undefined,
   ) {
+    let log: Logger | undefined;
     try {
       super(arguments[0]);
+      log = __container__.logger;
+      this.logger = log;
       this.batchJobService_ = __container__.batchJobService || this.batchJobService_;
       this.categoryService_ = __container__.productCategoryService;
       this.productVariantService_ = __container__.productVariantService;
       this.inventoryModule = __container__.inventoryService;
-      // this.inventoryItemService_ = __container__.inventoryItemService;
     } catch (e) {
-      console.log('error', e);
+      log ? log.error('sportlots::constructor::error', e) : console.log('error', e);
     }
   }
 
@@ -85,7 +90,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         });
       });
     } catch (e) {
-      console.log('sportlots::preProcessBatchJob::error', e);
+      this.logger.error('sportlots::preProcessBatchJob::error', e);
     }
   }
 
@@ -108,7 +113,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         });
       });
     } catch (e) {
-      console.log('sportlots::processJob::error', e);
+      this.logger.error('sportlots::processJob::error', e);
     }
   }
 
@@ -153,7 +158,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
       await browser.acceptAlert();
     } catch (e) {
       //TODO Need to handle in a recoverable way
-      console.log('sportlots::removeAllInventory::error', e);
+      this.logger.error('sportlots::removeAllInventory::error', e);
       throw e;
     }
   }
@@ -205,7 +210,6 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         for (const row of rows) {
           const cardNumber = await row.$('td:nth-child(2)').getText();
           if (!isNaN(parseInt(cardNumber))) {
-            console.log('sportlots::Checking Card Number', cardNumber);
             const product = products.find((p) => p.metadata.cardNumber === cardNumber);
             const variant = product?.variants[0]; //TODO This will need to handle multiple variants
             if (variant) {
@@ -215,7 +219,6 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
               ]);
               const quantity = isNaN(quantityFromService) ? 0 : quantityFromService;
 
-              console.log(`sportlots::Setting Inventory for ${variant.sku} to ${quantity}`);
               if (quantity > 0) {
                 await row.$('td:nth-child(1) > input').setValue(quantity);
 
@@ -234,7 +237,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         const banner = await browser.$('h2.message').getText();
         const resultCount = parseInt(banner.replace('  cards added', ''));
         if (resultCount == expectedAdds) {
-          console.log('sportlots::Set Successfully added:', expectedAdds);
+          this.logger.success('', 'sportlots::Set Successfully added:' + expectedAdds);
         } else {
           throw new Error(`sportlots::Failed. Uploaded ${resultCount} cards but expected ${expectedAdds} cards.`);
         }
@@ -250,7 +253,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
 
       await this.browser.pause(10000);
     } catch (e) {
-      console.log('sportlots::setInventory::error', e);
+      this.logger.error('sportlots::setInventory::error', e);
     }
   }
 
@@ -262,7 +265,8 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
 
       await this.setInventory(products, category);
     } catch (e) {
-      console.log('sportlots::syncProductsToSportlots::error', e);
+      this.logger.error('sportlots::syncProductsToSportlots::error', e);
+      this.logger.error('sportlots::syncProductsToSportlots::error', e);
     } finally {
       await this.browser.shutdown();
     }
