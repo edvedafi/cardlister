@@ -9,23 +9,27 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   const batchJobService: BatchJobService = req.scope.resolve('batchJobService');
   const responses: BatchJob[] = [];
 
-  responses.push(
-    await batchJobService.create({
-      type: 'sportlots-sync',
-      context: { category_id: req.body.category },
-      dry_run: false,
-      created_by: req.user.id,
-    }),
-  );
+  if (!req.body.only || req.body.only.includes('sportlots')) {
+    responses.push(
+      await batchJobService.create({
+        type: 'sportlots-sync',
+        context: { category_id: req.body.category },
+        dry_run: false,
+        created_by: req.user.id,
+      }),
+    );
+  }
 
-  responses.push(
-    await batchJobService.create({
-      type: 'bsc-sync',
-      context: { category_id: req.body.category },
-      dry_run: false,
-      created_by: req.user.id,
-    }),
-  );
+  if (!req.body.only || req.body.only.includes('bsc')) {
+    responses.push(
+      await batchJobService.create({
+        type: 'bsc-sync',
+        context: { category_id: req.body.category },
+        dry_run: false,
+        created_by: req.user.id,
+      }),
+    );
+  }
 
   res.json({ status: 'ok', category: req.body.category, job: responses });
 }

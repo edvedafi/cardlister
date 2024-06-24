@@ -12,6 +12,7 @@ import {
   getProductVariant,
   getRegion,
   updateInventory,
+  updatePrices,
   updateProduct,
   updateProductVariant,
 } from '../listing-sites/medusa.js';
@@ -452,6 +453,13 @@ export async function saveListing(productVariant, images, quantity) {
   return listing;
 }
 
+export async function saveBulk(product, productVariant, quantity) {
+  const listing = await getInventory(productVariant);
+  await updatePrices(product.id, productVariant.id, await getCommonPricing());
+  await updateInventory(listing, quantity);
+  return listing;
+}
+
 export async function getCardData(setData, imageDefaults) {
   const product = await matchCard(setData.products, imageDefaults);
   let productVariantId;
@@ -469,11 +477,11 @@ export async function getCardData(setData, imageDefaults) {
 
   const isCommon = await ask('Use common card pricing', true);
   if (isCommon) {
-    productVariant.prices = await getCommonPricing();
+    productVariant.prices = await getBasePricing();
   } else {
     productVariant.prices = [
       { amount: await ask('ebay price', 99), region_id: await getRegion('ebay') },
-      { amount: await ask('MCP Price', 99), region_id: await getRegion('MCP') },
+      { amount: await ask('MCP Price', 100), region_id: await getRegion('MCP') },
       { amount: await ask('BSC Price', 25), region_id: await getRegion('BSC') },
       { amount: await ask('SportLots Price', 18), region_id: await getRegion('SportLots') },
     ];
@@ -484,13 +492,25 @@ export async function getCardData(setData, imageDefaults) {
   return { productVariant, quantity };
 }
 
+let basePricing;
+
+export async function getBasePricing() {
+  if (!basePricing) {
+    basePricing = [
+      { amount: 99, region_id: await getRegion('ebay') },
+      { amount: 100, region_id: await getRegion('MCP') },
+      { amount: 25, region_id: await getRegion('BSC') },
+      { amount: 18, region_id: await getRegion('SportLots') },
+    ];
+  }
+  return basePricing;
+}
+
 let commonPricing;
 
 export async function getCommonPricing() {
   if (!commonPricing) {
     commonPricing = [
-      { amount: 99, region_id: await getRegion('ebay') },
-      { amount: 99, region_id: await getRegion('MCP') },
       { amount: 25, region_id: await getRegion('BSC') },
       { amount: 18, region_id: await getRegion('SportLots') },
     ];

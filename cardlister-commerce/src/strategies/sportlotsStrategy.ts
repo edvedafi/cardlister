@@ -8,7 +8,6 @@ import {
   ProductVariantService,
 } from '@medusajs/medusa';
 import { EntityManager } from 'typeorm';
-import { Locator, until, WebDriver } from 'selenium-webdriver';
 import { remote } from 'webdriverio';
 import { IInventoryService } from '@medusajs/types';
 import { InventoryService } from '@medusajs/inventory/dist/services';
@@ -30,9 +29,6 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
   protected productVariantService_: ProductVariantService;
   private inventoryModule: IInventoryService;
 
-  protected _driver: WebDriver;
-  protected clickSubmit: (text?: string) => Promise<void>;
-  protected click: (locator: Locator | Locator[] | string) => Promise<void>;
   private browser: WebdriverIO.Browser;
 
   protected constructor(
@@ -137,24 +133,32 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
 
   async removeAllInventory(category: ProductCategory): Promise<void> {
     try {
-      await this.login();
-      await this._driver.get(
-        `https://www.sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${category.metadata.sportlots}`,
+      const browser = await this.login();
+      await browser.url(`https://www.sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${category.metadata.sportlots}`);
+      await browser.$('input[value="Delete All Set Inventory"').click();
+      await browser.waitUntil(
+        async () => {
+          try {
+            await browser.getAlertText();
+            return true;
+          } catch (e) {
+            return false;
+          }
+        },
+        {
+          timeout: 5000, // Adjust the timeout as needed
+          timeoutMsg: 'Alert did not appear within the timeout',
+        },
       );
-      await this.clickSubmit('Delete All Set Inventory');
-      await this._driver.wait(until.alertIsPresent());
-      const alert = await this._driver.switchTo().alert();
-      await alert.accept();
-      await this._driver.switchTo().defaultContent();
-      await this._driver.get(
-        `https://www.sportlots.com/inven/dealbin/setdetail.tpl?Set_id=${category.metadata.sportlots}`,
-      );
+      await browser.acceptAlert();
     } catch (e) {
+      //TODO Need to handle in a recoverable way
       console.log('sportlots::removeAllInventory::error', e);
+      throw e;
     }
   }
 
-  async loadAddInventoryScreen(year: string, brand: string, sport: string): Promise<void> {
+  async loadAddInventoryScreen(year: string, brand: string, sport: string, bin: string): Promise<void> {
     const browser = await this.login();
     await browser.url('https://www.sportlots.com/inven/dealbin/newinven.tpl');
     await browser.$('select[name="yr"]').selectByAttribute('value', year);
@@ -167,6 +171,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         basketball: 'BK',
       }[sport.toLowerCase()],
     );
+    await browser.$('input[name="dbin"').setValue(bin);
     await browser.$('aria/Default to new pricing').click();
     await browser.$('input[value="Next"').click();
   }
@@ -186,6 +191,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         category.metadata.year as string,
         category.metadata.brand as string,
         category.metadata.sport as string,
+        category.metadata.bin as string,
       );
 
       await this.selectSet(category.metadata.sportlots as string);

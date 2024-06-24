@@ -25,15 +25,12 @@ export default async function inventoryUpdateHandler({
 
     // @ts-ignore
     const [levels, count] = await inventoryService.listInventoryLevels({ id });
-    // console.log('Inventory Level:', levels);
     const inventoryItemId = levels[0].inventory_item_id;
     const quantity = await inventoryService.retrieveAvailableQuantity(inventoryItemId, [levels[0].location_id]);
 
     const variantInventory = await productVariantInventoryService.listByItem([inventoryItemId]);
     const associatedVariantIds = variantInventory.map((vi: ProductVariantInventoryItem) => vi.variant_id);
-    // console.log('Variant IDs:', associatedVariantIds);
     const pv = await productVariantService.retrieve(associatedVariantIds[0], { relations: ['prices'] });
-    // console.log('PV:', pv);
 
     const regions = await regionService.list();
     const ebayRegion = regions.find((r) => r.name === 'ebay');

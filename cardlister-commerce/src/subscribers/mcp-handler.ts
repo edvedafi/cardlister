@@ -9,7 +9,6 @@ import {
 import { remote } from 'webdriverio';
 import axios from 'axios';
 import * as fs from 'node:fs';
-import logger from '@medusajs/medusa-cli/dist/reporter';
 
 export default async function mcpHandler({
   data,
@@ -18,15 +17,16 @@ export default async function mcpHandler({
   pluginOptions,
 }: SubscriberArgs<Record<string, any>>) {
   let mcp: WebdriverIO.Browser;
+  let logger: Logger;
   try {
+    logger = container.resolve<Logger>('logger');
     const { variantId, price, quantity } = data;
-
-    const productVariantService: ProductVariantService = container.resolve('productVariantService');
-    const productService: ProductService = container.resolve('productService');
-    const logger: Logger = container.resolve<Logger>('logger');
     const activityId = logger.activity(`MCP Listing Update for ${variantId}: ${quantity}`);
     const logProgress = (text: string) =>
       logger.progress(activityId, `MCP Listing Update for ${product.title} [${productVariant.sku}] :: ${text}`);
+
+    const productVariantService: ProductVariantService = container.resolve('productVariantService');
+    const productService: ProductService = container.resolve('productService');
 
     const productVariant = await productVariantService.retrieve(variantId);
     const product: Product = await productService.retrieve(productVariant.product_id, {
@@ -36,26 +36,6 @@ export default async function mcpHandler({
 
     logProgress(`Logging into MCP...`);
     mcp = await login();
-
-    // const mcpInventoryItem = convertCardToInventory(product, productVariant, category, quantity);
-    // // console.log('mcp::mcpInventoryItem: ');
-    // // console.log(JSON.stringify(mcpInventoryItem, null, 2));
-    // // @ts-ignore
-    // const response = await mcp.sell.inventory.createOrReplaceInventoryItem(productVariant.sku, mcpInventoryItem);
-    // // console.log('mcp::response: ', response);
-    // const offer = createOfferForCard(product, productVariant, category, quantity, price);
-    // let offerId: string;
-    // try {
-    //   const response = await mcp.sell.inventory.createOffer(offer);
-    //   offerId = response.offerId;
-    // } catch (e) {
-    //   const error = e.meta?.res?.data.errors[0];
-    //   if (error?.errorId === 25002) {
-    //     offerId = error.parameters[0].value;
-    //     await mcp.sell.inventory.updateOffer(offerId, offer);
-    //   }
-    // }
-    // await mcp.sell.inventory.publishOffer(offerId);
 
     logProgress('Getting Site Counts...');
     let siteCount: number;
@@ -181,7 +161,7 @@ export default async function mcpHandler({
       }
     }
   } catch (error) {
-    logger.error('mcpHandler::error: ', error);
+    logger?.error('mcpHandler::error: ', error);
     throw error;
   } finally {
     if (mcp) {

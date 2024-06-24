@@ -1,7 +1,6 @@
 import Medusa from '@medusajs/medusa-js';
 
 const medusa = new Medusa({
-  // publishableApiKey: process.env.MEDUSA_API_KEY,
   apiKey: process.env.MEDUSA_ADMIN_KEY,
 });
 
@@ -92,9 +91,16 @@ export async function updateProduct(product) {
 }
 
 export async function updateProductVariant(productVariant) {
-  // console.log(productVariant);
   const response = await medusa.admin.products.updateVariant(productVariant.product.id, productVariant.id, {
     prices: productVariant.prices,
+  });
+  return response.product;
+}
+
+export async function updatePrices(productId, variantId, prices) {
+  console.log(prices);
+  const response = await medusa.admin.products.updateVariant(productId, variantId, {
+    prices: prices,
   });
   return response.product;
 }
@@ -102,7 +108,6 @@ export async function updateProductVariant(productVariant) {
 export async function getProducts(category) {
   const response = await medusa.admin.products.list({
     category_id: [category],
-    fields: 'metadata',
   });
   return response.products;
 }
@@ -167,9 +172,12 @@ export async function getRegion(regionName) {
 }
 
 export async function startSync(categoryId) {
-  const response = medusa.admin.batchJobs.create({
-    type: 'publish-products',
-    context: { categoryId },
-    dry_run: true,
+  return await medusa.admin.custom.post('/sync', {
+    category: categoryId,
   });
+  // const response = medusa.admin.batchJobs.create({
+  //   type: 'publish-products',
+  //   context: { categoryId },
+  //   dry_run: true,
+  // });
 }

@@ -243,11 +243,11 @@ class BscStrategy extends AbstractBatchJobStrategy {
             // TODO Fix images
             if (product.images) {
               const images = product.images.map((image) => image.url).sort();
-              if (images.length > 0 && listing.sellerImgFront.indexOf('Default') > -1) {
+              if (images.length > 0 && (!listing.sellerImgFront || listing.sellerImgFront.indexOf('Default') > -1)) {
                 console.info('bsc::Uploading Front Image');
                 newListing.sellerImgFront = await this.postImage(`${images[0]}`);
               }
-              if (images.length > 1 && listing.sellerImgBack.indexOf('Default') > -1) {
+              if (images.length > 1 && (!listing.sellerImgBack || listing.sellerImgBack.indexOf('Default') > -1)) {
                 console.info('bsc::Uploading Back Image');
                 newListing.sellerImgBack = await this.postImage(`${images[1]}`);
               }

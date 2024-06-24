@@ -1,12 +1,13 @@
 import { useSpinners } from './utils/spinners.js';
 import chalk from 'chalk';
 import Queue from 'queue';
-import { getCardData, saveListing } from './card-data/cardData.js';
+import { getCardData, saveBulk, saveListing } from './card-data/cardData.js';
 import imageRecognition from './card-data/imageRecognition.js';
 import terminalImage from 'terminal-image';
 import { prepareImageFile } from './image-processing/imageProcessor.js';
 import { processImageFile } from './listing-sites/firebase.js';
-import { getProducts } from './listing-sites/medusa.js';
+import { getProducts, startSync } from './listing-sites/medusa.js';
+import { ask } from './utils/ask.js';
 
 const { showSpinner, log } = useSpinners('list-set', chalk.cyan);
 
@@ -88,6 +89,30 @@ const processUploads = async (productVariant, imageInfo, quantity) => {
   return productVariant;
 };
 
+const processBulk = async (setData) => {
+  const { update, finish, error } = showSpinner('bulk', `Processing Bulk Listings`);
+  log('Adding Bulk Listings');
+  try {
+    //TODD needs to handle variations
+    log(listings);
+    const listedProducts = listings.map((listing) => listing.product_id);
+    for (let i = 0; i < setData.products.length; i++) {
+      const product = setData.products[i];
+      log(product);
+      if (!listedProducts.includes(product.id)) {
+        const createListing = await ask(product.title, 0);
+        if (createListing > 0) {
+          await saveBulk(product, product.variants[0], createListing);
+        }
+      }
+    }
+    finish();
+  } catch (e) {
+    error(e);
+    throw e;
+  }
+};
+
 export async function processSet(setData, files) {
   const {
     update: updateSpinner,
@@ -166,10 +191,10 @@ export async function processSet(setData, files) {
     if (hasQueueError) {
       errorSpinner(hasQueueError);
     } else {
-      updateSpinner(`Writing output files`);
-
-      // const bulk = await collectBulkListings(savedAnswers, setData);
-      // await writeOutputFiles(allCards, bulk);
+      updateSpinner(`Process Bulk`);
+      await processBulk(setData);
+      updateSpinner(`Kickoff Set Processing`);
+      await startSync(setData.category.id);
     }
     finishSpinner('Completed Set Processing');
   } catch (error) {

@@ -1,4 +1,5 @@
 import {
+  Logger,
   Product,
   ProductCategory,
   ProductService,
@@ -13,53 +14,83 @@ import { isNo, isYes, titleCase } from '../utils/data';
 import { EbayOfferDetailsWithKeys } from 'ebay-api/lib/types';
 
 export default async function ebayHandler({
-                                            data, eventName, container, pluginOptions,
-                                          }: SubscriberArgs<Record<string, any>>) {
+  data,
+  eventName,
+  container,
+  pluginOptions,
+}: SubscriberArgs<Record<string, any>>) {
+  let logger: Logger;
   try {
-    console.log('ebay::Update Handler: ', data);
-
+    logger = container.resolve<Logger>('logger');
     const { variantId, price, quantity } = data;
+    const activityId = logger.activity(`eBay Listing Update for ${variantId}: ${quantity}`);
+    const logProgress = (text: string) =>
+      logger.progress(activityId, `eBay Listing Update for ${product.title} [${productVariant.sku}] :: ${text}`);
 
     const productVariantService: ProductVariantService = container.resolve('productVariantService');
     const productService: ProductService = container.resolve('productService');
+    logger = container.resolve<Logger>('logger');
 
     const productVariant = await productVariantService.retrieve(variantId);
-    const product: Product = await productService.retrieve(productVariant.product_id, { relations: ['categories', 'images'] });
+    const product: Product = await productService.retrieve(productVariant.product_id, {
+      relations: ['categories', 'images'],
+    });
     const category = product.categories[0];
-
-    // console.log('ebay::productVariant: ', productVariant);
-    // console.log('ebay::product: ', product);
-    // console.log('ebay::category: ', category);
 
     const eBay = await loginEbayAPI();
 
-    const ebayInventoryItem = convertCardToInventory(product, productVariant, category, quantity);
-    // console.log('ebay::ebayInventoryItem: ');
-    // console.log(JSON.stringify(ebayInventoryItem, null, 2));
-    // @ts-ignore
-    const response = await eBay.sell.inventory.createOrReplaceInventoryItem(productVariant.sku, ebayInventoryItem);
-    // console.log('ebay::response: ', response);
-    const offer = createOfferForCard(product, productVariant, category, quantity, price);
-    let offerId: string;
-    try {
-      const response = await eBay.sell.inventory.createOffer(offer);
-      offerId = response.offerId;
-    } catch (e) {
-      const error = e.meta?.res?.data.errors[0];
-      if (error?.errorId === 25002) {
-        offerId = error.parameters[0].value;
-        await eBay.sell.inventory.updateOffer(offerId, offer);
+    const offers = await eBay.sell.inventory.getOffers({ sku: productVariant.sku });
+
+    if (offers && offers.offers && offers.offers.length > 0) {
+      const offer = offers.offers[0];
+      if (quantity === offer.availableQuantity) {
+        logger.success(activityId, `ebay::No Updates needed for:: ${product.title}`);
+      } else if (quantity === 0) {
+        try {
+          logProgress('Deleting offer...');
+          await eBay.sell.inventory.deleteOffer(offer.offerId);
+          logger.success(activityId, `ebay::Success:: ${product.title}`);
+        } catch (e) {
+          //TODO Need to log this in a handleable way
+          logger.failure(activityId, `ebayHandler::deleteOffer::error ${e.meta?.Errors?.ErrorCode || e.message}`);
+        }
+      } else {
+        logProgress('Updating quantity...');
+        await eBay.sell.inventory.updateOffer(offer.offerId, { ...offer, availableQuantity: quantity });
+        logger.success(activityId, `ebay::Success:: ${product.title}`);
       }
+    } else if (quantity > 0) {
+      logProgress('Creating new item...');
+      const ebayInventoryItem = convertCardToInventory(product, productVariant, category, quantity);
+      // @ts-ignore
+      await eBay.sell.inventory.createOrReplaceInventoryItem(productVariant.sku, ebayInventoryItem);
+      const offer = createOfferForCard(product, productVariant, category, quantity, price);
+      let offerId: string;
+      try {
+        const response = await eBay.sell.inventory.createOffer(offer);
+        offerId = response.offerId;
+      } catch (e) {
+        const error = e.meta?.res?.data.errors[0];
+        if (error?.errorId === 25002) {
+          offerId = error.parameters[0].value;
+          await eBay.sell.inventory.updateOffer(offerId, offer);
+        }
+      }
+      await eBay.sell.inventory.publishOffer(offerId);
+      logger.success(activityId, `ebay::Success:: ${product.title}`);
     }
-    await eBay.sell.inventory.publishOffer(offerId);
-    console.log('ebay::Listing Complete: ', product.title);
   } catch (error) {
     console.error('ebayHandler::error: ', error);
     throw error;
   }
 }
 
-const convertCardToInventory = (card: Product, variant: ProductVariant, category: ProductCategory, quantity: number) => ({
+const convertCardToInventory = (
+  card: Product,
+  variant: ProductVariant,
+  category: ProductCategory,
+  quantity: number,
+) => ({
   availability: {
     // pickupAtLocationAvailability: [
     //   {
@@ -93,25 +124,25 @@ const convertCardToInventory = (card: Product, variant: ProductVariant, category
   // need to support graded as well, this is only ungraded
   conditionDescriptors: card.metadata.grade
     ? [
-      {
-        name: '27501',
-        values: [graderIds[card.metadata.grader as string] || 2750123],
-      },
-      {
-        name: '27502',
-        values: [gradeIds[card.metadata.grade as string]],
-      },
-      {
-        name: '27503',
-        values: [card.metadata.certNumber],
-      },
-    ]
+        {
+          name: '27501',
+          values: [graderIds[card.metadata.grader as string] || 2750123],
+        },
+        {
+          name: '27502',
+          values: [gradeIds[card.metadata.grade as string]],
+        },
+        {
+          name: '27503',
+          values: [card.metadata.certNumber],
+        },
+      ]
     : [
-      {
-        name: '40001',
-        values: ['400011'],
-      },
-    ],
+        {
+          name: '40001',
+          values: ['400011'],
+        },
+      ],
   packageWeightAndSize: {
     dimensions: {
       height: card.height,
@@ -134,7 +165,9 @@ const convertCardToInventory = (card: Product, variant: ProductVariant, category
     description: `${card.description}<br><br>${defaultValues.shippingInfo}`,
     // ean: ['string'],
     // epid: 'string',
-    imageUrls: card.images.map(image => `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${image.url}?alt=media`),
+    imageUrls: card.images.map(
+      (image) => `https://firebasestorage.googleapis.com/v0/b/hofdb-2038e.appspot.com/o/${image.url}?alt=media`,
+    ),
     // isbn: ['string'],
     mpn: category.metadata.setName,
     // upc: ['string'],
@@ -172,7 +205,10 @@ const convertCardToInventory = (card: Product, variant: ProductVariant, category
       'Certification Number': displayOrNA(card.metadata.certNumber),
       'Autograph Authentication Number': displayOrNA(card.metadata.certNumber),
       Features: getFeatures(card, category),
-      'Parallel/Variety': [category.metadata.parallel || (category.metadata.insert && !isNo(category.metadata.insert) ? 'Base Insert' : 'Base Set')],
+      'Parallel/Variety': [
+        category.metadata.parallel ||
+          (category.metadata.insert && !isNo(category.metadata.insert) ? 'Base Insert' : 'Base Set'),
+      ],
       Autographed: booleanText(card.metadata.autographed),
       'Card Name': [getCardName(card, category)],
       'Card Number': [card.metadata.cardNumber],
@@ -191,7 +227,13 @@ const convertCardToInventory = (card: Product, variant: ProductVariant, category
   },
 });
 
-const createOfferForCard = (card: Product, variant: ProductVariant, category: ProductCategory, quantity: number, price: number): EbayOfferDetailsWithKeys => ({
+const createOfferForCard = (
+  card: Product,
+  variant: ProductVariant,
+  category: ProductCategory,
+  quantity: number,
+  price: number,
+): EbayOfferDetailsWithKeys => ({
   availableQuantity: quantity,
   categoryId: '261328',
   // "charity": {
@@ -322,12 +364,14 @@ const createOfferForCard = (card: Product, variant: ProductVariant, category: Pr
   // },
 });
 
-export const displayYear = (year: string): string => year.indexOf('-') > -1 ? year.split('-')[0] : year;
+export const displayYear = (year: string): string => (year.indexOf('-') > -1 ? year.split('-')[0] : year);
 
-export const getThickness = (thickness: string): string[] => [thickness.toLowerCase().indexOf('pt') < 0 ? `${thickness} Pt.` : thickness];
+export const getThickness = (thickness: string): string[] => [
+  thickness.toLowerCase().indexOf('pt') < 0 ? `${thickness} Pt.` : thickness,
+];
 
 export const getFeatures = (card: Product, category: ProductCategory) => {
-  let features: string[] = card.metadata.features as string[] || [];
+  let features: string[] = (card.metadata.features as string[]) || [];
   if (!features || (features.length === 1 && isNo(features[0])) || features[0] === '') {
     features = [];
   }
@@ -344,7 +388,7 @@ export const getFeatures = (card: Product, category: ProductCategory) => {
     features.push('Insert');
   }
 
-  if (card.metadata.printRun && card.metadata.printRun as number > 0) {
+  if (card.metadata.printRun && (card.metadata.printRun as number) > 0) {
     features.push('Serial Numbered');
   }
 
@@ -475,7 +519,6 @@ const defaultValues = {
   packageType: 'Letter',
 };
 
-
 const scopes = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
@@ -556,7 +599,6 @@ export const config: SubscriberConfig = {
 //TODO: This is all moved to product
 
 function getCardName(card: Product, category: ProductCategory): string {
-
   const add = (info: any, modifier?: any) => {
     if (info === undefined || info === null || info === '' || isNo(info)) {
       return '';
@@ -573,13 +615,18 @@ function getCardName(card: Product, category: ProductCategory): string {
   let insert = add(category.metadata.insert);
   let parallel = add(category.metadata.parallel);
   if (cardName.length > maxCardNameLength) {
-    cardName = `${category.metadata.year} ${category.metadata.brand} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(
-      ' | ',
-      ' ',
-    );
+    cardName =
+      `${category.metadata.year} ${category.metadata.brand} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(
+        ' | ',
+        ' ',
+      );
   }
   if (cardName.length > maxCardNameLength) {
-    cardName = `${category.metadata.year} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(' | ', ' ');
+    cardName =
+      `${category.metadata.year} ${category.metadata.setName}${insert}${parallel} ${card.metadata.player}`.replace(
+        ' | ',
+        ' ',
+      );
   }
   if (cardName.length > maxCardNameLength) {
     cardName = `${category.metadata.year} ${category.metadata.setName}${insert}${parallel}`;
