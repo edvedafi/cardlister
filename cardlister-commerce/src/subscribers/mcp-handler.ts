@@ -179,7 +179,7 @@ export const login = async () => {
         capabilities: {
           browserName: 'chrome',
           'goog:chromeOptions': {
-            args: ['--no-sandbox', '--disable-dev-shm-usage'],
+            args: ['headless', 'disable-gpu', '--no-sandbox', '--disable-dev-shm-usage'],
           },
         },
         baseUrl: 'https://mycardpost.com/',

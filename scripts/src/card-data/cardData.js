@@ -82,8 +82,8 @@ const saveBulkAnswers = (cardData) => {
   });
 };
 
-export const getSetData = async () => {
-  const isSet = await ask('Is this a complete set?', saveData.setData?.isSet || 'Y');
+export const getSetData = async (allSets = false) => {
+  const isSet = allSets || (await ask('Is this a complete set?', saveData.setData?.isSet || 'Y'));
 
   if (isSet && !isNo(isSet)) {
     //check to see if isSet contains numeric data

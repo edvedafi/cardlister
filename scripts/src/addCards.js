@@ -36,7 +36,7 @@ try {
   update('Initializing Answers');
   const savedAnswers = await initializeAnswers(input_directory);
   update('Gathering Set Data');
-  const setData = await getSetData();
+  const setData = await getSetData(true);
 
   //gather the list of files that we will process
   let files = [];

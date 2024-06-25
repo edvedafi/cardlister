@@ -123,7 +123,7 @@ class SportlotsStrategy extends AbstractBatchJobStrategy {
         capabilities: {
           browserName: 'chrome',
           'goog:chromeOptions': {
-            args: process.env.CI ? ['headless', 'disable-gpu'] : [],
+            args: ['headless', 'disable-gpu'],
           },
         },
       });

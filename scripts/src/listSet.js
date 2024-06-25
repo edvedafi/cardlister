@@ -95,14 +95,16 @@ const processBulk = async (setData) => {
   try {
     //TODD needs to handle variations
     log(listings);
-    const listedProducts = listings.map((listing) => listing.product_id);
+    const listedProducts = listings.map((listing) => listing.id);
     for (let i = 0; i < setData.products.length; i++) {
       const product = setData.products[i];
-      log(product);
-      if (!listedProducts.includes(product.id)) {
-        const createListing = await ask(product.title, 0);
-        if (createListing > 0) {
-          await saveBulk(product, product.variants[0], createListing);
+      for (let j = 0; j < product.variants.length; j++) {
+        const variant = product.variants[j];
+        if (!listedProducts.includes(variant.id)) {
+          const createListing = await ask(product.title, 0);
+          if (createListing > 0) {
+            await saveBulk(product, variant, createListing);
+          }
         }
       }
     }

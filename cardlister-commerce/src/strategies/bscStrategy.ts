@@ -120,58 +120,62 @@ class BscStrategy extends AbstractBatchJobStrategy {
   }
 
   private _api: AxiosInstance;
-  private browser: WebdriverIO.Browser;
 
   async login() {
     if (!this._api) {
-      this.browser = await remote({
+      const browser = await remote({
         capabilities: {
           browserName: 'chrome',
           'goog:chromeOptions': {
-            args: process.env.CI ? ['headless', 'disable-gpu'] : [],
+            args: ['headless', 'disable-gpu', '--window-size=1200,2000'],
           },
         },
+        logLevel: 'error',
       });
 
-      await this.browser.url('https://www.buysportscards.com');
-      const signInButton = await this.browser.$('.=Sign In');
-      await signInButton.waitForClickable({ timeout: 5000 });
-      await signInButton.click();
+      try {
+        await browser.url('https://www.buysportscards.com');
+        const signInButton = await browser.$('.=Sign In');
+        await signInButton.waitForClickable({ timeout: 10000 });
+        await signInButton.click();
 
-      const emailInput = await this.browser.$('#signInName');
-      await emailInput.waitForExist({ timeout: 5000 });
-      await emailInput.setValue(process.env.BSC_EMAIL);
-      await this.browser.$('#password').setValue(process.env.BSC_PASSWORD);
+        const emailInput = await browser.$('#signInName');
+        await emailInput.waitForExist({ timeout: 5000 });
+        await emailInput.setValue(process.env.BSC_EMAIL);
+        await browser.$('#password').setValue(process.env.BSC_PASSWORD);
 
-      await this.browser.$('#next').click();
+        await browser.$('#next').click();
 
-      await this.browser.$('.=welcome back,').waitForExist({ timeout: 10000 });
+        await browser.$('.=welcome back,').waitForExist({ timeout: 10000 });
 
-      const reduxAsString: string = await this.browser.execute(
-        'return Object.values(localStorage).filter((value) => value.includes("secret")).find(value=>value.includes("Bearer"));',
-      );
+        const reduxAsString: string = await browser.execute(
+          'return Object.values(localStorage).filter((value) => value.includes("secret")).find(value=>value.includes("Bearer"));',
+        );
+        const redux = JSON.parse(reduxAsString);
 
-      const redux = JSON.parse(reduxAsString);
-
-      this._api = axios.create({
-        baseURL: 'https://api-prod.buysportscards.com/',
-        headers: {
-          accept: 'application/json, text/plain, */*',
-          'accept-language': 'en-US,en;q=0.9',
-          assumedrole: 'sellers',
-          'content-type': 'application/json',
-          origin: 'https://www.buysportscards.com',
-          referer: 'https://www.buysportscards.com/',
-          'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': 'macOS',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-site',
-          authority: 'api-prod.buysportscards.com',
-          authorization: `Bearer ${redux.secret.trim()}`,
-        },
-      });
+        this._api = axios.create({
+          baseURL: 'https://api-prod.buysportscards.com/',
+          headers: {
+            accept: 'application/json, text/plain, */*',
+            'accept-language': 'en-US,en;q=0.9',
+            assumedrole: 'sellers',
+            'content-type': 'application/json',
+            origin: 'https://www.buysportscards.com',
+            referer: 'https://www.buysportscards.com/',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': 'macOS',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-site',
+            authority: 'api-prod.buysportscards.com',
+            authorization: `Bearer ${redux.secret.trim()}`,
+          },
+        });
+      } finally {
+        await browser.saveScreenshot('.error.png');
+        await browser.shutdown();
+      }
 
       axiosRetry(this._api, { retries: 5, retryDelay: axiosRetry.exponentialDelay });
     }
@@ -207,6 +211,7 @@ class BscStrategy extends AbstractBatchJobStrategy {
   }
 
   async syncProductsToBSC(products: Product[], category: ProductCategory): Promise<void> {
+    const activityId = this.logger.activity('bsc::syncProductsTobsc');
     try {
       const api = await this.login();
 
@@ -227,14 +232,7 @@ class BscStrategy extends AbstractBatchJobStrategy {
           const quantity = await getAvailableQuantity(variant.sku, this.inventoryModule); //TODO assumes no variations exist
 
           if (quantity !== listing.availableQuantity || (listing.sellerSku && listing.sellerSku !== variant.sku)) {
-            console.info(
-              'bsc::adding card ',
-              listing.card.cardNo,
-              quantity,
-              listing.availableQuantity,
-              variant.sku,
-              listing.sellerSku,
-            );
+            this.logger.progress(activityId, `bsc::Adding::${variant.sku}`);
             let newListing: any = {
               ...listing,
               availableQuantity: quantity,
@@ -246,11 +244,11 @@ class BscStrategy extends AbstractBatchJobStrategy {
             if (product.images) {
               const images = product.images.map((image) => image.url).sort();
               if (images.length > 0 && (!listing.sellerImgFront || listing.sellerImgFront.indexOf('Default') > -1)) {
-                console.info('bsc::Uploading Front Image');
+                this.logger.progress(activityId, `bsc::Adding::${variant.sku}::Front Image`);
                 newListing.sellerImgFront = await this.postImage(`${images[0]}`);
               }
               if (images.length > 1 && (!listing.sellerImgBack || listing.sellerImgBack.indexOf('Default') > -1)) {
-                console.info('bsc::Uploading Back Image');
+                this.logger.progress(activityId, `bsc::Adding::${variant.sku}::Back Image`);
                 newListing.sellerImgBack = await this.postImage(`${images[1]}`);
               }
             }
@@ -267,17 +265,16 @@ class BscStrategy extends AbstractBatchJobStrategy {
           listings: updates,
         });
         if (results.result === 'Saved!') {
-          this.logger.success('', `bsc::syncProductsTobsc::${results.result} ${updates.length}`);
+          this.logger.success(activityId, `bsc::syncProductsTobsc::${results.result} ${updates.length}`);
         } else {
           throw new Error(results);
         }
       } else {
-        this.logger.success('', 'bsc::syncProductsTobsc::no updates to make');
+        this.logger.success(activityId, 'bsc::syncProductsTobsc::no updates to make');
       }
     } catch (e) {
       this.logger.error('bsc::syncProductsTobsc::error', e?.response?.data || e?.data || e);
-    } finally {
-      await this.browser.shutdown();
+      this.logger.failure(activityId, 'bsc::syncProductsTobsc::error');
     }
   }
 }
